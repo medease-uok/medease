@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Auto-assign PR author if unassigned
-        if: github.event.pull_request.assignees[0] == null
         uses: actions/github-script@v7
+        if: github.event.pull_request.assignees == null || toJSON(github.event.pull_request.assignees) == '[]'
         with:
           script: |
             await github.rest.issues.addAssignees({
