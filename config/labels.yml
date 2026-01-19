@@ -39,26 +39,22 @@
   color: 5319e7
   description: Build system changes
 
-# Size labels
-- name: size/XS
+# Review time labels
+- name: review: 5min
   color: 3cbf00
-  description: Extra small PR (< 10 lines)
+  description: Quick review (< 100 lines)
 
-- name: size/S
+- name: review: 15min
   color: 5d9801
-  description: Small PR (10-49 lines)
+  description: Short review (100-499 lines)
 
-- name: size/M
+- name: review: 30min
   color: d4c5f9
-  description: Medium PR (50-199 lines)
+  description: Medium review (500-1499 lines)
 
-- name: size/L
+- name: review: 1hr
   color: f9a825
-  description: Large PR (200-499 lines)
-
-- name: size/XL
-  color: dd0b0b
-  description: Extra large PR (500+ lines)
+  description: Long review (1500+ lines)
 
 # Component labels
 - name: frontend
