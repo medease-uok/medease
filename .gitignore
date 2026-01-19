@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Build directories
+target/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Additional common ignores
+dist/
+*.swp
+*.swo
+*~
+.cache/
+coverage/
+*.pid
+*.seed
+*.pid.lock
