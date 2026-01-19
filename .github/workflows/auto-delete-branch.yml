@@ -1,16 +1,17 @@
-name: Auto Delete Branch
+name: 🗑️ Cleanup Merged Branches
 
 on:
   pull_request:
     types: [closed]
 
 jobs:
-  delete-branch:
+  cleanup:
+    name: Delete merged branch
     runs-on: ubuntu-latest
     if: github.event.pull_request.merged == true
 
     steps:
-      - name: Delete merged branch
+      - name: Remove branch after merge
         uses: actions/github-script@v7
         with:
           script: |

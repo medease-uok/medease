@@ -1,20 +1,31 @@
-name: PR Validation
+name: ✅ Validate Pull Request
 
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
 
+permissions:
+  pull-requests: write
+
 jobs:
-  validate-pr:
+  validate:
+    name: Check PR requirements
     runs-on: ubuntu-latest
     steps:
-      - name: Check PR has assignee
+      - name: 👤 Auto-assign PR author if unassigned
         if: github.event.pull_request.assignees[0] == null
-        run: |
-          echo "❌ PR must have at least one assignee"
-          exit 1
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              assignees: [context.payload.pull_request.user.login]
+            });
+            console.log('✅ Auto-assigned PR to author: ' + context.payload.pull_request.user.login);
 
-      - name: Check PR title format
+      - name: 📝 Validate PR title format
         uses: actions/github-script@v7
         with:
           script: |
@@ -29,7 +40,7 @@ jobs:
               console.log('✅ PR title format is valid');
             }
 
-      - name: Check PR links to issue
+      - name: 🔗 Verify issue linkage
         uses: actions/github-script@v7
         with:
           script: |
