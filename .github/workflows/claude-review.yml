@@ -1,4 +1,4 @@
-name: Claude PR Review
+name: AI Code Review (Claude)
 
 on:
   issue_comment:
@@ -9,16 +9,17 @@ permissions:
   pull-requests: write
 
 jobs:
-  review:
+  ai-review:
+    name: Generate Claude code review
     runs-on: ubuntu-latest
     if: github.event.issue.pull_request && contains(github.event.comment.body, 'claude-review')
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get PR info
+      - name: Fetch PR information
         id: pr_info
         uses: actions/github-script@v7
         with:
@@ -41,7 +42,7 @@ jobs:
           git fetch origin ${{ fromJSON(steps.pr_info.outputs.result).head }}
           git checkout ${{ fromJSON(steps.pr_info.outputs.result).head }}
 
-      - name: Get PR diff
+      - name: Generate code diff
         id: diff
         run: |
           git fetch origin ${{ fromJSON(steps.pr_info.outputs.result).base }}
@@ -50,7 +51,7 @@ jobs:
           echo "$DIFF" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Claude Code Review
+      - name: Run AI code review with Claude
         uses: actions/github-script@v7
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -87,7 +88,7 @@ jobs:
             Keep your review concise and actionable.`;
 
             const data = JSON.stringify({
-              model: 'claude-sonnet-4.5-20250514',
+              model: 'claude-sonnet-4-5-20250929',
               max_tokens: 8192,
               messages: [{
                 role: 'user',
