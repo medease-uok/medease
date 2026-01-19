@@ -40,19 +40,19 @@
   description: Build system changes
 
 # Review time labels
-- name: review: 5min
+- name: 'review: 5min'
   color: 0e8a16
   description: Quick review (< 100 lines)
 
-- name: review: 15min
+- name: 'review: 15min'
   color: fbca04
   description: Short review (100-499 lines)
 
-- name: review: 30min
+- name: 'review: 30min'
   color: ff8c00
   description: Medium review (500-1499 lines)
 
-- name: review: 1hr
+- name: 'review: 1hr'
   color: d73a4a
   description: Long review (1500+ lines)
 
