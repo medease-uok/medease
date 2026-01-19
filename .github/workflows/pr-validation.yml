@@ -30,14 +30,15 @@ jobs:
         with:
           script: |
             const title = context.payload.pull_request.title;
-            const validPrefixes = ['feat:', 'fix:', 'docs:', 'style:', 'refactor:', 'perf:', 'test:', 'chore:', 'build:', 'ci:'];
 
-            const hasValidPrefix = validPrefixes.some(prefix => title.toLowerCase().startsWith(prefix));
+            // Conventional commit pattern: type(scope): description
+            // Examples: feat(api): add user endpoint, fix: resolve bug, chore(deps): update packages
+            const conventionalCommitPattern = /^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\(.+\))?:\s.+/i;
 
-            if (!hasValidPrefix) {
-              core.setFailed(`❌ PR title must start with one of: ${validPrefixes.join(', ')}\nExample: "feat: add user authentication"`);
+            if (!conventionalCommitPattern.test(title)) {
+              core.setFailed('PR title must follow conventional commit format.\nExamples:\n- feat(api): add user endpoint\n- fix(auth): resolve login issue\n- docs: update README\n- chore(deps): update dependencies');
             } else {
-              console.log('✅ PR title format is valid');
+              console.log('PR title format is valid');
             }
 
       - name: Verify issue linkage
