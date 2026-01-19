@@ -1,4 +1,4 @@
-name: 🔄 Sync Repository Labels
+name: Sync Repository Labels
 
 on:
   push:
@@ -13,10 +13,10 @@ jobs:
     name: Update GitHub labels
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🏷️ Synchronize labels from config
+      - name: Synchronize labels from config
         uses: micnncim/action-label-syncer@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

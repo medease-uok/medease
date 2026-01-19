@@ -1,4 +1,4 @@
-name: 🗑️ Cleanup Merged Branches
+name: Cleanup Merged Branches
 
 on:
   pull_request:
