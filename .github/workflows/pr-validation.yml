@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Auto-assign PR author if unassigned
-        if: github.event.pull_request.assignees[0] == null
         uses: actions/github-script@v7
+        if: github.event.pull_request.assignees == null || toJSON(github.event.pull_request.assignees) == '[]'
         with:
           script: |
             await github.rest.issues.addAssignees({
@@ -26,6 +26,8 @@ jobs:
             console.log('✅ Auto-assigned PR to author: ' + context.payload.pull_request.user.login);
 
       - name: Validate PR title format
+        id: title_check
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -36,12 +38,14 @@ jobs:
             const conventionalCommitPattern = /^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\(.+\))?:\s.+/i;
 
             if (!conventionalCommitPattern.test(title)) {
-              core.setFailed('PR title must follow conventional commit format.\nExamples:\n- feat(api): add user endpoint\n- fix(auth): resolve login issue\n- docs: update README\n- chore(deps): update dependencies');
+              core.setFailed('❌ PR title must follow conventional commit format.\nExamples:\n- feat(api): add user endpoint\n- fix(auth): resolve login issue\n- docs: update README\n- chore(deps): update dependencies');
             } else {
-              console.log('PR title format is valid');
+              console.log('✅ PR title format is valid');
             }
 
       - name: Verify issue linkage
+        id: issue_check
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -54,3 +58,9 @@ jobs:
             } else {
               console.log('✅ PR is linked to an issue');
             }
+
+      - name: Check validation results
+        if: steps.title_check.outcome == 'failure' || steps.issue_check.outcome == 'failure'
+        run: |
+          echo "::error::One or more PR validation checks failed"
+          exit 1

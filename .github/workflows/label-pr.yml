@@ -68,16 +68,16 @@ jobs:
 
             // Determine the new review time label
             let reviewLabel = '';
-            if (total < 100) reviewLabel = 'review: 5min';
-            else if (total < 500) reviewLabel = 'review: 15min';
-            else if (total < 1500) reviewLabel = 'review: 30min';
-            else reviewLabel = 'review: 1hr';
+            if (total < 100) reviewLabel = '5min review';
+            else if (total < 500) reviewLabel = '15min review';
+            else if (total < 1500) reviewLabel = '30min review';
+            else reviewLabel = '1hr review';
 
             // Get current labels
             const currentLabels = pr.labels.map(label => label.name);
 
             // Remove all existing review time labels
-            const reviewTimeLabels = ['review: 5min', 'review: 15min', 'review: 30min', 'review: 1hr'];
+            const reviewTimeLabels = ['5min review', '15min review', '30min review', '1hr review'];
             const labelsToRemove = currentLabels.filter(label => reviewTimeLabels.includes(label));
 
             for (const label of labelsToRemove) {
