@@ -1,0 +1,186 @@
+name: Fix Jira Hierarchy in GitHub Issues
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  fix-hierarchy:
+    name: Update task issues with parent story
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fix Jira hierarchy
+        uses: actions/github-script@v7
+        env:
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_KEY }}
+          JIRA_BASE_URL: 'https://medease-uok.atlassian.net'
+          JIRA_EMAIL: 'dhanikaanupama2000@gmail.com'
+        with:
+          script: |
+            console.log('🔍 Starting Jira hierarchy fix...\n');
+
+            const jiraToken = process.env.JIRA_API_TOKEN;
+            const jiraEmail = process.env.JIRA_EMAIL;
+            const jiraBaseUrl = process.env.JIRA_BASE_URL;
+
+            if (!jiraToken) {
+              core.setFailed('JIRA_API_TOKEN not configured');
+              return;
+            }
+
+            const authHeader = Buffer.from(`${jiraEmail}:${jiraToken}`).toString('base64');
+
+            // Fetch all GitHub issues
+            console.log('📥 Fetching GitHub issues...');
+            const { data: allIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              per_page: 100
+            });
+
+            // Build mappings
+            const stories = {};
+            const tasks = [];
+            const storyNameToId = {};
+
+            for (const issue of allIssues) {
+              const labels = issue.labels.map(l => l.name);
+              const title = issue.title.trim();
+              const body = issue.body || '';
+
+              const match = title.match(/\[MEDEASE-(\d+)\](.+)/);
+              if (!match) continue;
+
+              const jiraId = `MEDEASE-${match[1]}`;
+              const cleanTitle = match[2].trim();
+
+              if (labels.includes('story')) {
+                stories[jiraId] = {
+                  title: cleanTitle,
+                  number: issue.number
+                };
+                storyNameToId[cleanTitle] = jiraId;
+              } else if (labels.includes('task')) {
+                tasks.push({
+                  jiraId,
+                  number: issue.number,
+                  title: cleanTitle,
+                  body: body
+                });
+              }
+            }
+
+            console.log(`✅ Found ${Object.keys(stories).length} stories and ${tasks.length} tasks\n`);
+
+            // Process tasks in batches
+            let updated = 0;
+            let skipped = 0;
+            let errors = 0;
+
+            console.log('🔨 Processing tasks...\n');
+
+            for (const task of tasks) {
+              try {
+                // Check if already has Story field
+                if (task.body.includes('**Story**:')) {
+                  console.log(`⏭️  Skipping ${task.jiraId} (already has Story field)`);
+                  skipped++;
+                  continue;
+                }
+
+                // Fetch task details from Jira
+                const jiraResponse = await fetch(`${jiraBaseUrl}/rest/api/3/issue/${task.jiraId}`, {
+                  headers: {
+                    'Authorization': `Basic ${authHeader}`,
+                    'Accept': 'application/json'
+                  }
+                });
+
+                if (!jiraResponse.ok) {
+                  console.log(`⚠️  Failed to fetch ${task.jiraId} from Jira: ${jiraResponse.status}`);
+                  errors++;
+                  continue;
+                }
+
+                const jiraIssue = await jiraResponse.json();
+
+                // Get parent (should be a Story)
+                const parentKey = jiraIssue.fields.parent?.key;
+                const parentSummary = jiraIssue.fields.parent?.fields?.summary;
+
+                if (!parentKey || !parentSummary) {
+                  console.log(`⚠️  ${task.jiraId} has no parent in Jira`);
+                  errors++;
+                  continue;
+                }
+
+                // Update GitHub issue body to add Story field
+                const epicMatch = task.body.match(/\*\*Epic\*\*:\s*(.+?)(?:\n|$)/);
+                const epicLine = epicMatch ? epicMatch[0] : '';
+
+                // Insert Story field after Status and before Epic
+                let newBody = task.body;
+
+                // Find the Status line
+                const statusMatch = newBody.match(/(\*\*Status\*\*:\s*.+?\n)/);
+                if (statusMatch) {
+                  const insertAfter = statusMatch[0];
+                  newBody = newBody.replace(
+                    insertAfter,
+                    insertAfter + `**Story**: ${parentSummary}\n`
+                  );
+                } else {
+                  // Fallback: insert before Epic
+                  if (epicLine) {
+                    newBody = newBody.replace(epicLine, `**Story**: ${parentSummary}\n${epicLine}`);
+                  } else {
+                    // Last resort: append to Jira Reference section
+                    const jiraRefMatch = newBody.match(/(## Jira Reference[\s\S]*?)(\n##|$)/);
+                    if (jiraRefMatch) {
+                      newBody = newBody.replace(
+                        jiraRefMatch[1],
+                        jiraRefMatch[1] + `**Story**: ${parentSummary}\n`
+                      );
+                    }
+                  }
+                }
+
+                // Update the issue
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: task.number,
+                  body: newBody
+                });
+
+                updated++;
+                console.log(`✅ Updated ${task.jiraId} → Story: ${parentSummary}`);
+
+                // Rate limiting
+                if (updated % 50 === 0) {
+                  console.log(`\n⏸️  Processed ${updated} tasks, pausing for 10 seconds...`);
+                  await new Promise(resolve => setTimeout(resolve, 10000));
+                }
+
+              } catch (error) {
+                console.log(`❌ Error processing ${task.jiraId}: ${error.message}`);
+                errors++;
+              }
+            }
+
+            console.log('\n' + '='.repeat(60));
+            console.log('📊 Summary:');
+            console.log(`   ✅ Updated: ${updated}`);
+            console.log(`   ⏭️  Skipped: ${skipped}`);
+            console.log(`   ❌ Errors: ${errors}`);
+            console.log(`   📝 Total: ${tasks.length}`);
+            console.log('='.repeat(60));
+
+            if (errors > 0) {
+              core.warning(`${errors} tasks could not be updated`);
+            }
+
+            console.log('\n✅ Jira hierarchy fix complete!');
