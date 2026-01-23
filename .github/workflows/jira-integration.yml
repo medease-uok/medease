@@ -49,10 +49,12 @@ jobs:
 
             console.log('=== Starting Jira-GitHub Integration ===');
 
-            // Check if PR title already has Jira reference format (to avoid re-running)
+            // Check if both title has Jira format AND body has Jira reference section
             const jiraTitlePattern = /^MEDEASE-\d+:/;
-            if (jiraTitlePattern.test(title)) {
-              console.log('PR title already has Jira reference, skipping update');
+            const jiraReferenceSection = /##\s*Jira Reference/i;
+
+            if (jiraTitlePattern.test(title) && jiraReferenceSection.test(body)) {
+              console.log('PR already has Jira title and description, skipping update');
               return;
             }
 
