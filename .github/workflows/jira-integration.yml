@@ -35,7 +35,7 @@ jobs:
       - name: Update PR with Claude
         uses: actions/github-script@v7
         env:
-          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_KEY }}
           JIRA_BASE_URL: 'https://medease-uok.atlassian.net'
           JIRA_EMAIL: 'dhanikaanupama2000@gmail.com'
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -49,6 +49,13 @@ jobs:
 
             console.log('=== Starting Jira-GitHub Integration ===');
 
+            // Check if PR title already has Jira reference format (to avoid re-running)
+            const jiraTitlePattern = /^MEDEASE-\d+:/;
+            if (jiraTitlePattern.test(title)) {
+              console.log('PR title already has Jira reference, skipping update');
+              return;
+            }
+
             // Extract issue references (Fixes #123, Closes #456, etc.)
             const issueKeywords = ['fixes', 'closes', 'resolves', 'fix', 'close', 'resolve'];
             const issuePattern = new RegExp(`(${issueKeywords.join('|')})\\s+#(\\d+)`, 'gi');
@@ -60,21 +67,6 @@ jobs:
 
             console.log(`Found ${issueMatches.length} GitHub issue references`);
             console.log(`Found ${jiraKeys.length} direct Jira references`);
-
-            // If no GitHub issue is linked, error
-            if (issueMatches.length === 0) {
-              const errorMessage = `❌ **Missing Issue Link**\n\nThis PR must link to a GitHub issue using:\n- \`Fixes #123\`\n- \`Closes #456\`\n- \`Resolves #789\`\n\nPlease add one of these to your PR description.`;
-
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: errorMessage
-              });
-
-              core.setFailed('PR must link to a GitHub issue');
-              return;
-            }
 
             // Fetch linked GitHub issues to extract Jira references
             let linkedIssues = [];
@@ -105,16 +97,7 @@ jobs:
             }
 
             if (jiraKeys.length === 0) {
-              const errorMessage = `⚠️ **No Jira Reference Found**\n\nThe linked GitHub issue(s) don't contain a Jira reference (MEDEASE-XXX).\n\nPlease ensure the linked issue references a Jira task.`;
-
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: errorMessage
-              });
-
-              core.setFailed('No Jira reference found');
+              console.log('No Jira reference found, skipping Jira integration');
               return;
             }
 
@@ -127,8 +110,7 @@ jobs:
             const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
             if (!jiraToken) {
-              console.log('⚠️ JIRA_API_TOKEN not configured');
-              core.setFailed('JIRA_API_TOKEN secret not configured');
+              console.log('⚠️ JIRA_API_TOKEN not configured, skipping Jira integration');
               return;
             }
 
@@ -192,57 +174,58 @@ jobs:
             const primaryJira = jiraIssues[0];
 
             // Use Claude to generate PR title and description
+            let generated;
             if (anthropicKey) {
               console.log('Generating PR content with Claude...');
 
               try {
                 const claudePrompt = `You are a technical writer helping to create a pull request description.
 
-**Jira Issue Details:**
-- Key: ${primaryJira.key}
-- Summary: ${primaryJira.summary}
-- Description: ${primaryJira.description}
-- Type: ${primaryJira.type}
-- Status: ${primaryJira.status}
+                Jira Issue Details:
+                - Key: ${primaryJira.key}
+                - Summary: ${primaryJira.summary}
+                - Description: ${primaryJira.description}
+                - Type: ${primaryJira.type}
+                - Status: ${primaryJira.status}
 
-**Linked GitHub Issues:**
-${linkedIssues.map(i => `- #${i.number}: ${i.title}`).join('\n')}
+                Linked GitHub Issues:
+                ${linkedIssues.map(i => `- #${i.number}: ${i.title}`).join('\n')}
 
-**Code Changes Summary:**
-${prDiff.substring(0, 5000)}
+                Code Changes Summary:
+                ${prDiff.substring(0, 5000)}
 
-Generate a concise, professional PR title and description following these rules:
+                Generate a concise, professional PR title and description following these rules:
 
-**PR Title Format:**
-- Start with: ${primaryJira.key}:
-- Followed by a brief, clear summary (max 60 chars total)
-- Use imperative mood (e.g., "Add", "Fix", "Update")
-- Example: "MEDEASE-123: Add user authentication"
+                PR Title Format:
+                - Start with: ${primaryJira.key}:
+                - Followed by a brief, clear summary of WHAT THIS PR ACTUALLY DOES (not the Jira issue title)
+                - Base the summary on the actual code changes shown above
+                - Use imperative mood (e.g., "Add", "Fix", "Update")
+                - Max 72 chars total
+                - Example: "MEDEASE-123: Add bidirectional Jira sync"
 
-**PR Description Format:**
-\`\`\`markdown
-## Description
-[2-3 sentences describing what this PR does and why]
+                PR Description Format (NO code blocks, just plain markdown):
+                ## Description
+                [2-3 sentences describing what this PR does based on the actual code changes]
 
-## Jira Reference
-**Issue:** [${primaryJira.key}](${primaryJira.url})
-**Type:** ${primaryJira.type}
-**Status:** ${primaryJira.status}
+                ## Jira Reference
+                - Issue: [${primaryJira.key}](${primaryJira.url})
+                - Type: ${primaryJira.type}
+                - Status: ${primaryJira.status}
 
-## Changes
-- [Key change 1]
-- [Key change 2]
-- [Key change 3]
+                ## Changes
+                - [Bullet point for each major change based on the diff]
+                - [Use the actual file changes and code modifications]
+                - [Be specific about what was added/modified]
 
-## Related Issues
-Fixes #${linkedIssues[0].number}
-\`\`\`
+                ## Related Issues
+                Fixes #${linkedIssues[0].number}
 
-Return ONLY a JSON object with this exact structure:
-{
-  "title": "MEDEASE-XXX: Brief summary",
-  "description": "Full markdown description"
-}`;
+                Return ONLY a JSON object with this exact structure:
+                {
+                "title": "MEDEASE-XXX: Brief summary based on actual changes",
+                "description": "Full markdown description without code blocks"
+                }`;
 
                 const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
                   method: 'POST',
@@ -252,8 +235,8 @@ Return ONLY a JSON object with this exact structure:
                     'content-type': 'application/json'
                   },
                   body: JSON.stringify({
-                    model: 'claude-3-5-sonnet-20241022',
-                    max_tokens: 1024,
+                    model: 'claude-sonnet-4-5-20250929',
+                    max_tokens: 2048,
                     messages: [{
                       role: 'user',
                       content: claudePrompt
@@ -262,6 +245,8 @@ Return ONLY a JSON object with this exact structure:
                 });
 
                 if (!claudeResponse.ok) {
+                  const errorBody = await claudeResponse.text();
+                  console.error(`Claude API error ${claudeResponse.status}: ${errorBody}`);
                   throw new Error(`Claude API returned ${claudeResponse.status}`);
                 }
 
@@ -274,7 +259,7 @@ Return ONLY a JSON object with this exact structure:
                   throw new Error('No JSON found in Claude response');
                 }
 
-                const generated = JSON.parse(jsonMatch[0]);
+                generated = JSON.parse(jsonMatch[0]);
 
                 console.log('✅ Claude generated:');
                 console.log('Title:', generated.title);
@@ -291,31 +276,23 @@ Return ONLY a JSON object with this exact structure:
 
                 console.log('✅ Updated PR title and description');
 
-                // Add success comment
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: prNumber,
-                  body: `✅ **PR automatically updated with Jira details**\n\nTitle and description generated from [${primaryJira.key}](${primaryJira.url}) using Claude AI.`
-                });
-
               } catch (error) {
                 console.error(`Claude generation failed: ${error.message}`);
 
                 // Fallback: Use template-based description
                 const fallbackDescription = `## Description
-${primaryJira.summary}
+                ${primaryJira.summary}
 
-## Jira Reference
-**Issue:** [${primaryJira.key}](${primaryJira.url})
-**Type:** ${primaryJira.type}
-**Status:** ${primaryJira.status}
+                ## Jira Reference
+                - Issue: [${primaryJira.key}](${primaryJira.url})
+                - Type: ${primaryJira.type}
+                - Status: ${primaryJira.status}
 
-## Description from Jira
-${primaryJira.description}
+                ## Description from Jira
+                ${primaryJira.description}
 
-## Related Issues
-Fixes #${linkedIssues[0].number}`;
+                ## Related Issues
+                Fixes #${linkedIssues[0].number}`;
 
                 await github.rest.pulls.update({
                   owner: context.repo.owner,
@@ -332,18 +309,18 @@ Fixes #${linkedIssues[0].number}`;
 
               // Fallback without Claude
               const fallbackDescription = `## Description
-${primaryJira.summary}
+                ${primaryJira.summary}
 
-## Jira Reference
-**Issue:** [${primaryJira.key}](${primaryJira.url})
-**Type:** ${primaryJira.type}
-**Status:** ${primaryJira.status}
+                ## Jira Reference
+                - Issue: [${primaryJira.key}](${primaryJira.url})
+                - Type: ${primaryJira.type}
+                - Status: ${primaryJira.status}
 
-## Description from Jira
-${primaryJira.description}
+                ## Description from Jira
+                ${primaryJira.description}
 
-## Related Issues
-Fixes #${linkedIssues[0].number}`;
+                ## Related Issues
+                Fixes #${linkedIssues[0].number}`;
 
               await github.rest.pulls.update({
                 owner: context.repo.owner,
@@ -375,6 +352,91 @@ Fixes #${linkedIssues[0].number}`;
               issue_number: prNumber,
               labels: ['jira-linked']
             });
+
+            // Add comment to Jira issue linking the PR
+            console.log('Adding PR link to Jira issue...');
+            try {
+              const prUrl = context.payload.pull_request.html_url;
+              const prAuthor = context.payload.pull_request.user.login;
+
+              const jiraComment = {
+                body: {
+                  version: 1,
+                  type: 'doc',
+                  content: [
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: '🔗 ',
+                          marks: []
+                        },
+                        {
+                          type: 'text',
+                          text: 'GitHub Pull Request',
+                          marks: [{ type: 'strong' }]
+                        }
+                      ]
+                    },
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: `PR #${prNumber}: `,
+                          marks: []
+                        },
+                        {
+                          type: 'text',
+                          text: generated?.title || title,
+                          marks: [{ type: 'link', attrs: { href: prUrl } }]
+                        }
+                      ]
+                    },
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: `Author: @${prAuthor}`,
+                          marks: []
+                        }
+                      ]
+                    },
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: `Status: ${context.payload.pull_request.state}`,
+                          marks: []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              };
+
+              const jiraCommentResponse = await fetch(`${jiraBaseUrl}/rest/api/3/issue/${primaryJira.key}/comment`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Basic ${authHeader}`,
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(jiraComment)
+              });
+
+              if (jiraCommentResponse.ok) {
+                console.log(`✅ Added PR link to Jira issue ${primaryJira.key}`);
+              } else {
+                const errorText = await jiraCommentResponse.text();
+                console.error(`Failed to add Jira comment: ${jiraCommentResponse.status} - ${errorText}`);
+              }
+            } catch (error) {
+              console.error(`Error adding Jira comment: ${error.message}`);
+            }
 
             console.log('✅ Jira integration complete');
 
@@ -410,14 +472,5 @@ Fixes #${linkedIssues[0].number}`;
             }
 
             if (invalidCommits.length > 0) {
-              const message = `⚠️ **Jira Reference Warning**\n\nThe following commits do not reference a Jira issue:\n\n${invalidCommits.join('\n')}\n\n**Best Practice:** Include Jira issue key (MEDEASE-XXX) in commit messages.\n\n**Example:**\n\`\`\`\nMEDEASE-123: Add user authentication\nMEDEASE-456: Fix login bug\n\`\`\``;
-
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: message
-              });
-
-              core.warning('Some commits are missing Jira references');
+              console.log(`Found ${invalidCommits.length} commits without Jira references`);
             }
