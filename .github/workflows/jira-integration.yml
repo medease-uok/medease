@@ -198,28 +198,28 @@ jobs:
               try {
                 const claudePrompt = `You are a technical writer helping to create a pull request description.
 
-**Jira Issue Details:**
+Jira Issue Details:
 - Key: ${primaryJira.key}
 - Summary: ${primaryJira.summary}
 - Description: ${primaryJira.description}
 - Type: ${primaryJira.type}
 - Status: ${primaryJira.status}
 
-**Linked GitHub Issues:**
+Linked GitHub Issues:
 ${linkedIssues.map(i => `- #${i.number}: ${i.title}`).join('\n')}
 
-**Code Changes Summary:**
+Code Changes Summary:
 ${prDiff.substring(0, 5000)}
 
 Generate a concise, professional PR title and description following these rules:
 
-**PR Title Format:**
+PR Title Format:
 - Start with: ${primaryJira.key}:
 - Followed by a brief, clear summary (max 60 chars total)
 - Use imperative mood (e.g., "Add", "Fix", "Update")
 - Example: "MEDEASE-123: Add user authentication"
 
-**PR Description Format:**
+PR Description Format:
 \`\`\`markdown
 ## Description
 [2-3 sentences describing what this PR does and why]
