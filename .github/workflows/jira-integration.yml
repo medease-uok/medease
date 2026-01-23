@@ -376,6 +376,91 @@ Fixes #${linkedIssues[0].number}`;
               labels: ['jira-linked']
             });
 
+            // Add comment to Jira issue linking the PR
+            console.log('Adding PR link to Jira issue...');
+            try {
+              const prUrl = context.payload.pull_request.html_url;
+              const prAuthor = context.payload.pull_request.user.login;
+
+              const jiraComment = {
+                body: {
+                  version: 1,
+                  type: 'doc',
+                  content: [
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: '🔗 ',
+                          marks: []
+                        },
+                        {
+                          type: 'text',
+                          text: 'GitHub Pull Request',
+                          marks: [{ type: 'strong' }]
+                        }
+                      ]
+                    },
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: `PR #${prNumber}: `,
+                          marks: []
+                        },
+                        {
+                          type: 'text',
+                          text: generated?.title || title,
+                          marks: [{ type: 'link', attrs: { href: prUrl } }]
+                        }
+                      ]
+                    },
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: `Author: @${prAuthor}`,
+                          marks: []
+                        }
+                      ]
+                    },
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: `Status: ${context.payload.pull_request.state}`,
+                          marks: []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              };
+
+              const jiraCommentResponse = await fetch(`${jiraBaseUrl}/rest/api/3/issue/${primaryJira.key}/comment`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Basic ${authHeader}`,
+                  'Accept': 'application/json',
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(jiraComment)
+              });
+
+              if (jiraCommentResponse.ok) {
+                console.log(`✅ Added PR link to Jira issue ${primaryJira.key}`);
+              } else {
+                const errorText = await jiraCommentResponse.text();
+                console.error(`Failed to add Jira comment: ${jiraCommentResponse.status} - ${errorText}`);
+              }
+            } catch (error) {
+              console.error(`Error adding Jira comment: ${error.message}`);
+            }
+
             console.log('✅ Jira integration complete');
 
   validate-commits:
