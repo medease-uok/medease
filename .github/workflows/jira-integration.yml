@@ -192,6 +192,7 @@ jobs:
             const primaryJira = jiraIssues[0];
 
             // Use Claude to generate PR title and description
+            let generated;
             if (anthropicKey) {
               console.log('Generating PR content with Claude...');
 
@@ -274,7 +275,7 @@ jobs:
                   throw new Error('No JSON found in Claude response');
                 }
 
-                const generated = JSON.parse(jsonMatch[0]);
+                generated = JSON.parse(jsonMatch[0]);
 
                 console.log('✅ Claude generated:');
                 console.log('Title:', generated.title);
