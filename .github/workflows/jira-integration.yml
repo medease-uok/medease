@@ -472,14 +472,5 @@ jobs:
             }
 
             if (invalidCommits.length > 0) {
-              const message = `⚠️ **Jira Reference Warning**\n\nThe following commits do not reference a Jira issue:\n\n${invalidCommits.join('\n')}\n\n**Best Practice:** Include Jira issue key (MEDEASE-XXX) in commit messages.\n\n**Example:**\n\`\`\`\nMEDEASE-123: Add user authentication\nMEDEASE-456: Fix login bug\n\`\`\``;
-
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: message
-              });
-
-              core.warning('Some commits are missing Jira references');
+              console.log(`Found ${invalidCommits.length} commits without Jira references`);
             }
