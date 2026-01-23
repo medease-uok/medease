@@ -77,15 +77,6 @@ jobs:
             } else {
               const jiraKey = (title.match(jiraPattern) || body.match(jiraPattern))[0];
               console.log(`✅ PR references Jira issue: ${jiraKey}`);
-
-              // Add comment with Jira link
-              const jiraUrl = `https://medease-uok.atlassian.net/browse/${jiraKey}`;
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: `🔗 **Jira Issue:** [${jiraKey}](${jiraUrl})`
-              });
             }
 
       - name: Check validation results

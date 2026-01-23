@@ -49,6 +49,13 @@ jobs:
 
             console.log('=== Starting Jira-GitHub Integration ===');
 
+            // Check if PR title already has Jira reference format (to avoid re-running)
+            const jiraTitlePattern = /^MEDEASE-\d+:/;
+            if (jiraTitlePattern.test(title)) {
+              console.log('PR title already has Jira reference, skipping update');
+              return;
+            }
+
             // Extract issue references (Fixes #123, Closes #456, etc.)
             const issueKeywords = ['fixes', 'closes', 'resolves', 'fix', 'close', 'resolve'];
             const issuePattern = new RegExp(`(${issueKeywords.join('|')})\\s+#(\\d+)`, 'gi');
