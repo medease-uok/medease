@@ -197,52 +197,52 @@ jobs:
 
               try {
                 const claudePrompt = `You are a technical writer helping to create a pull request description.
-
-Jira Issue Details:
-- Key: ${primaryJira.key}
-- Summary: ${primaryJira.summary}
-- Description: ${primaryJira.description}
-- Type: ${primaryJira.type}
-- Status: ${primaryJira.status}
-
-Linked GitHub Issues:
-${linkedIssues.map(i => `- #${i.number}: ${i.title}`).join('\n')}
-
-Code Changes Summary:
-${prDiff.substring(0, 5000)}
-
-Generate a concise, professional PR title and description following these rules:
-
-PR Title Format:
-- Start with: ${primaryJira.key}:
-- Followed by a brief, clear summary (max 60 chars total)
-- Use imperative mood (e.g., "Add", "Fix", "Update")
-- Example: "MEDEASE-123: Add user authentication"
-
-PR Description Format:
-\`\`\`markdown
-## Description
-[2-3 sentences describing what this PR does and why]
-
-## Jira Reference
-**Issue:** [${primaryJira.key}](${primaryJira.url})
-**Type:** ${primaryJira.type}
-**Status:** ${primaryJira.status}
-
-## Changes
-- [Key change 1]
-- [Key change 2]
-- [Key change 3]
-
-## Related Issues
-Fixes #${linkedIssues[0].number}
-\`\`\`
-
-Return ONLY a JSON object with this exact structure:
-{
-  "title": "MEDEASE-XXX: Brief summary",
-  "description": "Full markdown description"
-}`;
+                
+                Jira Issue Details:
+                - Key: ${primaryJira.key}
+                - Summary: ${primaryJira.summary}
+                - Description: ${primaryJira.description}
+                - Type: ${primaryJira.type}
+                - Status: ${primaryJira.status}
+                
+                Linked GitHub Issues:
+                ${linkedIssues.map(i => `- #${i.number}: ${i.title}`).join('\n')}
+                
+                Code Changes Summary:
+                ${prDiff.substring(0, 5000)}
+                
+                Generate a concise, professional PR title and description following these rules:
+                
+                PR Title Format:
+                - Start with: ${primaryJira.key}:
+                - Followed by a brief, clear summary (max 60 chars total)
+                - Use imperative mood (e.g., "Add", "Fix", "Update")
+                - Example: "MEDEASE-123: Add user authentication"
+                
+                PR Description Format:
+                \`\`\`markdown
+                ## Description
+                [2-3 sentences describing what this PR does and why]
+                
+                ## Jira Reference
+                **Issue:** [${primaryJira.key}](${primaryJira.url})
+                **Type:** ${primaryJira.type}
+                **Status:** ${primaryJira.status}
+                
+                ## Changes
+                - [Key change 1]
+                - [Key change 2]
+                - [Key change 3]
+                
+                ## Related Issues
+                Fixes #${linkedIssues[0].number}
+                \`\`\`
+                
+                Return ONLY a JSON object with this exact structure:
+                {
+                "title": "MEDEASE-XXX: Brief summary",
+                "description": "Full markdown description"
+                }`;
 
                 const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
                   method: 'POST',
@@ -304,19 +304,19 @@ Return ONLY a JSON object with this exact structure:
 
                 // Fallback: Use template-based description
                 const fallbackDescription = `## Description
-${primaryJira.summary}
-
-## Jira Reference
-**Issue:** [${primaryJira.key}](${primaryJira.url})
-**Type:** ${primaryJira.type}
-**Status:** ${primaryJira.status}
-
-## Description from Jira
-${primaryJira.description}
-
-## Related Issues
-Fixes #${linkedIssues[0].number}`;
-
+                ${primaryJira.summary}
+                
+                ## Jira Reference
+                **Issue:** [${primaryJira.key}](${primaryJira.url})
+                **Type:** ${primaryJira.type}
+                **Status:** ${primaryJira.status}
+                
+                ## Description from Jira
+                ${primaryJira.description}
+                
+                ## Related Issues
+                Fixes #${linkedIssues[0].number}`;
+                
                 await github.rest.pulls.update({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -332,19 +332,19 @@ Fixes #${linkedIssues[0].number}`;
 
               // Fallback without Claude
               const fallbackDescription = `## Description
-${primaryJira.summary}
-
-## Jira Reference
-**Issue:** [${primaryJira.key}](${primaryJira.url})
-**Type:** ${primaryJira.type}
-**Status:** ${primaryJira.status}
-
-## Description from Jira
-${primaryJira.description}
-
-## Related Issues
-Fixes #${linkedIssues[0].number}`;
-
+                ${primaryJira.summary}
+                
+                ## Jira Reference
+                **Issue:** [${primaryJira.key}](${primaryJira.url})
+                **Type:** ${primaryJira.type}
+                **Status:** ${primaryJira.status}
+                
+                ## Description from Jira
+                ${primaryJira.description}
+                
+                ## Related Issues
+                Fixes #${linkedIssues[0].number}`;
+                
               await github.rest.pulls.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
