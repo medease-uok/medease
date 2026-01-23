@@ -210,8 +210,6 @@ jobs:
 
                 ## Jira Reference
                 - Issue: [${primaryJira.key}](${primaryJira.url})
-                - Type: ${primaryJira.type}
-                - Status: ${primaryJira.status}
 
                 ## Changes
                 - [Bullet point for each major change based on the diff]
@@ -285,8 +283,6 @@ jobs:
 
                 ## Jira Reference
                 - Issue: [${primaryJira.key}](${primaryJira.url})
-                - Type: ${primaryJira.type}
-                - Status: ${primaryJira.status}
 
                 ## Description from Jira
                 ${primaryJira.description}
@@ -313,8 +309,6 @@ jobs:
 
                 ## Jira Reference
                 - Issue: [${primaryJira.key}](${primaryJira.url})
-                - Type: ${primaryJira.type}
-                - Status: ${primaryJira.status}
 
                 ## Description from Jira
                 ${primaryJira.description}
