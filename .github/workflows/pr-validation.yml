@@ -33,12 +33,13 @@ jobs:
           script: |
             const title = context.payload.pull_request.title;
 
-            // Conventional commit pattern: type(scope): description
-            // Examples: feat(api): add user endpoint, fix: resolve bug, chore(deps): update packages
+            // Conventional commit pattern: type(scope): description OR MEDEASE-XXX: description
+            // Examples: feat(api): add user endpoint, fix: resolve bug, MEDEASE-123: add feature
             const conventionalCommitPattern = /^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\(.+\))?:\s.+/i;
+            const jiraPattern = /^MEDEASE-\d+:\s.+/;
 
-            if (!conventionalCommitPattern.test(title)) {
-              core.setFailed('❌ PR title must follow conventional commit format.\nExamples:\n- feat(api): add user endpoint\n- fix(auth): resolve login issue\n- docs: update README\n- chore(deps): update dependencies');
+            if (!conventionalCommitPattern.test(title) && !jiraPattern.test(title)) {
+              core.setFailed('❌ PR title must follow conventional commit format OR include Jira key.\nExamples:\n- feat(api): add user endpoint\n- fix(auth): resolve login issue\n- MEDEASE-123: implement user authentication\n- docs: update README');
             } else {
               console.log('✅ PR title format is valid');
             }
@@ -59,8 +60,36 @@ jobs:
               console.log('✅ PR is linked to an issue');
             }
 
+      - name: Validate Jira reference
+        id: jira_check
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const title = context.payload.pull_request.title;
+
+            // Check for MEDEASE-XXX pattern in either title or body
+            const jiraPattern = /MEDEASE-\d+/;
+
+            if (!jiraPattern.test(title) && !jiraPattern.test(body)) {
+              core.setFailed('❌ PR must reference a Jira issue (MEDEASE-XXX) in title or description.\nExample: MEDEASE-123: Add authentication feature');
+            } else {
+              const jiraKey = (title.match(jiraPattern) || body.match(jiraPattern))[0];
+              console.log(`✅ PR references Jira issue: ${jiraKey}`);
+
+              // Add comment with Jira link
+              const jiraUrl = `https://medease-uok.atlassian.net/browse/${jiraKey}`;
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `🔗 **Jira Issue:** [${jiraKey}](${jiraUrl})`
+              });
+            }
+
       - name: Check validation results
-        if: steps.title_check.outcome == 'failure' || steps.issue_check.outcome == 'failure'
+        if: steps.title_check.outcome == 'failure' || steps.issue_check.outcome == 'failure' || steps.jira_check.outcome == 'failure'
         run: |
           echo "::error::One or more PR validation checks failed"
           exit 1

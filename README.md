@@ -178,7 +178,17 @@ git checkout -b feat/your-feature-name
 
 ### 4. Commit Guidelines
 
-Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
+**IMPORTANT: Include Jira Reference**
+
+All commits should reference a Jira issue for traceability:
+
+```bash
+git commit -m "MEDEASE-123: Add user authentication"
+git commit -m "MEDEASE-456: Fix payment validation bug"
+git commit -m "MEDEASE-789: Update API documentation"
+```
+
+Alternatively, follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```
 <type>(<scope>): <description>
@@ -206,6 +216,12 @@ git commit -m "feat(auth): add user login functionality"
 git commit -m "fix(api): resolve null pointer in user service"
 git commit -m "docs: update installation instructions"
 ```
+
+**Setup Commit Template (Optional):**
+```bash
+git config --local commit.template .gitmessage
+```
+This will provide a template when you run `git commit`.
 
 ### 5. Push and Create Pull Request
 
@@ -245,6 +261,50 @@ claude-review
 
 This will trigger Claude AI to review your changes and provide feedback.
 
+## Jira Integration
+
+This repository is integrated with Jira for seamless project tracking:
+
+**Jira Board:** [https://medease-uok.atlassian.net](https://medease-uok.atlassian.net)
+
+### Automatic Features
+
+When you include Jira issue keys (e.g., `MEDEASE-123`) in your commits and PRs:
+
+- ✅ **Commits appear in Jira**: Every commit with a Jira key shows up in the Development panel
+- ✅ **PRs link automatically**: Pull requests are linked to Jira issues
+- ✅ **Status tracking**: Development progress is visible in Jira
+- ✅ **Auto-labeling**: PRs with Jira references get `jira-linked` label
+
+### Smart Commits
+
+Perform Jira actions directly from commit messages:
+
+```bash
+# Add comment to Jira issue
+git commit -m "MEDEASE-123 #comment Fixed authentication bug"
+
+# Log work time
+git commit -m "MEDEASE-123 #time 2h 30m Debugging API"
+
+# Close Jira issue
+git commit -m "MEDEASE-123 #close Completed feature implementation"
+```
+
+### PR Requirements
+
+All PRs must:
+- Include Jira reference (MEDEASE-XXX) in title or description
+- Link to related GitHub issue (if applicable)
+- Follow conventional commit format OR use Jira key format
+
+**Valid PR Titles:**
+- ✅ `MEDEASE-123: Add authentication feature`
+- ✅ `feat(auth): implement JWT authentication`
+- ❌ `Added new feature` (Missing Jira reference)
+
+See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for detailed workflow guide.
+
 ## Workflows & Automation
 
 This project uses GitHub Actions for automation:
@@ -253,7 +313,8 @@ This project uses GitHub Actions for automation:
 
 - **Auto-Format Code**: Formats changed files with Prettier
 - **Auto-Label PRs**: Labels based on files changed and PR title
-- **Validate PR**: Checks title format and issue linkage
+- **Validate PR**: Checks title format, issue linkage, and Jira reference
+- **Jira Integration**: Links commits and PRs to Jira issues
 - **Review Time Estimate**: Adds labels based on PR size
 - **Branch Cleanup**: Deletes branches after merge
 - **Claude AI Review**: On-demand code review (comment `claude-review`)
