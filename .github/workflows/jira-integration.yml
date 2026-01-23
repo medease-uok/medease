@@ -2,10 +2,7 @@ name: Jira Integration
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - main
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   pull-requests: write
@@ -13,152 +10,190 @@ permissions:
   issues: write
 
 jobs:
-  validate-commits:
-    name: Validate Jira references in commits
+  sync-with-jira:
+    name: Sync PR with Jira
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check commits for Jira references
+      - name: Process PR and fetch Jira details
         uses: actions/github-script@v7
-        with:
-          script: |
-            const { execSync } = require('child_process');
-
-            // Get commits in this PR or push
-            let commits;
-            if (context.eventName === 'pull_request') {
-              const { data } = await github.rest.pulls.listCommits({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number,
-              });
-              commits = data.map(c => ({
-                sha: c.sha.substring(0, 7),
-                message: c.commit.message
-              }));
-            } else {
-              // For push events, get commits from payload
-              commits = context.payload.commits.map(c => ({
-                sha: c.id.substring(0, 7),
-                message: c.message
-              }));
-            }
-
-            const jiraPattern = /MEDEASE-\d+/;
-            const invalidCommits = [];
-            const validCommits = [];
-
-            for (const commit of commits) {
-              const firstLine = commit.message.split('\n')[0];
-
-              // Skip merge commits
-              if (firstLine.startsWith('Merge ')) {
-                continue;
-              }
-
-              if (jiraPattern.test(firstLine)) {
-                const jiraKey = firstLine.match(jiraPattern)[0];
-                validCommits.push(`✅ ${commit.sha}: ${firstLine.substring(0, 60)}... [${jiraKey}]`);
-              } else {
-                invalidCommits.push(`❌ ${commit.sha}: ${firstLine.substring(0, 60)}...`);
-              }
-            }
-
-            // Log results
-            console.log('=== Valid Commits ===');
-            validCommits.forEach(c => console.log(c));
-            console.log('\n=== Invalid Commits ===');
-            invalidCommits.forEach(c => console.log(c));
-
-            if (invalidCommits.length > 0) {
-              const message = `⚠️ **Jira Reference Warning**\n\nThe following commits do not reference a Jira issue:\n\n${invalidCommits.map(c => `- ${c}`).join('\n')}\n\n**Best Practice:** Include Jira issue key (MEDEASE-XXX) in commit messages.\n\nExample:\n\`\`\`\nMEDEASE-123: Add user authentication\nMEDEASE-456: Fix login bug\n\`\`\``;
-
-              if (context.eventName === 'pull_request') {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  body: message
-                });
-              }
-
-              core.warning('Some commits are missing Jira references');
-            } else {
-              console.log('✅ All commits reference Jira issues!');
-            }
-
-  link-jira-issues:
-    name: Link Jira issues to PR
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Extract and link Jira issues
-        uses: actions/github-script@v7
+        env:
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_BASE_URL: 'https://medease-uok.atlassian.net'
+          JIRA_EMAIL: 'dhanikaanupama2000@gmail.com'
         with:
           script: |
             const title = context.payload.pull_request.title;
             const body = context.payload.pull_request.body || '';
-            const fullText = `${title} ${body}`;
+            const prNumber = context.issue.number;
 
-            // Find all Jira references
+            // Extract issue references (Fixes #123, Closes #456, etc.)
+            const issueKeywords = ['fixes', 'closes', 'resolves', 'fix', 'close', 'resolve'];
+            const issuePattern = new RegExp(`(${issueKeywords.join('|')})\\s+#(\\d+)`, 'gi');
+            const issueMatches = [...body.matchAll(issuePattern)];
+
+            // Extract direct Jira references
             const jiraPattern = /MEDEASE-\d+/g;
-            const jiraKeys = [...new Set(fullText.match(jiraPattern) || [])];
+            let jiraKeys = [...new Set((title + ' ' + body).match(jiraPattern) || [])];
 
-            if (jiraKeys.length === 0) {
-              console.log('No Jira issues found in PR');
-              return;
-            }
+            console.log(`Found ${issueMatches.length} GitHub issue references`);
+            console.log(`Found ${jiraKeys.length} direct Jira references`);
 
-            console.log(`Found Jira issues: ${jiraKeys.join(', ')}`);
+            // If no GitHub issue is linked, error
+            if (issueMatches.length === 0) {
+              const errorMessage = `❌ **Missing Issue Link**\n\nThis PR must link to a GitHub issue using:\n- \`Fixes #123\`\n- \`Closes #456\`\n- \`Resolves #789\`\n\nPlease add one of these to your PR description.`;
 
-            // Create links to all referenced Jira issues
-            const jiraLinks = jiraKeys.map(key => {
-              const url = `https://medease-uok.atlassian.net/browse/${key}`;
-              return `- [${key}](${url})`;
-            }).join('\n');
-
-            const comment = `🔗 **Related Jira Issues:**\n\n${jiraLinks}`;
-
-            // Check if we've already posted this comment
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const alreadyCommented = comments.some(c =>
-              c.user.login === 'github-actions[bot]' &&
-              c.body.includes('Related Jira Issues')
-            );
-
-            if (!alreadyCommented) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: comment
+                issue_number: prNumber,
+                body: errorMessage
               });
+
+              core.setFailed('PR must link to a GitHub issue');
+              return;
             }
 
-  add-jira-label:
-    name: Add Jira label to issues
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Add jira-linked label
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const title = context.payload.pull_request.title;
-            const body = context.payload.pull_request.body || '';
-            const jiraPattern = /MEDEASE-\d+/;
+            // Fetch linked GitHub issues to extract Jira references
+            for (const match of issueMatches) {
+              const issueNumber = match[2];
+              console.log(`Checking GitHub issue #${issueNumber}...`);
 
-            if (jiraPattern.test(`${title} ${body}`)) {
-              // Ensure label exists
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(issueNumber)
+                });
+
+                // Extract Jira key from issue title or body
+                const issueJiraKeys = (issue.title + ' ' + issue.body).match(jiraPattern) || [];
+                jiraKeys = [...new Set([...jiraKeys, ...issueJiraKeys])];
+                console.log(`Found Jira keys in issue #${issueNumber}: ${issueJiraKeys.join(', ')}`);
+              } catch (error) {
+                console.error(`Failed to fetch issue #${issueNumber}: ${error.message}`);
+              }
+            }
+
+            if (jiraKeys.length === 0) {
+              const errorMessage = `⚠️ **No Jira Reference Found**\n\nThe linked GitHub issue(s) don't contain a Jira reference.\n\nPlease ensure the linked issue references a Jira task (MEDEASE-XXX).`;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: errorMessage
+              });
+
+              console.log('No Jira keys found in linked issues');
+              return;
+            }
+
+            console.log(`Processing Jira keys: ${jiraKeys.join(', ')}`);
+
+            // Fetch Jira issue details
+            const jiraToken = process.env.JIRA_API_TOKEN;
+            const jiraEmail = process.env.JIRA_EMAIL;
+            const jiraBaseUrl = process.env.JIRA_BASE_URL;
+
+            if (!jiraToken) {
+              console.log('⚠️ JIRA_API_TOKEN not configured, skipping Jira API calls');
+
+              // Just add links without fetching details
+              const jiraLinks = jiraKeys.map(key => {
+                const url = `${jiraBaseUrl}/browse/${key}`;
+                return `- [${key}](${url})`;
+              }).join('\n');
+
+              const comment = `🔗 **Related Jira Issues:**\n\n${jiraLinks}`;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: comment
+              });
+
+              return;
+            }
+
+            const authHeader = Buffer.from(`${jiraEmail}:${jiraToken}`).toString('base64');
+
+            // Fetch details for the first Jira issue
+            const primaryJiraKey = jiraKeys[0];
+            console.log(`Fetching details for ${primaryJiraKey}...`);
+
+            try {
+              const jiraResponse = await fetch(`${jiraBaseUrl}/rest/api/3/issue/${primaryJiraKey}`, {
+                headers: {
+                  'Authorization': `Basic ${authHeader}`,
+                  'Accept': 'application/json'
+                }
+              });
+
+              if (!jiraResponse.ok) {
+                throw new Error(`Jira API returned ${jiraResponse.status}`);
+              }
+
+              const jiraIssue = await jiraResponse.json();
+              const jiraSummary = jiraIssue.fields.summary;
+              const jiraDescription = jiraIssue.fields.description?.content?.[0]?.content?.[0]?.text || 'No description';
+              const jiraStatus = jiraIssue.fields.status.name;
+              const jiraType = jiraIssue.fields.issuetype.name;
+              const jiraUrl = `${jiraBaseUrl}/browse/${primaryJiraKey}`;
+
+              console.log(`Jira issue details: ${jiraSummary} (${jiraStatus})`);
+
+              // Update PR title if it doesn't have Jira reference
+              if (!title.includes(primaryJiraKey)) {
+                const newTitle = `${primaryJiraKey}: ${jiraSummary}`;
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                  title: newTitle
+                });
+                console.log(`✅ Updated PR title to: ${newTitle}`);
+              }
+
+              // Add comprehensive comment with Jira details
+              const allJiraLinks = jiraKeys.map(key => {
+                const url = `${jiraBaseUrl}/browse/${key}`;
+                return `- [${key}](${url})`;
+              }).join('\n');
+
+              const comment = `🔗 **Jira Integration**\n\n**Primary Issue:** [${primaryJiraKey}](${jiraUrl})\n**Summary:** ${jiraSummary}\n**Type:** ${jiraType}\n**Status:** ${jiraStatus}\n\n**Description:**\n> ${jiraDescription.substring(0, 200)}${jiraDescription.length > 200 ? '...' : ''}\n\n${jiraKeys.length > 1 ? `**Additional Issues:**\n${allJiraLinks.slice(1).join('\n')}` : ''}`;
+
+              // Check if we already commented
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+              });
+
+              const existingComment = comments.find(c =>
+                c.user.login === 'github-actions[bot]' &&
+                c.body.includes('Jira Integration')
+              );
+
+              if (existingComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existingComment.id,
+                  body: comment
+                });
+                console.log('✅ Updated existing Jira comment');
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body: comment
+                });
+                console.log('✅ Added Jira details comment');
+              }
+
+              // Add jira-linked label
               try {
                 await github.rest.issues.createLabel({
                   owner: context.repo.owner,
@@ -168,16 +203,77 @@ jobs:
                   description: 'PR is linked to a Jira issue'
                 });
               } catch (error) {
-                // Label already exists, ignore
+                // Label exists
               }
 
-              // Add label to PR
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: context.issue.number,
+                issue_number: prNumber,
                 labels: ['jira-linked']
               });
 
-              console.log('✅ Added jira-linked label');
+              console.log('✅ Jira integration complete');
+
+            } catch (error) {
+              console.error(`Failed to fetch Jira details: ${error.message}`);
+
+              // Fallback: just add links
+              const jiraLinks = jiraKeys.map(key => {
+                const url = `${jiraBaseUrl}/browse/${key}`;
+                return `- [${key}](${url})`;
+              }).join('\n');
+
+              const comment = `🔗 **Related Jira Issues:**\n\n${jiraLinks}\n\n⚠️ Unable to fetch full details from Jira API.`;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: comment
+              });
+            }
+
+  validate-commits:
+    name: Validate commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check commits for Jira references
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: commits } = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            const jiraPattern = /MEDEASE-\d+/;
+            const invalidCommits = [];
+
+            for (const commit of commits) {
+              const message = commit.commit.message;
+              const firstLine = message.split('\n')[0];
+
+              // Skip merge commits
+              if (firstLine.startsWith('Merge ')) {
+                continue;
+              }
+
+              if (!jiraPattern.test(firstLine)) {
+                invalidCommits.push(`❌ \`${commit.sha.substring(0, 7)}\`: ${firstLine.substring(0, 60)}...`);
+              }
+            }
+
+            if (invalidCommits.length > 0) {
+              const message = `⚠️ **Jira Reference Warning**\n\nThe following commits do not reference a Jira issue:\n\n${invalidCommits.join('\n')}\n\n**Best Practice:** Include Jira issue key (MEDEASE-XXX) in commit messages.\n\n**Example:**\n\`\`\`\nMEDEASE-123: Add user authentication\nMEDEASE-456: Fix login bug\n\`\`\``;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: message
+              });
+
+              core.warning('Some commits are missing Jira references');
             }
