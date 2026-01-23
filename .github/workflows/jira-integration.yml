@@ -61,21 +61,6 @@ jobs:
             console.log(`Found ${issueMatches.length} GitHub issue references`);
             console.log(`Found ${jiraKeys.length} direct Jira references`);
 
-            // If no GitHub issue is linked, error
-            if (issueMatches.length === 0) {
-              const errorMessage = `❌ **Missing Issue Link**\n\nThis PR must link to a GitHub issue using:\n- \`Fixes #123\`\n- \`Closes #456\`\n- \`Resolves #789\`\n\nPlease add one of these to your PR description.`;
-
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: errorMessage
-              });
-
-              core.setFailed('PR must link to a GitHub issue');
-              return;
-            }
-
             // Fetch linked GitHub issues to extract Jira references
             let linkedIssues = [];
             for (const match of issueMatches) {
@@ -105,16 +90,7 @@ jobs:
             }
 
             if (jiraKeys.length === 0) {
-              const errorMessage = `⚠️ **No Jira Reference Found**\n\nThe linked GitHub issue(s) don't contain a Jira reference (MEDEASE-XXX).\n\nPlease ensure the linked issue references a Jira task.`;
-
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: errorMessage
-              });
-
-              core.setFailed('No Jira reference found');
+              console.log('No Jira reference found, skipping Jira integration');
               return;
             }
 
@@ -127,8 +103,7 @@ jobs:
             const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
             if (!jiraToken) {
-              console.log('⚠️ JIRA_API_TOKEN not configured');
-              core.setFailed('JIRA_API_TOKEN secret not configured');
+              console.log('⚠️ JIRA_API_TOKEN not configured, skipping Jira integration');
               return;
             }
 
@@ -293,14 +268,6 @@ jobs:
                 });
 
                 console.log('✅ Updated PR title and description');
-
-                // Add success comment
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: prNumber,
-                  body: `✅ **PR automatically updated with Jira details**\n\nTitle and description generated from [${primaryJira.key}](${primaryJira.url}) using Claude AI.`
-                });
 
               } catch (error) {
                 console.error(`Claude generation failed: ${error.message}`);
