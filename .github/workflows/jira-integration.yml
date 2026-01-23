@@ -254,7 +254,7 @@ jobs:
                   },
                   body: JSON.stringify({
                     model: 'claude-3-5-sonnet-20241022',
-                    max_tokens: 1024,
+                    max_tokens: 2048,
                     messages: [{
                       role: 'user',
                       content: claudePrompt
@@ -263,6 +263,8 @@ jobs:
                 });
 
                 if (!claudeResponse.ok) {
+                  const errorBody = await claudeResponse.text();
+                  console.error(`Claude API error ${claudeResponse.status}: ${errorBody}`);
                   throw new Error(`Claude API returned ${claudeResponse.status}`);
                 }
 
@@ -306,18 +308,18 @@ jobs:
                 // Fallback: Use template-based description
                 const fallbackDescription = `## Description
                 ${primaryJira.summary}
-                
+
                 ## Jira Reference
-                **Issue:** [${primaryJira.key}](${primaryJira.url})
-                **Type:** ${primaryJira.type}
-                **Status:** ${primaryJira.status}
-                
+                - Issue: [${primaryJira.key}](${primaryJira.url})
+                - Type: ${primaryJira.type}
+                - Status: ${primaryJira.status}
+
                 ## Description from Jira
                 ${primaryJira.description}
-                
+
                 ## Related Issues
                 Fixes #${linkedIssues[0].number}`;
-                
+
                 await github.rest.pulls.update({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -334,18 +336,18 @@ jobs:
               // Fallback without Claude
               const fallbackDescription = `## Description
                 ${primaryJira.summary}
-                
+
                 ## Jira Reference
-                **Issue:** [${primaryJira.key}](${primaryJira.url})
-                **Type:** ${primaryJira.type}
-                **Status:** ${primaryJira.status}
-                
+                - Issue: [${primaryJira.key}](${primaryJira.url})
+                - Type: ${primaryJira.type}
+                - Status: ${primaryJira.status}
+
                 ## Description from Jira
                 ${primaryJira.description}
-                
+
                 ## Related Issues
                 Fixes #${linkedIssues[0].number}`;
-                
+
               await github.rest.pulls.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
