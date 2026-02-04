@@ -191,7 +191,7 @@ jobs:
                 - Status: ${primaryJira.status}
 
                 Linked GitHub Issues:
-                ${linkedIssues.map(i => `- #${i.number}: ${i.title}`).join('\n')}
+                ${linkedIssues.length > 0 ? linkedIssues.map(i => `- #${i.number}: ${i.title}`).join('\n') : 'None'}
 
                 Code Changes Summary:
                 ${prDiff.substring(0, 5000)}
@@ -217,9 +217,7 @@ jobs:
                 - [Bullet point for each major change based on the diff]
                 - [Use the actual file changes and code modifications]
                 - [Be specific about what was added/modified]
-
-                ## Related Issues
-                Fixes #${linkedIssues[0].number}
+                ${linkedIssues.length > 0 ? `\n## Related Issues\nFixes #${linkedIssues[0].number}` : ''}
 
                 Return ONLY a JSON object with this exact structure:
                 {
@@ -280,17 +278,18 @@ jobs:
                 console.error(`Claude generation failed: ${error.message}`);
 
                 // Fallback: Use template-based description
-                const fallbackDescription = `## Description
+                let fallbackDescription = `## Description
                 ${primaryJira.summary}
 
                 ## Jira Reference
                 - Issue: [${primaryJira.key}](${primaryJira.url})
 
                 ## Description from Jira
-                ${primaryJira.description}
+                ${primaryJira.description}`;
 
-                ## Related Issues
-                Fixes #${linkedIssues[0].number}`;
+                if (linkedIssues.length > 0) {
+                  fallbackDescription += `\n\n## Related Issues\nFixes #${linkedIssues[0].number}`;
+                }
 
                 await github.rest.pulls.update({
                   owner: context.repo.owner,
@@ -306,17 +305,18 @@ jobs:
               console.log('⚠️ ANTHROPIC_API_KEY not configured, using fallback');
 
               // Fallback without Claude
-              const fallbackDescription = `## Description
+              let fallbackDescription = `## Description
                 ${primaryJira.summary}
 
                 ## Jira Reference
                 - Issue: [${primaryJira.key}](${primaryJira.url})
 
                 ## Description from Jira
-                ${primaryJira.description}
+                ${primaryJira.description}`;
 
-                ## Related Issues
-                Fixes #${linkedIssues[0].number}`;
+              if (linkedIssues.length > 0) {
+                fallbackDescription += `\n\n## Related Issues\nFixes #${linkedIssues[0].number}`;
+              }
 
               await github.rest.pulls.update({
                 owner: context.repo.owner,
