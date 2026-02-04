@@ -43,8 +43,8 @@ medease/
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js** (v18 or higher)
-- **npm** or **yarn**
+- **Node.js** v24.10.0
+- **npm** v11.6.0
 - **Git**
 - **Terraform** (v1.0 or higher) - for infrastructure management
 - **Docker** (optional, for containerized development)
