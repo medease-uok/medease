@@ -46,6 +46,7 @@ Before you begin, ensure you have the following installed:
 - **Node.js** v24.10.0 (installed)
 - **npm** v11.6.0 (installed)
 - **React** v19.2.4 (installed in frontend/)
+- **Express.js** v5.2.1 (installed in backend/)
 - **Git**
 - **Terraform** (v1.0 or higher) - for infrastructure management
 - **Docker** (optional, for containerized development)
@@ -85,7 +86,6 @@ REACT_APP_API_URL=http://localhost:3000
 #### Backend `.env`
 ```env
 PORT=3000
-DATABASE_URL=your_database_url
 NODE_ENV=development
 ```
 
@@ -140,10 +140,6 @@ npm test
 ```bash
 # Frontend
 cd frontend
-npm run build
-
-# Backend
-cd backend
 npm run build
 ```
 
