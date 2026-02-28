@@ -74,7 +74,7 @@ jobs:
             const prDetails = ${{ steps.pr_info.outputs.result }};
             const diff = process.env.PR_DIFF || '';
 
-            const maxDiffLength = 50000;
+            const maxDiffLength = 30000;
             const truncatedDiff = diff.length > maxDiffLength
               ? diff.substring(0, maxDiffLength) + '\n\n... (diff truncated due to length)'
               : diff;
@@ -116,7 +116,7 @@ jobs:
                 'Content-Type': 'application/json',
                 'x-api-key': process.env.ANTHROPIC_API_KEY,
                 'anthropic-version': '2023-06-01',
-                'Content-Length': data.length
+                'Content-Length': Buffer.byteLength(data, 'utf8')
               }
             };
 
