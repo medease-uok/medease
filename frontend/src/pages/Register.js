@@ -114,10 +114,10 @@ export default function Register() {
       return;
     }
     const result = register(form);
-    if (result) {
+    if (result.success) {
       setSuccess(true);
     } else {
-      setError('An account with this email already exists.');
+      setError(result.error);
     }
   };
 

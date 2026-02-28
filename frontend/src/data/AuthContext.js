@@ -7,7 +7,11 @@ import { addAuditLog } from './auditLogs';
 
 const AuthContext = createContext(null);
 
-// Required fields per role for profile validation
+// --- Validation ---
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^\d{9,10}$/; // local digits after +94
+
 const ROLE_REQUIRED_FIELDS = {
   patient: ['dateOfBirth', 'gender'],
   doctor: ['specialization', 'licenseNumber', 'department'],
@@ -20,6 +24,38 @@ function validateProfileData(role, data) {
   const required = ROLE_REQUIRED_FIELDS[role];
   if (!required) return true;
   return required.every((field) => data[field]);
+}
+
+function validateRegistration(form) {
+  if (!form.firstName || !form.lastName) return { ok: false, error: 'First name and last name are required.' };
+  if (!form.email || !EMAIL_RE.test(form.email)) return { ok: false, error: 'Please enter a valid email address.' };
+  if (!form.password || form.password.length < 6) return { ok: false, error: 'Password must be at least 6 characters.' };
+  if (form.password !== form.confirmPassword) return { ok: false, error: 'Passwords do not match.' };
+  if (form.phone && !PHONE_RE.test(form.phone)) return { ok: false, error: 'Phone number should be 9-10 digits (without +94).' };
+  if (form.role === 'patient' && form.dateOfBirth) {
+    if (new Date(form.dateOfBirth) > new Date()) return { ok: false, error: 'Date of birth cannot be in the future.' };
+  }
+  if (!validateProfileData(form.role, form)) return { ok: false, error: 'Please fill in all required professional fields.' };
+  return { ok: true };
+}
+
+// --- Profile config ---
+
+// Fields to extract from form into profileData per role
+const PROFILE_FIELD_MAP = {
+  patient: ['dateOfBirth', 'gender', 'bloodType', 'address', 'emergencyContact', 'emergencyRelationship', 'emergencyPhone'],
+  doctor: ['specialization', 'licenseNumber', 'department'],
+  nurse: ['licenseNumber', 'department'],
+  lab_technician: ['department'],
+  pharmacist: ['licenseNumber'],
+};
+
+function buildProfileData(role, form) {
+  const fields = PROFILE_FIELD_MAP[role];
+  if (!fields) return {};
+  const data = {};
+  fields.forEach((f) => { data[f] = form[f] || ''; });
+  return data;
 }
 
 // Profile creators for roles with dedicated tables
@@ -53,11 +89,12 @@ const profileCreators = {
   }),
 };
 
-// Target arrays for each profile type
 const profileTargets = {
   patient: patients,
   doctor: doctors,
 };
+
+// --- Auth Provider ---
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -83,9 +120,10 @@ export function AuthProvider({ children }) {
 
   const register = (form) => {
     const exists = users.find((u) => u.email === form.email);
-    if (exists) return false;
+    if (exists) return { success: false, error: 'An account with this email already exists.' };
 
-    if (!validateProfileData(form.role, form)) return false;
+    const validation = validateRegistration(form);
+    if (!validation.ok) return { success: false, error: validation.error };
 
     const newUser = {
       id: `reg-${uuidv4()}`,
@@ -96,67 +134,43 @@ export function AuthProvider({ children }) {
       phone: form.phone || '',
       role: form.role,
       isActive: false,
-      profileData: {},
+      profileData: buildProfileData(form.role, form),
     };
-
-    if (form.role === 'patient') {
-      newUser.profileData = {
-        dateOfBirth: form.dateOfBirth,
-        gender: form.gender,
-        bloodType: form.bloodType || '',
-        address: form.address || '',
-        emergencyContact: form.emergencyContact || '',
-        emergencyRelationship: form.emergencyRelationship || '',
-        emergencyPhone: form.emergencyPhone || '',
-      };
-    } else if (form.role === 'doctor') {
-      newUser.profileData = {
-        specialization: form.specialization,
-        licenseNumber: form.licenseNumber,
-        department: form.department,
-      };
-    } else if (form.role === 'nurse') {
-      newUser.profileData = {
-        licenseNumber: form.licenseNumber,
-        department: form.department,
-      };
-    } else if (form.role === 'lab_technician') {
-      newUser.profileData = {
-        department: form.department,
-      };
-    } else if (form.role === 'pharmacist') {
-      newUser.profileData = {
-        licenseNumber: form.licenseNumber,
-      };
-    }
 
     users.push(newUser);
     addAuditLog({ userId: newUser.id, userName: `${newUser.firstName} ${newUser.lastName}`, action: 'REGISTER', resourceType: 'user', resourceId: newUser.id });
-    return true;
+    return { success: true };
   };
 
   const approveUser = (userId) => {
-    if (currentUser?.role !== 'admin') return;
+    if (currentUser?.role !== 'admin') {
+      addAuditLog({ userId: currentUser?.id, userName: `${currentUser?.firstName} ${currentUser?.lastName}`, action: 'APPROVE_USER_DENIED', resourceType: 'user', resourceId: userId, success: false });
+      return;
+    }
 
     const user = users.find((u) => u.id === userId);
     if (!user || user.isActive) return;
 
     const profile = user.profileData || {};
 
-    // Validate profile data before approval
     if (!validateProfileData(user.role, profile)) return;
 
-    // Create role-specific profile record if applicable
+    // Create role-specific profile with rollback on failure
     const creator = profileCreators[user.role];
     const target = profileTargets[user.role];
     if (creator && target) {
-      const record = creator(user, profile);
-      target.push(record);
+      try {
+        const record = creator(user, profile);
+        target.push(record);
+      } catch (err) {
+        addAuditLog({ userId: currentUser.id, userName: `${currentUser.firstName} ${currentUser.lastName}`, action: 'APPROVE_USER_FAILED', resourceType: 'user', resourceId: userId, success: false });
+        return;
+      }
     }
     // Nurses, lab_technicians, pharmacists don't have separate profile tables —
     // their data lives on the user record (matches the database schema)
 
-    // Activate user and clean up only after profile creation succeeds
+    // Activate only after profile creation succeeds
     user.isActive = true;
     delete user.profileData;
 
@@ -164,7 +178,10 @@ export function AuthProvider({ children }) {
   };
 
   const rejectUser = (userId) => {
-    if (currentUser?.role !== 'admin') return;
+    if (currentUser?.role !== 'admin') {
+      addAuditLog({ userId: currentUser?.id, userName: `${currentUser?.firstName} ${currentUser?.lastName}`, action: 'REJECT_USER_DENIED', resourceType: 'user', resourceId: userId, success: false });
+      return;
+    }
 
     const idx = users.findIndex((u) => u.id === userId);
     if (idx !== -1) {
