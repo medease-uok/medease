@@ -133,6 +133,19 @@ This starts:
 To stop services: `docker compose down`
 To reset data: `docker compose down -v`
 
+#### Seed Test Data (Optional)
+
+To populate the database with sample data for development:
+
+```bash
+cd backend
+npm run db:seed
+```
+
+This adds test users (all roles), patients, doctors, appointments, medical records, prescriptions, lab reports, and audit logs. All test accounts use the password `password123`.
+
+To reset everything and start fresh: `npm run db:reset`
+
 ### 5. Run the Application
 
 #### Frontend
