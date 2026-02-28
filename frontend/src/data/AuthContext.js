@@ -103,20 +103,20 @@ export function AuthProvider({ children }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const login = (email, password) => {
-    const user = users.find((u) => u.email === email && u.password === password);
-    if (!user) {
-      addAuditLog({ userId: null, userName: email, action: 'LOGIN_FAILED', resourceType: 'session', success: false });
+  const login = async (email, password) => {
+    try {
+      const data = await api.post('/auth/login', { email, password });
+      const { token, user } = data.data;
+      setCurrentUser(user);
+      localStorage.setItem('medease_user', JSON.stringify(user));
+      localStorage.setItem('medease_token', token);
+      return { success: true };
+    } catch (err) {
+      if (err.status === 403) {
+        return { success: false, reason: 'pending' };
+      }
       return { success: false, reason: 'invalid' };
     }
-    if (!user.isActive) {
-      addAuditLog({ userId: user.id, userName: `${user.firstName} ${user.lastName}`, action: 'LOGIN_BLOCKED', resourceType: 'session', success: false });
-      return { success: false, reason: 'pending' };
-    }
-    setCurrentUser(user);
-    localStorage.setItem('medease_user', JSON.stringify(user));
-    addAuditLog({ userId: user.id, userName: `${user.firstName} ${user.lastName}`, action: 'LOGIN', resourceType: 'session' });
-    return { success: true };
   };
 
   const register = async (form) => {
@@ -195,6 +195,7 @@ export function AuthProvider({ children }) {
     }
     setCurrentUser(null);
     localStorage.removeItem('medease_user');
+    localStorage.removeItem('medease_token');
   };
 
   return (
