@@ -127,7 +127,7 @@ docker compose up -d
 
 This starts:
 - **PostgreSQL 17** on port 5432 (database auto-initialized with schema)
-- **Redis 8** on port 6379
+- **Redis 8** on port 6379 (session caching and data caching)
 - **pgAdmin** on http://localhost:5050 (login: admin@medease.com / admin)
 
 To stop services: `docker compose down`
