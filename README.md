@@ -104,7 +104,19 @@ npm install
 
 ### 3. Environment Configuration
 
-Create `.env` files in the appropriate directories:
+Copy the example files to create your local environment config:
+
+```bash
+cp frontend/.env.example frontend/.env
+cp backend/.env.example backend/.env
+```
+
+Or use the pre-configured development defaults directly:
+
+```bash
+cp frontend/.env.development frontend/.env
+cp backend/.env.development backend/.env
+```
 
 #### Frontend `.env`
 ```env
@@ -117,6 +129,10 @@ PORT=3000
 NODE_ENV=development
 DATABASE_URL=postgresql://medease_user:medease_dev_password@localhost:5432/medease
 REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-jwt-secret-here
+JWT_EXPIRES_IN=24h
+CORS_ORIGIN=http://localhost:3001
+LOG_LEVEL=debug
 ```
 
 ### 4. Start Database Services
