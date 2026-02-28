@@ -1,0 +1,6 @@
+export const doctors = [
+  { id: 'dc000000-0000-0000-0000-000000000001', userId: 'd0000000-0000-0000-0000-000000000001', firstName: 'Kamal', lastName: 'Perera', email: 'kamal.perera@medease.com', phone: '+94772000001', specialization: 'Cardiology', licenseNumber: 'SLMC-2015-4521', department: 'Cardiology', available: true },
+  { id: 'dc000000-0000-0000-0000-000000000002', userId: 'd0000000-0000-0000-0000-000000000002', firstName: 'Sithara', lastName: 'Silva', email: 'sithara.silva@medease.com', phone: '+94772000002', specialization: 'Neurology', licenseNumber: 'SLMC-2016-7832', department: 'Neurology', available: true },
+  { id: 'dc000000-0000-0000-0000-000000000003', userId: 'd0000000-0000-0000-0000-000000000003', firstName: 'Ruwan', lastName: 'Fernando', email: 'ruwan.fernando@medease.com', phone: '+94772000003', specialization: 'Orthopedics', licenseNumber: 'SLMC-2018-3294', department: 'Orthopedics', available: true },
+  { id: 'dc000000-0000-0000-0000-000000000004', userId: 'd0000000-0000-0000-0000-000000000004', firstName: 'Anjali', lastName: 'Dissanayake', email: 'anjali.dissanayake@medease.com', phone: '+94772000004', specialization: 'Pediatrics', licenseNumber: 'SLMC-2019-5617', department: 'Pediatrics', available: false },
+];
