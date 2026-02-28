@@ -145,15 +145,18 @@ export function AuthProvider({ children }) {
   const approveUser = (userId) => {
     if (currentUser?.role !== 'admin') {
       addAuditLog({ userId: currentUser?.id, userName: `${currentUser?.firstName} ${currentUser?.lastName}`, action: 'APPROVE_USER_DENIED', resourceType: 'user', resourceId: userId, success: false });
-      return;
+      return { success: false, error: 'Unauthorized.' };
     }
 
     const user = users.find((u) => u.id === userId);
-    if (!user || user.isActive) return;
+    if (!user) return { success: false, error: 'User not found.' };
+    if (user.isActive) return { success: false, error: 'User is already active.' };
 
     const profile = user.profileData || {};
 
-    if (!validateProfileData(user.role, profile)) return;
+    if (!validateProfileData(user.role, profile)) {
+      return { success: false, error: 'Incomplete profile data. Cannot approve.' };
+    }
 
     // Create role-specific profile with rollback on failure
     const creator = profileCreators[user.role];
@@ -164,7 +167,7 @@ export function AuthProvider({ children }) {
         target.push(record);
       } catch (err) {
         addAuditLog({ userId: currentUser.id, userName: `${currentUser.firstName} ${currentUser.lastName}`, action: 'APPROVE_USER_FAILED', resourceType: 'user', resourceId: userId, success: false });
-        return;
+        return { success: false, error: 'Failed to create profile. Please try again.' };
       }
     }
     // Nurses, lab_technicians, pharmacists don't have separate profile tables —
@@ -175,19 +178,21 @@ export function AuthProvider({ children }) {
     delete user.profileData;
 
     addAuditLog({ userId: currentUser.id, userName: `${currentUser.firstName} ${currentUser.lastName}`, action: 'APPROVE_USER', resourceType: 'user', resourceId: userId });
+    return { success: true };
   };
 
   const rejectUser = (userId) => {
     if (currentUser?.role !== 'admin') {
       addAuditLog({ userId: currentUser?.id, userName: `${currentUser?.firstName} ${currentUser?.lastName}`, action: 'REJECT_USER_DENIED', resourceType: 'user', resourceId: userId, success: false });
-      return;
+      return { success: false, error: 'Unauthorized.' };
     }
 
     const idx = users.findIndex((u) => u.id === userId);
-    if (idx !== -1) {
-      addAuditLog({ userId: currentUser.id, userName: `${currentUser.firstName} ${currentUser.lastName}`, action: 'REJECT_USER', resourceType: 'user', resourceId: userId });
-      users.splice(idx, 1);
-    }
+    if (idx === -1) return { success: false, error: 'User not found.' };
+
+    addAuditLog({ userId: currentUser.id, userName: `${currentUser.firstName} ${currentUser.lastName}`, action: 'REJECT_USER', resourceType: 'user', resourceId: userId });
+    users.splice(idx, 1);
+    return { success: true };
   };
 
   const logout = () => {
