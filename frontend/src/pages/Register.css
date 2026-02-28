@@ -1,0 +1,40 @@
+.register-card {
+  max-width: 500px;
+}
+
+.register-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.register-error {
+  background: #fed7d7;
+  color: #9b2c2c;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.register-success {
+  text-align: center;
+  padding: 20px 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.register-success p:first-child {
+  font-size: 16px;
+  font-weight: 600;
+  color: #38a169;
+  margin-bottom: 8px;
+}
+
+.register-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}

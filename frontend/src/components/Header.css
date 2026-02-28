@@ -1,0 +1,57 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-width);
+  right: 0;
+  height: var(--header-height);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 99;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-user {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.header-role {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
+  background: var(--color-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.header-logout {
+  background: none;
+  border: 1px solid var(--color-border);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  transition: all 0.15s;
+}
+
+.header-logout:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
