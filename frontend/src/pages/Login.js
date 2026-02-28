@@ -1,29 +1,26 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
-import { users, roles } from '../data/users';
 import './Login.css';
 
 export default function Login() {
-  const [selectedRole, setSelectedRole] = useState('admin');
-  const [email, setEmail] = useState('admin@medease.com');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const roleUsers = users.filter((u) => u.role === selectedRole);
-
-  const handleRoleChange = (role) => {
-    setSelectedRole(role);
-    const first = users.find((u) => u.role === role);
-    if (first) setEmail(first.email);
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
-    const user = users.find((u) => u.email === email);
-    if (user) {
-      login(user.id);
+    if (!email || !password) {
+      setError('Please enter both email and password.');
+      return;
+    }
+    const success = login(email, password);
+    if (success) {
       navigate('/dashboard');
+    } else {
+      setError('Invalid email or password.');
     }
   };
 
@@ -35,48 +32,35 @@ export default function Login() {
           <h1 className="login-title">MedEase</h1>
           <p className="login-subtitle">Hospital Management System</p>
         </div>
+        {error && <div className="register-error">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="login-field">
-            <label className="login-label">Role</label>
-            <select
-              className="login-select"
-              value={selectedRole}
-              onChange={(e) => handleRoleChange(e.target.value)}
-            >
-              {roles.map((role) => (
-                <option key={role} value={role}>
-                  {role.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="login-field">
             <label className="login-label">Email</label>
-            <select
-              className="login-select"
+            <input
+              type="email"
+              className="login-input"
+              placeholder="Enter your email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            >
-              {roleUsers.map((u) => (
-                <option key={u.id} value={u.email}>
-                  {u.firstName} {u.lastName} ({u.email})
-                </option>
-              ))}
-            </select>
+              onChange={(e) => { setEmail(e.target.value); setError(''); }}
+            />
           </div>
           <div className="login-field">
             <label className="login-label">Password</label>
             <input
               type="password"
               className="login-input"
-              value="password123"
-              readOnly
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setError(''); }}
             />
           </div>
           <button type="submit" className="login-button">
             Sign In
           </button>
         </form>
+        <div className="register-footer">
+          Don't have an account? <Link to="/register">Create Account</Link>
+        </div>
       </div>
     </div>
   );
