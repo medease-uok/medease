@@ -4,6 +4,7 @@ import { users } from './users';
 import { patients } from './patients';
 import { doctors } from './doctors';
 import { addAuditLog } from './auditLogs';
+import api from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -118,28 +119,21 @@ export function AuthProvider({ children }) {
     return { success: true };
   };
 
-  const register = (form) => {
-    const exists = users.find((u) => u.email === form.email);
-    if (exists) return { success: false, error: 'An account with this email already exists.' };
-
+  const register = async (form) => {
+    // Quick client-side validation before hitting the API
     const validation = validateRegistration(form);
     if (!validation.ok) return { success: false, error: validation.error };
 
-    const newUser = {
-      id: `reg-${uuidv4()}`,
-      firstName: form.firstName,
-      lastName: form.lastName,
-      email: form.email,
-      password: form.password,
-      phone: form.phone || '',
-      role: form.role,
-      isActive: false,
-      profileData: buildProfileData(form.role, form),
-    };
-
-    users.push(newUser);
-    addAuditLog({ userId: newUser.id, userName: `${newUser.firstName} ${newUser.lastName}`, action: 'REGISTER', resourceType: 'user', resourceId: newUser.id });
-    return { success: true };
+    try {
+      await api.post('/auth/register', form);
+      return { success: true };
+    } catch (err) {
+      // If the backend returns field-level validation errors, show the first one
+      if (err.data?.errors?.length) {
+        return { success: false, error: err.data.errors[0].message };
+      }
+      return { success: false, error: err.message || 'Registration failed. Please try again.' };
+    }
   };
 
   const approveUser = (userId) => {

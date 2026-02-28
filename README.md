@@ -41,7 +41,7 @@ MedEase is a web-based hospital management system that streamlines patient care,
 
 ### Tech Stack
 
-- **Frontend**: React.js with Tailwind CSS
+- **Frontend**: React.js
 - **Backend**: Node.js & Express (RESTful API)
 - **Database**: PostgreSQL (RDS)
 - **Cloud**: AWS (Fargate, S3, CloudFront, API Gateway, Cognito)
@@ -60,9 +60,21 @@ medease/
 │   ├── labels.yml         # GitHub labels configuration
 │   ├── labeler.yml        # Auto-labeling rules
 │   └── prettier.json      # Code formatting rules
+├── database/
+│   └── init/              # PostgreSQL initialization scripts
+│       └── 01-init.sql    # Schema: users, patients, doctors, nurses, pharmacists, etc.
 ├── docs/                  # Project documentation
 ├── frontend/              # React.js frontend application
 ├── backend/               # Node.js & Express backend API
+│   └── src/
+│       ├── config/        # Database, Redis, and app configuration
+│       ├── controllers/   # Route handlers (auth, etc.)
+│       ├── middleware/     # Error handler, validation runner
+│       ├── routes/        # API route definitions
+│       ├── validators/    # Request validation rules
+│       ├── utils/         # Shared utilities (AppError, etc.)
+│       └── index.js       # Express server entry point
+├── docker-compose.yml     # PostgreSQL, Redis, pgAdmin services
 ├── terraform/             # Infrastructure as Code
 └── README.md
 ```
@@ -102,52 +114,44 @@ cd backend
 npm install
 ```
 
-### 3. Environment Configuration
+### 3. Start Database Services
 
-Copy the example files to create your local environment config:
-
-```bash
-cp frontend/.env.example frontend/.env
-cp backend/.env.example backend/.env
-```
-
-Or use the pre-configured development defaults directly:
-
-```bash
-cp frontend/.env.development frontend/.env
-cp backend/.env.development backend/.env
-```
-
-#### Frontend `.env`
-```env
-REACT_APP_API_URL=http://localhost:3000
-```
-
-#### Backend `.env`
-```env
-PORT=3000
-NODE_ENV=development
-DATABASE_URL=postgresql://medease_user:medease_dev_password@localhost:5432/medease
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=your-jwt-secret-here
-JWT_EXPIRES_IN=24h
-CORS_ORIGIN=http://localhost:3001
-LOG_LEVEL=debug
-```
-
-### 4. Start Database Services
+Start PostgreSQL and Redis before configuring the backend:
 
 ```bash
 docker compose up -d
 ```
 
 This starts:
-- **PostgreSQL 17** on port 5432 (database auto-initialized with schema)
+- **PostgreSQL 17** on port 5433 (database auto-initialized with schema)
 - **Redis 8** on port 6379 (session caching and data caching)
 - **pgAdmin** on http://localhost:5050 (login: admin@medease.com / admin)
 
+> **Note:** PostgreSQL is mapped to port 5433 (not the default 5432) to avoid conflicts with any locally installed PostgreSQL.
+
 To stop services: `docker compose down`
 To reset data: `docker compose down -v`
+
+### 4. Environment Configuration
+
+The project includes pre-configured `.env.development` files that work out of the box. The backend reads `.env.development` automatically based on `NODE_ENV`, and the frontend uses `.env.development` as a fallback when no `.env` exists.
+
+If you need to override any values, copy the example files:
+
+```bash
+cp frontend/.env.example frontend/.env
+cp backend/.env.example backend/.env
+```
+
+#### Default Development Ports
+
+| Service | Port |
+|---------|------|
+| Frontend (React) | 3000 |
+| Backend (Express) | 5001 |
+| PostgreSQL | 5433 |
+| Redis | 6379 |
+| pgAdmin | 5050 |
 
 #### Seed Test Data (Optional)
 
@@ -164,16 +168,21 @@ To reset everything and start fresh: `npm run db:reset`
 
 ### 5. Run the Application
 
-#### Frontend
+#### Frontend (port 3000)
 ```bash
 cd frontend
 npm start
 ```
 
-#### Backend
+#### Backend (port 5001)
 ```bash
 cd backend
 npm run dev
+```
+
+Verify the backend is connected:
+```bash
+curl http://localhost:5001/health
 ```
 
 ### 6. Infrastructure Setup (Optional)
