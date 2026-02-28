@@ -34,6 +34,7 @@ export default function PatientDetail() {
           { label: 'Blood Type', value: patient.bloodType },
           { label: 'Address', value: patient.address },
           { label: 'Emergency Contact', value: patient.emergencyContact },
+          { label: 'Relationship', value: patient.emergencyRelationship },
           { label: 'Emergency Phone', value: patient.emergencyPhone },
         ]}
       />

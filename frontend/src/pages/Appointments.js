@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { appointments, appointmentStatuses } from '../data/appointments';
+import { patients } from '../data/patients';
+import { useAuth } from '../data/AuthContext';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import './Appointments.css';
@@ -11,25 +13,34 @@ const formatDate = (iso) => {
   });
 };
 
-const columns = [
-  { key: 'patientName', label: 'Patient' },
-  { key: 'doctorName', label: 'Doctor' },
-  { key: 'scheduledAt', label: 'Scheduled', render: (val) => formatDate(val) },
-  { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
-  { key: 'notes', label: 'Notes', render: (val) => val?.substring(0, 50) + '...' },
-];
-
 export default function Appointments() {
   const [filter, setFilter] = useState('all');
+  const { currentUser } = useAuth();
+
+  const patient = currentUser?.role === 'patient'
+    ? patients.find((p) => p.userId === currentUser.id)
+    : null;
+
+  const baseData = patient
+    ? appointments.filter((a) => a.patientId === patient.id)
+    : appointments;
 
   const filtered = filter === 'all'
-    ? appointments
-    : appointments.filter((a) => a.status === filter);
+    ? baseData
+    : baseData.filter((a) => a.status === filter);
+
+  const columns = [
+    ...(patient ? [] : [{ key: 'patientName', label: 'Patient' }]),
+    { key: 'doctorName', label: 'Doctor' },
+    { key: 'scheduledAt', label: 'Scheduled', render: (val) => formatDate(val) },
+    { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
+    { key: 'notes', label: 'Notes', render: (val) => val?.substring(0, 50) + '...' },
+  ];
 
   return (
     <div>
       <div className="page-header">
-        <h2 className="page-title">Appointments</h2>
+        <h2 className="page-title">{patient ? 'My Appointments' : 'Appointments'}</h2>
         <span className="count-badge">{filtered.length}</span>
       </div>
       <div className="filter-bar">
