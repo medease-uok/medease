@@ -19,7 +19,7 @@
 
 ## Executive Summary
 
-MedEase is a healthcare platform handling Protected Health Information (PHI). This document outlines our comprehensive security architecture ensuring HIPAA compliance and data protection.
+MedEase is a healthcare platform built on a **microservices architecture** handling Protected Health Information (PHI). Each service (appointments, medical records, prescriptions, lab reports, payments, notifications) is independently deployed on AWS Fargate. This document outlines our comprehensive security architecture ensuring HIPAA compliance and data protection.
 
 ### Security Objectives
 - **Confidentiality**: PHI accessible only to authorized users
@@ -64,6 +64,8 @@ graph TB
 ---
 
 ## Authentication
+
+Authentication is managed through **AWS Cognito** for identity management, issuing JWT tokens for API authorization.
 
 ### Authentication Flow
 
@@ -146,6 +148,8 @@ graph TD
     SA --> CO[Compliance Officer]
     OA --> DOC[Doctor]
     OA --> NUR[Nurse]
+    OA --> LT[Lab Technician]
+    OA --> PH[Pharmacist]
     OA --> ADM[Staff Admin]
     DOC --> PAT[Patient]
 ```
@@ -165,9 +169,11 @@ Examples:
 |------|----------------|-----|---------|
 | System Admin | `admin:*:all` | Yes | 30 min |
 | Org Admin | `admin:org:own` | Yes | 60 min |
-| Doctor | `read:patients:assigned`, `write:medical_records:assigned` | Yes | 60 min |
+| Doctor | `read:patients:assigned`, `write:medical_records:assigned`, `write:prescriptions:own` | Yes | 60 min |
 | Nurse | `read:patients:assigned`, `write:vitals:assigned` | No | 60 min |
-| Patient | `read:patients:own` | No | 120 min |
+| Lab Technician | `write:lab_reports:own`, `read:patients:assigned` | No | 60 min |
+| Pharmacist | `read:prescriptions:all`, `write:inventory:own`, `write:dispensing:own` | No | 60 min |
+| Patient | `read:patients:own`, `read:prescriptions:own`, `read:lab_reports:own` | No | 120 min |
 
 ### Database Schema
 
@@ -376,6 +382,14 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 ```
+
+### Payment Security (Hela Pay)
+
+- All payment transactions processed through the **Hela Pay** gateway
+- Payment data transmitted over TLS 1.3 only
+- No credit card or payment credentials stored in MedEase database
+- Payment confirmation tokens validated server-side before updating billing records
+- All payment events logged in the audit trail
 
 ### SQL Injection Prevention
 
