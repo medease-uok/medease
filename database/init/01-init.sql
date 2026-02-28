@@ -33,7 +33,7 @@ CREATE TABLE users (
   last_name VARCHAR(100) NOT NULL,
   role user_role NOT NULL,
   phone VARCHAR(20),
-  is_active BOOLEAN DEFAULT true,
+  is_active BOOLEAN DEFAULT false,
   mfa_enabled BOOLEAN DEFAULT false,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -48,6 +48,7 @@ CREATE TABLE patients (
   blood_type VARCHAR(5),
   address TEXT,
   emergency_contact VARCHAR(100),
+  emergency_relationship VARCHAR(50),
   emergency_phone VARCHAR(20),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -61,6 +62,25 @@ CREATE TABLE doctors (
   license_number VARCHAR(50) UNIQUE NOT NULL,
   department VARCHAR(100),
   available BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Nurses table
+CREATE TABLE nurses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  license_number VARCHAR(50) UNIQUE NOT NULL,
+  department VARCHAR(100),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Pharmacists table
+CREATE TABLE pharmacists (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  license_number VARCHAR(50) UNIQUE NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -135,6 +155,9 @@ CREATE INDEX idx_appointments_scheduled ON appointments(scheduled_at);
 CREATE INDEX idx_medical_records_patient ON medical_records(patient_id);
 CREATE INDEX idx_prescriptions_patient ON prescriptions(patient_id);
 CREATE INDEX idx_lab_reports_patient ON lab_reports(patient_id);
+CREATE INDEX idx_nurses_user ON nurses(user_id);
+CREATE INDEX idx_nurses_department ON nurses(department);
+CREATE INDEX idx_pharmacists_user ON pharmacists(user_id);
 CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_created ON audit_logs(created_at);
 
@@ -143,6 +166,8 @@ ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medical_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lab_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nurses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pharmacists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Grant table permissions to app role
