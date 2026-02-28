@@ -16,9 +16,11 @@ export default function Login() {
       setError('Please enter both email and password.');
       return;
     }
-    const success = login(email, password);
-    if (success) {
+    const result = login(email, password);
+    if (result.success) {
       navigate('/dashboard');
+    } else if (result.reason === 'pending') {
+      setError('Your account is pending admin approval.');
     } else {
       setError('Invalid email or password.');
     }

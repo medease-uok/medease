@@ -1,3 +1,19 @@
+let logCounter = 16;
+
+export function addAuditLog({ userId, userName, action, resourceType, resourceId = null, success = true }) {
+  auditLogs.push({
+    id: `al-${String(logCounter++).padStart(3, '0')}`,
+    userId,
+    userName,
+    action,
+    resourceType,
+    resourceId,
+    ipAddress: '127.0.0.1',
+    success,
+    createdAt: new Date().toISOString(),
+  });
+}
+
 export const auditLogs = [
   { id: 'al-001', userId: 'a0000000-0000-0000-0000-000000000001', userName: 'System Admin', action: 'LOGIN', resourceType: 'session', resourceId: null, ipAddress: '192.168.1.10', success: true, createdAt: '2026-02-28T08:00:00' },
   { id: 'al-002', userId: 'd0000000-0000-0000-0000-000000000001', userName: 'Kamal Perera', action: 'LOGIN', resourceType: 'session', resourceId: null, ipAddress: '192.168.1.20', success: true, createdAt: '2026-02-28T08:15:00' },

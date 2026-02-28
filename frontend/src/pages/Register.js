@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
-import { roles } from '../data/users';
+import { roles as allRoles } from '../data/users';
 import './Login.css';
 import './Register.css';
+
+const roles = allRoles.filter((r) => r !== 'admin');
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -16,8 +18,8 @@ export default function Register() {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const { register } = useAuth();
-  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -39,9 +41,9 @@ export default function Register() {
       return;
     }
 
-    const success = register(form);
-    if (success) {
-      navigate('/dashboard');
+    const result = register(form);
+    if (result) {
+      setSuccess(true);
     } else {
       setError('An account with this email already exists.');
     }
@@ -55,6 +57,15 @@ export default function Register() {
           <h1 className="login-title">MedEase</h1>
           <p className="login-subtitle">Create an Account</p>
         </div>
+        {success ? (
+          <div className="register-success">
+            <p>Your account has been created successfully.</p>
+            <p>Please wait for admin approval before signing in.</p>
+            <Link to="/login" className="login-button" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '20px' }}>
+              Back to Sign In
+            </Link>
+          </div>
+        ) : (<>
         {error && <div className="register-error">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="register-row">
@@ -144,6 +155,7 @@ export default function Register() {
         <div className="register-footer">
           Already have an account? <Link to="/login">Sign In</Link>
         </div>
+        </>)}
       </div>
     </div>
   );

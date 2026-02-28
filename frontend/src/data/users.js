@@ -1,9 +1,8 @@
 export const roles = ['patient', 'doctor', 'nurse', 'lab_technician', 'pharmacist', 'admin'];
 
 export const users = [
-  // Admins
+  // Admin
   { id: 'a0000000-0000-0000-0000-000000000001', email: 'admin@medease.com', password: 'admin123', firstName: 'System', lastName: 'Admin', role: 'admin', phone: '+94771000001', isActive: true },
-  { id: 'a0000000-0000-0000-0000-000000000002', email: 'nimali.admin@medease.com', password: 'password123', firstName: 'Nimali', lastName: 'Jayawardena', role: 'admin', phone: '+94771000002', isActive: true },
 
   // Doctors
   { id: 'd0000000-0000-0000-0000-000000000001', email: 'kamal.perera@medease.com', password: 'password123', firstName: 'Kamal', lastName: 'Perera', role: 'doctor', phone: '+94772000001', isActive: true },

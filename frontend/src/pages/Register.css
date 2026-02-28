@@ -17,6 +17,21 @@
   margin-bottom: 20px;
 }
 
+.register-success {
+  text-align: center;
+  padding: 20px 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.register-success p:first-child {
+  font-size: 16px;
+  font-weight: 600;
+  color: #38a169;
+  margin-bottom: 8px;
+}
+
 .register-footer {
   text-align: center;
   margin-top: 20px;
