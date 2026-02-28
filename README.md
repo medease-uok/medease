@@ -77,7 +77,7 @@ Before you begin, ensure you have the following installed:
 - **Express.js** v5.2.1 (installed in backend/)
 - **Git**
 - **Terraform** (v1.0 or higher) - for infrastructure management
-- **Docker** (optional, for containerized development)
+- **Docker** v28+ and Docker Compose - required for database services
 
 ## Getting Started
 
@@ -115,9 +115,25 @@ REACT_APP_API_URL=http://localhost:3000
 ```env
 PORT=3000
 NODE_ENV=development
+DATABASE_URL=postgresql://medease_user:medease_dev_password@localhost:5432/medease
+REDIS_URL=redis://localhost:6379
 ```
 
-### 4. Run the Application
+### 4. Start Database Services
+
+```bash
+docker compose up -d
+```
+
+This starts:
+- **PostgreSQL 17** on port 5432 (database auto-initialized with schema)
+- **Redis 8** on port 6379
+- **pgAdmin** on http://localhost:5050 (login: admin@medease.com / admin)
+
+To stop services: `docker compose down`
+To reset data: `docker compose down -v`
+
+### 5. Run the Application
 
 #### Frontend
 ```bash
@@ -131,7 +147,7 @@ cd backend
 npm run dev
 ```
 
-### 5. Infrastructure Setup (Optional)
+### 6. Infrastructure Setup (Optional)
 
 ```bash
 cd terraform
