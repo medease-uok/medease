@@ -6,9 +6,26 @@ import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import './AdminPanel.css';
 
+function ProfileDetails({ user }) {
+  const profile = user.profileData || {};
+  const entries = Object.entries(profile).filter(([, v]) => v);
+  if (entries.length === 0) return <span className="admin-detail-empty">No additional details</span>;
+  return (
+    <div className="admin-profile-details">
+      {entries.map(([key, val]) => (
+        <div key={key} className="admin-detail-item">
+          <strong>{key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())}</strong>
+          {val}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const [tab, setTab] = useState('users');
   const [, forceUpdate] = useState(0);
+  const [expandedUser, setExpandedUser] = useState(null);
   const { approveUser, rejectUser } = useAuth();
 
   const pendingUsers = users.filter((u) => !u.isActive);
@@ -21,6 +38,7 @@ export default function AdminPanel() {
 
   const handleReject = (userId) => {
     rejectUser(userId);
+    setExpandedUser(null);
     forceUpdate((n) => n + 1);
   };
 
@@ -29,24 +47,6 @@ export default function AdminPanel() {
     { key: 'email', label: 'Email' },
     { key: 'role', label: 'Role', render: (val) => <StatusBadge status={val} /> },
     { key: 'phone', label: 'Phone' },
-  ];
-
-  const pendingColumns = [
-    ...userColumns,
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (_, row) => (
-        <div className="admin-actions">
-          <button className="admin-btn admin-btn-approve" onClick={() => handleApprove(row.id)}>
-            Approve
-          </button>
-          <button className="admin-btn admin-btn-reject" onClick={() => handleReject(row.id)}>
-            Reject
-          </button>
-        </div>
-      ),
-    },
   ];
 
   const logColumns = [
@@ -101,9 +101,47 @@ export default function AdminPanel() {
       {tab === 'users' && <DataTable columns={userColumns} data={activeUsers} />}
       {tab === 'pending' && (
         pendingUsers.length > 0 ? (
-          <DataTable columns={pendingColumns} data={pendingUsers} />
+          <>
+            <div className="admin-pending-banner">
+              <span className="admin-pending-banner-icon">!</span>
+              <span>{pendingUsers.length} user{pendingUsers.length > 1 ? 's' : ''} waiting for approval</span>
+            </div>
+            <div className="admin-pending-list">
+              {pendingUsers.map((user) => (
+                <div key={user.id} className="admin-pending-card">
+                  <div className="admin-pending-header">
+                    <div className="admin-pending-info">
+                      <div className="admin-pending-name">{user.firstName} {user.lastName}</div>
+                      <div className="admin-pending-meta">
+                        {user.email} &middot; {user.phone || 'No phone'}
+                      </div>
+                    </div>
+                    <div className="admin-pending-role">
+                      <StatusBadge status={user.role} />
+                    </div>
+                  </div>
+                  <div className="admin-pending-body">
+                    <div className="admin-pending-body-title">Registration Details</div>
+                    <ProfileDetails user={user} />
+                  </div>
+                  <div className="admin-pending-footer">
+                    <button className="admin-btn admin-btn-approve" onClick={() => handleApprove(user.id)}>
+                      Approve User
+                    </button>
+                    <button className="admin-btn admin-btn-reject" onClick={() => handleReject(user.id)}>
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
-          <p className="admin-empty">No pending approvals.</p>
+          <div className="admin-empty-state">
+            <div className="admin-empty-icon">&#10003;</div>
+            <p className="admin-empty-title">All caught up!</p>
+            <p className="admin-empty-desc">No pending approvals at the moment.</p>
+          </div>
         )
       )}
       {tab === 'logs' && <DataTable columns={logColumns} data={[...auditLogs].reverse()} />}
