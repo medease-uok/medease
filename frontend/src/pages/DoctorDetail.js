@@ -1,21 +1,33 @@
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { doctors } from '../data/doctors';
-import { appointments } from '../data/appointments';
-import { prescriptions } from '../data/prescriptions';
+import api from '../services/api';
 import DetailCard from '../components/DetailCard';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 
 export default function DoctorDetail() {
   const { id } = useParams();
-  const doctor = doctors.find((d) => d.id === id);
+  const [doctor, setDoctor] = useState(null);
+  const [appts, setAppts] = useState([]);
+  const [rxs, setRxs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/doctors/${id}`)
+      .then((res) => {
+        setDoctor(res.data.doctor);
+        setAppts(res.data.appointments);
+        setRxs(res.data.prescriptions);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return <div style={{ padding: 32 }}>Loading doctor...</div>;
 
   if (!doctor) {
     return <div>Doctor not found. <Link to="/doctors">Back to Doctors</Link></div>;
   }
-
-  const appts = appointments.filter((a) => a.doctorId === id);
-  const rxs = prescriptions.filter((p) => p.doctorId === id);
 
   return (
     <div>
