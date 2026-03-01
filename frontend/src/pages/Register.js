@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
-import { roles as allRoles } from '../data/users';
+import { roles as allRoles } from '../constants';
 import './Login.css';
 import './Register.css';
 
