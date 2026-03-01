@@ -1,6 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const authRoutes = require('./auth.routes');
+const patientRoutes = require('./patients.routes');
+const doctorRoutes = require('./doctors.routes');
+const appointmentRoutes = require('./appointments.routes');
+const medicalRecordRoutes = require('./medicalRecords.routes');
+const prescriptionRoutes = require('./prescriptions.routes');
+const labReportRoutes = require('./labReports.routes');
+const adminRoutes = require('./admin.routes');
+const dashboardRoutes = require('./dashboard.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -11,5 +19,13 @@ router.get('/', (req, res) => {
 });
 
 router.use('/auth', authRoutes);
+router.use('/patients', patientRoutes);
+router.use('/doctors', doctorRoutes);
+router.use('/appointments', appointmentRoutes);
+router.use('/medical-records', medicalRecordRoutes);
+router.use('/prescriptions', prescriptionRoutes);
+router.use('/lab-reports', labReportRoutes);
+router.use('/admin', adminRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 module.exports = router;
