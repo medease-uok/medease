@@ -61,15 +61,22 @@ medease/
 │   ├── labeler.yml        # Auto-labeling rules
 │   └── prettier.json      # Code formatting rules
 ├── database/
-│   └── init/              # PostgreSQL initialization scripts
-│       └── 01-init.sql    # Schema: users, patients, doctors, nurses, pharmacists, etc.
+│   ├── init/              # PostgreSQL initialization scripts
+│   │   └── 01-init.sql    # Schema: users, patients, doctors, nurses, pharmacists, etc.
+│   └── seed.sql           # Test data for all tables
 ├── docs/                  # Project documentation
 ├── frontend/              # React.js frontend application
+│   └── src/
+│       ├── components/    # Reusable UI components (DataTable, DetailCard, StatusBadge, etc.)
+│       ├── constants.js   # Shared enums (roles, appointment/prescription statuses)
+│       ├── data/          # AuthContext (authentication state management)
+│       ├── pages/         # Page components (Dashboard, Patients, Doctors, etc.)
+│       └── services/      # API client with JWT auth headers
 ├── backend/               # Node.js & Express backend API
 │   └── src/
 │       ├── config/        # Database, Redis, and app configuration
-│       ├── controllers/   # Route handlers (auth, etc.)
-│       ├── middleware/     # Error handler, validation runner
+│       ├── controllers/   # Route handlers (auth, patients, doctors, appointments, etc.)
+│       ├── middleware/     # JWT authentication, role authorization, error handler
 │       ├── routes/        # API route definitions
 │       ├── validators/    # Request validation rules
 │       ├── utils/         # Shared utilities (AppError, etc.)
@@ -162,7 +169,25 @@ cd backend
 npm run db:seed
 ```
 
-This adds test users (all roles), patients, doctors, appointments, medical records, prescriptions, lab reports, and audit logs. All test accounts use the password `password123`.
+This adds test data across all tables:
+
+| Table | Records | Description |
+|-------|---------|-------------|
+| Users | 19 | 2 admins, 4 doctors, 3 nurses, 2 lab technicians, 2 pharmacists, 6 patients |
+| Doctors | 4 | Cardiology, Neurology, Orthopedics, Pediatrics |
+| Patients | 6 | With emergency contacts, blood types, addresses |
+| Nurses | 3 | Emergency, ICU, Surgery departments |
+| Pharmacists | 2 | Licensed pharmacists |
+| Appointments | 12 | Mixed statuses: completed, confirmed, scheduled, in_progress, cancelled |
+| Medical Records | 8 | Diagnoses and treatment plans |
+| Prescriptions | 11 | Active, dispensed, expired, cancelled |
+| Lab Reports | 10 | CBC, MRI, ECG, X-Ray, and more |
+| Audit Logs | 15 | Login, view, create, update actions |
+
+All test accounts use the password `password123`. Key accounts:
+- **Admin**: admin@medease.com
+- **Doctor**: kamal.perera@medease.com
+- **Patient**: sarah.fernando@medease.com
 
 To reset everything and start fresh: `npm run db:reset`
 
