@@ -81,7 +81,7 @@ medease/
 │       ├── validators/    # Request validation rules
 │       ├── utils/         # Shared utilities (AppError, etc.)
 │       └── index.js       # Express server entry point
-├── docker-compose.yml     # PostgreSQL, Redis, pgAdmin services
+├── docker-compose.yml     # PostgreSQL, Redis, Adminer services
 ├── terraform/             # Infrastructure as Code
 └── README.md
 ```
@@ -132,7 +132,7 @@ docker compose up -d
 This starts:
 - **PostgreSQL 17** on port 5433 (database auto-initialized with schema)
 - **Redis 8** on port 6379 (session caching and data caching)
-- **pgAdmin** on http://localhost:5050 (login: admin@medease.com / admin)
+- **Adminer** on http://localhost:5050 (lightweight database UI)
 
 > **Note:** PostgreSQL is mapped to port 5433 (not the default 5432) to avoid conflicts with any locally installed PostgreSQL.
 
@@ -158,7 +158,7 @@ cp backend/.env.example backend/.env
 | Backend (Express) | 5001 |
 | PostgreSQL | 5433 |
 | Redis | 6379 |
-| pgAdmin | 5050 |
+| Adminer | 5050 |
 
 #### Seed Test Data (Optional)
 
@@ -188,6 +188,8 @@ All test accounts use the password `password123`. Key accounts:
 - **Admin**: admin@medease.com
 - **Doctor**: kamal.perera@medease.com
 - **Patient**: sarah.fernando@medease.com
+
+> **Warning:** These credentials are for local development only. Never use default passwords or secrets in production.
 
 To reset everything and start fresh: `npm run db:reset`
 
