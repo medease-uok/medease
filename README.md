@@ -1,6 +1,6 @@
 # MedEase
 
-A comprehensive, cloud-based hospital management system.
+A cloud-based hospital management system designed for Sri Lankan government hospitals.
 
 ## Table of Contents
 
@@ -15,11 +15,38 @@ A comprehensive, cloud-based hospital management system.
 
 ## Overview
 
-MedEase is a full-stack hospital management application designed to streamline medical operations and patient care. The project includes:
+MedEase is a web-based hospital management system that streamlines patient care, appointment scheduling, medical record management, and hospital resource tracking for government hospitals in Sri Lanka. It reduces waiting times, enhances staff efficiency, and improves healthcare accessibility.
 
-- **Frontend**: Modern web interface for hospital staff and patients
-- **Backend**: RESTful API services for data management
-- **Infrastructure**: Terraform-managed cloud resources for scalability
+### Key Features
+
+- **Appointment Scheduling** - Book, reschedule, and cancel appointments with real-time doctor availability
+- **Electronic Medical Records (EMR)** - Secure digital patient records, prescriptions, and medical history
+- **Lab Reports** - Upload, view, and manage laboratory test results
+- **Prescription Management** - Electronic prescriptions with pharmacy integration
+- **Billing & Payments** - Hela Pay gateway integration for secure transactions
+- **Inventory Management** - Track medications, equipment, and medical supplies
+- **Staff Scheduling** - Shift management for doctors, nurses, and technicians
+- **Notifications** - SMS and email alerts for appointments, prescriptions, and reports
+
+### User Roles
+
+| Role | Access |
+|------|--------|
+| **Patient** | Book appointments, view records/reports/prescriptions |
+| **Doctor** | Manage appointments, access patient records, write prescriptions |
+| **Nurse** | Assist patient care, monitor vitals, update records |
+| **Lab Technician** | Upload and manage lab test results |
+| **Pharmacist** | Dispense medications, manage inventory |
+| **Admin** | Manage users, generate reports, system administration |
+
+### Tech Stack
+
+- **Frontend**: React.js with Tailwind CSS
+- **Backend**: Node.js & Express (RESTful API)
+- **Database**: PostgreSQL (RDS)
+- **Cloud**: AWS (Fargate, S3, CloudFront, API Gateway, Cognito)
+- **IaC**: Terraform
+- **CI/CD**: GitHub Actions
 
 ## Project Structure
 
@@ -33,8 +60,9 @@ medease/
 │   ├── labels.yml         # GitHub labels configuration
 │   ├── labeler.yml        # Auto-labeling rules
 │   └── prettier.json      # Code formatting rules
-├── frontend/              # Frontend application
-├── backend/               # Backend services
+├── docs/                  # Project documentation
+├── frontend/              # React.js frontend application
+├── backend/               # Node.js & Express backend API
 ├── terraform/             # Infrastructure as Code
 └── README.md
 ```
@@ -49,14 +77,14 @@ Before you begin, ensure you have the following installed:
 - **Express.js** v5.2.1 (installed in backend/)
 - **Git**
 - **Terraform** (v1.0 or higher) - for infrastructure management
-- **Docker** (optional, for containerized development)
+- **Docker** v28+ and Docker Compose - required for database services
 
 ## Getting Started
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/medease.git
+git clone https://github.com/medease-uok/medease.git
 cd medease
 ```
 
@@ -76,7 +104,19 @@ npm install
 
 ### 3. Environment Configuration
 
-Create `.env` files in the appropriate directories:
+Copy the example files to create your local environment config:
+
+```bash
+cp frontend/.env.example frontend/.env
+cp backend/.env.example backend/.env
+```
+
+Or use the pre-configured development defaults directly:
+
+```bash
+cp frontend/.env.development frontend/.env
+cp backend/.env.development backend/.env
+```
 
 #### Frontend `.env`
 ```env
@@ -87,9 +127,42 @@ REACT_APP_API_URL=http://localhost:3000
 ```env
 PORT=3000
 NODE_ENV=development
+DATABASE_URL=postgresql://medease_user:medease_dev_password@localhost:5432/medease
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-jwt-secret-here
+JWT_EXPIRES_IN=24h
+CORS_ORIGIN=http://localhost:3001
+LOG_LEVEL=debug
 ```
 
-### 4. Run the Application
+### 4. Start Database Services
+
+```bash
+docker compose up -d
+```
+
+This starts:
+- **PostgreSQL 17** on port 5432 (database auto-initialized with schema)
+- **Redis 8** on port 6379 (session caching and data caching)
+- **pgAdmin** on http://localhost:5050 (login: admin@medease.com / admin)
+
+To stop services: `docker compose down`
+To reset data: `docker compose down -v`
+
+#### Seed Test Data (Optional)
+
+To populate the database with sample data for development:
+
+```bash
+cd backend
+npm run db:seed
+```
+
+This adds test users (all roles), patients, doctors, appointments, medical records, prescriptions, lab reports, and audit logs. All test accounts use the password `password123`.
+
+To reset everything and start fresh: `npm run db:reset`
+
+### 5. Run the Application
 
 #### Frontend
 ```bash
@@ -103,7 +176,7 @@ cd backend
 npm run dev
 ```
 
-### 5. Infrastructure Setup (Optional)
+### 6. Infrastructure Setup (Optional)
 
 ```bash
 cd terraform
@@ -160,7 +233,7 @@ Use our [issue templates](.github/ISSUE_TEMPLATE/) for consistent reporting.
 
 ```bash
 # Fork the repository on GitHub, then:
-git clone https://github.com/yourusername/medease.git
+git clone https://github.com/medease-uok/medease.git
 cd medease
 git checkout -b feat/your-feature-name
 ```
@@ -235,10 +308,10 @@ Then create a PR on GitHub with:
 
 All PRs must pass the following checks:
 
-- ✅ **PR Title Format**: Must follow conventional commit format
-- ✅ **Issue Linkage**: Must reference an issue
-- ✅ **Code Formatting**: Automatically formatted with Prettier
-- ✅ **Assignee**: PR author is auto-assigned
+- **PR Title Format**: Must follow conventional commit format
+- **Issue Linkage**: Must reference an issue
+- **Code Formatting**: Automatically formatted with Prettier
+- **Assignee**: PR author is auto-assigned
 
 ### Code Review Process
 
@@ -268,10 +341,10 @@ This repository is integrated with Jira for seamless project tracking:
 
 When you include Jira issue keys (e.g., `MEDEASE-123`) in your commits and PRs:
 
-- ✅ **Commits appear in Jira**: Every commit with a Jira key shows up in the Development panel
-- ✅ **PRs link automatically**: Pull requests are linked to Jira issues
-- ✅ **Status tracking**: Development progress is visible in Jira
-- ✅ **Auto-labeling**: PRs with Jira references get `jira-linked` label
+- **Commits appear in Jira**: Every commit with a Jira key shows up in the Development panel
+- **PRs link automatically**: Pull requests are linked to Jira issues
+- **Status tracking**: Development progress is visible in Jira
+- **Auto-labeling**: PRs with Jira references get `jira-linked` label
 
 ### Smart Commits
 
@@ -296,9 +369,11 @@ All PRs must:
 - Follow conventional commit format OR use Jira key format
 
 **Valid PR Titles:**
-- ✅ `MEDEASE-123: Add authentication feature`
-- ✅ `feat(auth): implement JWT authentication`
-- ❌ `Added new feature` (Missing Jira reference)
+- `MEDEASE-123: Add authentication feature`
+- `feat(auth): implement JWT authentication`
+
+**Invalid PR Titles:**
+- `Added new feature` (Missing Jira reference)
 
 See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for detailed workflow guide.
 
@@ -366,7 +441,7 @@ We use labels to categorize issues and PRs:
 
 ## Support
 
-- Create an [issue](https://github.com/yourusername/medease/issues) for bug reports or feature requests
+- Create an [issue](https://github.com/medease-uok/medease/issues) for bug reports or feature requests
 - Check existing issues before creating new ones
 - Use appropriate issue templates
 
@@ -376,4 +451,4 @@ We use labels to categorize issues and PRs:
 
 ---
 
-Built with ❤️ by the MedEase team
+Built by the MedEase team at the University of Kelaniya, Sri Lanka
