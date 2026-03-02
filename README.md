@@ -81,7 +81,8 @@ medease/
 │       ├── validators/    # Request validation rules
 │       ├── utils/         # Shared utilities (AppError, etc.)
 │       └── index.js       # Express server entry point
-├── docker-compose.yml     # PostgreSQL, Redis, Adminer services
+├── docker-compose.yml     # PostgreSQL, Redis, Adminer, Backend, Frontend services
+├── start.sh               # Interactive launcher (prompts for database seeding)
 ├── terraform/             # Infrastructure as Code
 └── README.md
 ```
@@ -121,25 +122,58 @@ cd backend
 npm install
 ```
 
-### 3. Start Database Services
+### 3. Start Everything with Docker (Recommended)
 
-Start PostgreSQL and Redis before configuring the backend:
+The easiest way to run the full stack is with the interactive launcher:
 
 ```bash
-docker compose up -d
+./start.sh
 ```
 
-This starts:
-- **PostgreSQL 17** on port 5433 (database auto-initialized with schema)
-- **Redis 8** on port 6379 (session caching and data caching)
-- **Adminer** on http://localhost:5050 (lightweight database UI)
+This will:
+1. Ask if you want to seed the database with sample data
+2. Build and start all services (PostgreSQL, Redis, Backend, Frontend, Adminer)
+
+Alternatively, use Docker Compose directly:
+
+```bash
+# Without seeding
+docker compose up --build
+
+# With seeding
+docker compose --profile seed up --build
+
+# Detached mode
+./start.sh -d
+```
+
+#### Services
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| Frontend | http://localhost:3000 | React app with hot-reloading |
+| Backend | http://localhost:5001 | Express API with nodemon |
+| PostgreSQL | localhost:5433 | Database (schema auto-initialized) |
+| Redis | localhost:6379 | Session and data caching |
+| Adminer | http://localhost:5050 | Database web UI |
 
 > **Note:** PostgreSQL is mapped to port 5433 (not the default 5432) to avoid conflicts with any locally installed PostgreSQL.
 
-To stop services: `docker compose down`
-To reset data: `docker compose down -v`
+Code changes in `backend/src/` and `frontend/src/` are automatically picked up via hot-reloading.
 
-### 4. Environment Configuration
+To stop services: `docker compose down`
+To reset all data: `docker compose down -v`
+
+### 4. Run Without Docker (Alternative)
+
+If you prefer running the backend and frontend directly on your machine:
+
+#### Start database services only
+```bash
+docker compose up -d postgres redis adminer
+```
+
+#### Environment Configuration
 
 The project includes pre-configured `.env.development` files that work out of the box. The backend reads `.env.development` automatically based on `NODE_ENV`, and the frontend uses `.env.development` as a fallback when no `.env` exists.
 
@@ -150,26 +184,35 @@ cp frontend/.env.example frontend/.env
 cp backend/.env.example backend/.env
 ```
 
-#### Default Development Ports
+#### Frontend (port 3000)
+```bash
+cd frontend
+npm install
+npm start
+```
 
-| Service | Port |
-|---------|------|
-| Frontend (React) | 3000 |
-| Backend (Express) | 5001 |
-| PostgreSQL | 5433 |
-| Redis | 6379 |
-| Adminer | 5050 |
+#### Backend (port 5001)
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+Verify the backend is connected:
+```bash
+curl http://localhost:5001/health
+```
 
 #### Seed Test Data (Optional)
-
-To populate the database with sample data for development:
 
 ```bash
 cd backend
 npm run db:seed
 ```
 
-This adds test data across all tables:
+### 5. Test Data
+
+The seed data includes:
 
 | Table | Records | Description |
 |-------|---------|-------------|
@@ -193,26 +236,7 @@ All test accounts use the password `Password@123`. Key accounts:
 
 To reset everything and start fresh: `npm run db:reset`
 
-### 5. Run the Application
-
-#### Frontend (port 3000)
-```bash
-cd frontend
-npm start
-```
-
-#### Backend (port 5001)
-```bash
-cd backend
-npm run dev
-```
-
-Verify the backend is connected:
-```bash
-curl http://localhost:5001/health
-```
-
-### 6. Infrastructure Setup (Optional)
+### 6. Infrastructure Setup (Optional - AWS Deployment)
 
 ```bash
 cd terraform
