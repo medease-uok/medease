@@ -49,6 +49,18 @@ const MSG = {
   licenseFormat: (prefix) => `Format: ${prefix}-XXXX-XXXX`,
 };
 
+const STRENGTH_LEVELS = ['Weak', 'Fair', 'Good', 'Strong'];
+
+function getPasswordStrength(password) {
+  if (!password) return { score: 0, label: '' };
+  let score = 0;
+  if (password.length >= MIN_PASSWORD_LENGTH) score++;
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) score++;
+  return { score, label: STRENGTH_LEVELS[score - 1] || 'Weak' };
+}
+
 export default function Register() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -458,6 +470,19 @@ export default function Register() {
                 <label className="login-label" htmlFor="reg-password">Password *</label>
                 <input id="reg-password" type="password" name="password" maxLength={72} {...fieldProps('password')} value={form.password} onChange={handleChange} />
                 {renderError('password')}
+                {form.password && (() => {
+                  const { score, label } = getPasswordStrength(form.password);
+                  return (
+                    <div className="password-strength">
+                      <div className="password-strength-bar">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className={`password-strength-segment${i <= score ? ` strength-${score}` : ''}`} />
+                        ))}
+                      </div>
+                      <span className={`password-strength-label strength-text-${score}`}>{label}</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-confirmPassword">Confirm Password *</label>

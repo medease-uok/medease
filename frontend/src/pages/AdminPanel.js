@@ -4,6 +4,13 @@ import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import './AdminPanel.css';
 
+function formatProfileValue(key, val) {
+  if (/date|birth/i.test(key) && !isNaN(Date.parse(val))) {
+    return new Date(val).toLocaleDateString();
+  }
+  return String(val);
+}
+
 function ProfileDetails({ profileData }) {
   const entries = Object.entries(profileData || {}).filter(([, v]) => v);
   if (entries.length === 0) return <span className="admin-detail-empty">No additional details</span>;
@@ -12,7 +19,7 @@ function ProfileDetails({ profileData }) {
       {entries.map(([key, val]) => (
         <div key={key} className="admin-detail-item">
           <strong>{key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())}</strong>
-          {String(val)}
+          {formatProfileValue(key, val)}
         </div>
       ))}
     </div>

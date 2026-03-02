@@ -9,7 +9,7 @@ const columns = [
   { key: 'phone', label: 'Phone' },
   { key: 'gender', label: 'Gender' },
   { key: 'bloodType', label: 'Blood Type' },
-  { key: 'dateOfBirth', label: 'Date of Birth' },
+  { key: 'dateOfBirth', label: 'Date of Birth', render: (val) => val ? new Date(val).toLocaleDateString() : '' },
 ];
 
 export default function Patients() {
