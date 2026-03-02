@@ -42,6 +42,68 @@ services:
       postgres:
         condition: service_healthy
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medease-backend
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      NODE_ENV: development
+      PORT: 5001
+      DATABASE_URL: postgresql://medease_user:medease_dev_password@postgres:5432/medease
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: medease-dev-jwt-secret-do-not-use-in-production
+      JWT_EXPIRES_IN: 24h
+      CORS_ORIGIN: http://localhost:3000
+      CLOUDFLARE_SECRET_KEY: 1x0000000000000000000000000000000AA
+      LOG_LEVEL: debug
+    volumes:
+      - ./backend/src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: medease-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:5001
+      REACT_APP_CLOUDFLARE_SITE_KEY: 1x00000000000000000000AA
+      WATCHPACK_POLLING: "true"
+      WDS_SOCKET_HOST: "0.0.0.0"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    depends_on:
+      - backend
+    stdin_open: true
+
+  db-seed:
+    image: postgres:17-alpine
+    container_name: medease-db-seed
+    profiles:
+      - seed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./database/seed.sql:/seed.sql:ro
+    entrypoint: >
+      sh -c "echo 'Seeding database...' &&
+             PGPASSWORD=medease_dev_password psql -h postgres -U medease_user -d medease -f /seed.sql &&
+             echo 'Database seeded successfully.'"
+    restart: "no"
+
 volumes:
   postgres_data:
   redis_data:
