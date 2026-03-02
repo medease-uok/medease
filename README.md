@@ -108,21 +108,7 @@ git clone https://github.com/medease-uok/medease.git
 cd medease
 ```
 
-### 2. Install Dependencies
-
-#### Frontend
-```bash
-cd frontend
-npm install
-```
-
-#### Backend
-```bash
-cd backend
-npm install
-```
-
-### 3. Start Everything with Docker (Recommended)
+### 2. Start Everything with Docker (Recommended)
 
 The easiest way to run the full stack is with the interactive launcher:
 
@@ -131,8 +117,9 @@ The easiest way to run the full stack is with the interactive launcher:
 ```
 
 This will:
-1. Ask if you want to seed the database with sample data
-2. Build and start all services (PostgreSQL, Redis, Backend, Frontend, Adminer)
+1. Install dependencies for both frontend and backend
+2. Ask if you want to seed the database with sample data
+3. Build and start all services (PostgreSQL, Redis, Backend, Frontend, Adminer)
 
 Alternatively, use Docker Compose directly:
 
@@ -164,7 +151,7 @@ Code changes in `backend/src/` and `frontend/src/` are automatically picked up v
 To stop services: `docker compose down`
 To reset all data: `docker compose down -v`
 
-### 4. Run Without Docker (Alternative)
+### 3. Run Without Docker (Alternative)
 
 If you prefer running the backend and frontend directly on your machine:
 
@@ -210,7 +197,7 @@ cd backend
 npm run db:seed
 ```
 
-### 5. Test Data
+### 4. Test Data
 
 The seed data includes:
 
@@ -236,7 +223,7 @@ All test accounts use the password `Password@123`. Key accounts:
 
 To reset everything and start fresh: `npm run db:reset`
 
-### 6. Infrastructure Setup (Optional - AWS Deployment)
+### 5. Infrastructure Setup (Optional - AWS Deployment)
 
 ```bash
 cd terraform
