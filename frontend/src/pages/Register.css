@@ -117,6 +117,11 @@
   border-radius: 0 6px 6px 0;
 }
 
+/* Captcha widget */
+.register-captcha {
+  margin: 16px 0;
+}
+
 /* Navigation buttons */
 .register-nav {
   display: flex;
