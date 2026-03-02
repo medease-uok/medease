@@ -6,7 +6,7 @@ import { roles as allRoles } from '../constants';
 import './Login.css';
 import './Register.css';
 
-const TURNSTILE_SITE_KEY = process.env.REACT_APP_CLOUDFLARE_SITE_KEY;
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_CLOUDFLARE_SITE_KEY;
 
 const roles = allRoles.filter((r) => r !== 'admin');
 
