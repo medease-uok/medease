@@ -11,6 +11,19 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
+echo "Installing dependencies..."
+echo ""
+
+cd "$(dirname "$0")"
+
+echo "[1/2] Backend dependencies..."
+(cd backend && npm install)
+
+echo ""
+echo "[2/2] Frontend dependencies..."
+(cd frontend && npm install)
+
+echo ""
 read -rp "Do you want to seed the database with sample data? (y/N): " SEED_CHOICE
 
 PROFILE_FLAG=""
