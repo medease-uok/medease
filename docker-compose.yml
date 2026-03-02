@@ -55,10 +55,10 @@ services:
       PORT: 5001
       DATABASE_URL: postgresql://medease_user:medease_dev_password@postgres:5432/medease
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: medease-dev-jwt-secret-do-not-use-in-production
+      JWT_SECRET: ${JWT_SECRET:-medease-dev-jwt-secret-do-not-use-in-production}
       JWT_EXPIRES_IN: 24h
       CORS_ORIGIN: http://localhost:3000
-      CLOUDFLARE_SECRET_KEY: 1x0000000000000000000000000000000AA
+      CLOUDFLARE_SECRET_KEY: ${CLOUDFLARE_SECRET_KEY:-1x0000000000000000000000000000000AA}
       LOG_LEVEL: debug
     volumes:
       - ./backend/src:/app/src
@@ -78,7 +78,7 @@ services:
       - "3000:3000"
     environment:
       VITE_API_URL: http://localhost:5001
-      VITE_CLOUDFLARE_SITE_KEY: 1x00000000000000000000AA
+      VITE_CLOUDFLARE_SITE_KEY: ${VITE_CLOUDFLARE_SITE_KEY:-1x00000000000000000000AA}
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
