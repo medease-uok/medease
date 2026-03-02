@@ -1,23 +1,35 @@
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { patients } from '../data/patients';
-import { medicalRecords } from '../data/medicalRecords';
-import { prescriptions } from '../data/prescriptions';
-import { labReports } from '../data/labReports';
+import api from '../services/api';
 import DetailCard from '../components/DetailCard';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 
 export default function PatientDetail() {
   const { id } = useParams();
-  const patient = patients.find((p) => p.id === id);
+  const [patient, setPatient] = useState(null);
+  const [records, setRecords] = useState([]);
+  const [rxs, setRxs] = useState([]);
+  const [labs, setLabs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/patients/${id}`)
+      .then((res) => {
+        setPatient(res.data.patient);
+        setRecords(res.data.medicalRecords);
+        setRxs(res.data.prescriptions);
+        setLabs(res.data.labReports);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return <div style={{ padding: 32 }}>Loading patient...</div>;
 
   if (!patient) {
     return <div>Patient not found. <Link to="/patients">Back to Patients</Link></div>;
   }
-
-  const records = medicalRecords.filter((r) => r.patientId === id);
-  const rxs = prescriptions.filter((p) => p.patientId === id);
-  const labs = labReports.filter((r) => r.patientId === id);
 
   return (
     <div>
@@ -29,7 +41,7 @@ export default function PatientDetail() {
         fields={[
           { label: 'Email', value: patient.email },
           { label: 'Phone', value: patient.phone },
-          { label: 'Date of Birth', value: patient.dateOfBirth },
+          { label: 'Date of Birth', value: new Date(patient.dateOfBirth).toLocaleDateString() },
           { label: 'Gender', value: patient.gender },
           { label: 'Blood Type', value: patient.bloodType },
           { label: 'Address', value: patient.address },

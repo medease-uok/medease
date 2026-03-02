@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
-import { roles as allRoles } from '../data/users';
+import { roles as allRoles } from '../constants';
 import './Login.css';
 import './Register.css';
 
@@ -98,7 +98,9 @@ export default function Register() {
     setStep(step - 1);
   };
 
-  const handleSubmit = (e) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     if (!form.password) {
@@ -113,7 +115,9 @@ export default function Register() {
       setError('Password must be at least 6 characters.');
       return;
     }
-    const result = register(form);
+    setLoading(true);
+    const result = await register(form);
+    setLoading(false);
     if (result.success) {
       setSuccess(true);
     } else {
@@ -359,8 +363,8 @@ export default function Register() {
                 <button type="button" className="register-btn-back" onClick={handleBack}>
                   Back
                 </button>
-                <button type="submit" className="login-button register-btn-next">
-                  Create Account
+                <button type="submit" className="login-button register-btn-next" disabled={loading}>
+                  {loading ? 'Creating...' : 'Create Account'}
                 </button>
               </div>
             </>

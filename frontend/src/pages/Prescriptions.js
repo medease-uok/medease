@@ -1,29 +1,31 @@
-import { useState } from 'react';
-import { prescriptions, prescriptionStatuses } from '../data/prescriptions';
-import { patients } from '../data/patients';
+import { useState, useEffect } from 'react';
+import { prescriptionStatuses } from '../constants';
 import { useAuth } from '../data/AuthContext';
+import api from '../services/api';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import './Appointments.css';
 
 export default function Prescriptions() {
   const [filter, setFilter] = useState('all');
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { currentUser } = useAuth();
+  const isPatient = currentUser?.role === 'patient';
 
-  const patient = currentUser?.role === 'patient'
-    ? patients.find((p) => p.userId === currentUser.id)
-    : null;
-
-  const baseData = patient
-    ? prescriptions.filter((p) => p.patientId === patient.id)
-    : prescriptions;
+  useEffect(() => {
+    api.get('/prescriptions')
+      .then((res) => setPrescriptions(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = filter === 'all'
-    ? baseData
-    : baseData.filter((p) => p.status === filter);
+    ? prescriptions
+    : prescriptions.filter((p) => p.status === filter);
 
   const columns = [
-    ...(patient ? [] : [{ key: 'patientName', label: 'Patient' }]),
+    ...(isPatient ? [] : [{ key: 'patientName', label: 'Patient' }]),
     { key: 'doctorName', label: 'Doctor' },
     { key: 'medication', label: 'Medication' },
     { key: 'dosage', label: 'Dosage' },
@@ -32,10 +34,12 @@ export default function Prescriptions() {
     { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
   ];
 
+  if (loading) return <div style={{ padding: 32 }}>Loading prescriptions...</div>;
+
   return (
     <div>
       <div className="page-header">
-        <h2 className="page-title">{patient ? 'My Prescriptions' : 'Prescriptions'}</h2>
+        <h2 className="page-title">{isPatient ? 'My Prescriptions' : 'Prescriptions'}</h2>
         <span className="count-badge">{filtered.length}</span>
       </div>
       <div className="filter-bar">

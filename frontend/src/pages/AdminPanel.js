@@ -1,21 +1,18 @@
-import { useState } from 'react';
-import { users } from '../data/users';
-import { auditLogs } from '../data/auditLogs';
-import { useAuth } from '../data/AuthContext';
+import { useState, useEffect } from 'react';
+import api from '../services/api';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import './AdminPanel.css';
 
-function ProfileDetails({ user }) {
-  const profile = user.profileData || {};
-  const entries = Object.entries(profile).filter(([, v]) => v);
+function ProfileDetails({ profileData }) {
+  const entries = Object.entries(profileData || {}).filter(([, v]) => v);
   if (entries.length === 0) return <span className="admin-detail-empty">No additional details</span>;
   return (
     <div className="admin-profile-details">
       {entries.map(([key, val]) => (
         <div key={key} className="admin-detail-item">
           <strong>{key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())}</strong>
-          {val}
+          {String(val)}
         </div>
       ))}
     </div>
@@ -24,22 +21,42 @@ function ProfileDetails({ user }) {
 
 export default function AdminPanel() {
   const [tab, setTab] = useState('users');
-  const [, forceUpdate] = useState(0);
-  const [expandedUser, setExpandedUser] = useState(null);
-  const { approveUser, rejectUser } = useAuth();
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [activeUsers, setActiveUsers] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const pendingUsers = users.filter((u) => !u.isActive);
-  const activeUsers = users.filter((u) => u.isActive);
+  useEffect(() => {
+    Promise.all([
+      api.get('/admin/users/pending'),
+      api.get('/admin/users'),
+      api.get('/admin/audit-logs'),
+    ])
+      .then(([pendingRes, usersRes, logsRes]) => {
+        setPendingUsers(pendingRes.data);
+        setActiveUsers(usersRes.data.filter((u) => u.isActive));
+        setAuditLogs(logsRes.data);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  const handleApprove = (userId) => {
-    approveUser(userId);
-    forceUpdate((n) => n + 1);
+  const handleApprove = async (userId) => {
+    try {
+      await api.patch(`/admin/users/${userId}/approve`);
+      setPendingUsers((prev) => prev.filter((u) => u.id !== userId));
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
-  const handleReject = (userId) => {
-    rejectUser(userId);
-    setExpandedUser(null);
-    forceUpdate((n) => n + 1);
+  const handleReject = async (userId) => {
+    try {
+      await api.delete(`/admin/users/${userId}/reject`);
+      setPendingUsers((prev) => prev.filter((u) => u.id !== userId));
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const userColumns = [
@@ -69,6 +86,8 @@ export default function AdminPanel() {
       render: (val) => new Date(val).toLocaleString(),
     },
   ];
+
+  if (loading) return <div style={{ padding: 32 }}>Loading admin panel...</div>;
 
   return (
     <div>
@@ -122,7 +141,7 @@ export default function AdminPanel() {
                   </div>
                   <div className="admin-pending-body">
                     <div className="admin-pending-body-title">Registration Details</div>
-                    <ProfileDetails user={user} />
+                    <ProfileDetails profileData={user.profileData} />
                   </div>
                   <div className="admin-pending-footer">
                     <button className="admin-btn admin-btn-approve" onClick={() => handleApprove(user.id)}>
@@ -144,7 +163,7 @@ export default function AdminPanel() {
           </div>
         )
       )}
-      {tab === 'logs' && <DataTable columns={logColumns} data={[...auditLogs].reverse()} />}
+      {tab === 'logs' && <DataTable columns={logColumns} data={auditLogs} />}
     </div>
   );
 }

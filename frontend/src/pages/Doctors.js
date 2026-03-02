@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doctors } from '../data/doctors';
+import api from '../services/api';
 import DataTable from '../components/DataTable';
 
 const columns = [
@@ -21,6 +22,17 @@ const columns = [
 
 export default function Doctors() {
   const navigate = useNavigate();
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/doctors')
+      .then((res) => setDoctors(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ padding: 32 }}>Loading doctors...</div>;
 
   return (
     <div>
