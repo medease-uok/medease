@@ -12,6 +12,11 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     try {
       const data = await api.post('/auth/login', { email, password });
+      // Backend now returns otp_required before issuing a token
+      if (data.status === 'otp_required') {
+        return { success: false, reason: 'otp_required', maskedEmail: data.data.email };
+      }
+      // Fallback: if backend ever returns token directly (e.g. future bypass flag)
       const { token, user } = data.data;
       setCurrentUser(user);
       localStorage.setItem('medease_user', JSON.stringify(user));
@@ -22,6 +27,19 @@ export function AuthProvider({ children }) {
         return { success: false, reason: 'pending' };
       }
       return { success: false, reason: 'invalid' };
+    }
+  };
+
+  const verifyOtp = async (email, otp) => {
+    try {
+      const data = await api.post('/auth/verify-otp', { email, otp });
+      const { token, user } = data.data;
+      setCurrentUser(user);
+      localStorage.setItem('medease_user', JSON.stringify(user));
+      localStorage.setItem('medease_token', token);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message || 'Invalid verification code.' };
     }
   };
 
@@ -44,7 +62,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, register }}>
+    <AuthContext.Provider value={{ currentUser, login, verifyOtp, logout, register }}>
       {children}
     </AuthContext.Provider>
   );

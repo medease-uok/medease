@@ -1,9 +1,22 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../config/database');
+const redis = require('../config/redis');
 const config = require('../config');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/auditLog');
+const { sendLoginOtpEmail } = require('../utils/emailService');
+
+/** Masks most of an email address for safe display, e.g. jo***@example.com */
+function maskEmail(email) {
+  const [local, domain] = email.split('@');
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}***@${domain}`;
+}
+
+/** Redis key for a user's pending login OTP */
+const otpKey = (userId) => `login_otp:${userId}`;
 
 const SALT_ROUNDS = 12;
 
@@ -170,6 +183,7 @@ const login = async (req, res, next) => {
 
     const user = result.rows[0];
 
+    // Use the same error message for wrong email or password to prevent enumeration
     if (!user) {
       throw new AppError('Invalid email or password.', 401);
     }
@@ -185,33 +199,36 @@ const login = async (req, res, next) => {
       throw new AppError('Your account is pending admin approval.', 403);
     }
 
-    // Audit log: successful login
+    // -------------------------------------------------------------------
+    // Email OTP Verification
+    // -------------------------------------------------------------------
+    // Generate a cryptographically-random 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+
+    // Store in Redis: { otp, attempts } – expires after OTP_TTL_SECONDS
+    await redis.set(
+      otpKey(user.id),
+      JSON.stringify({ otp, attempts: 0 }),
+      'EX',
+      config.otp.ttlSeconds
+    );
+
+    // Send OTP email (non-blocking audit is still recorded below on failure)
+    await sendLoginOtpEmail(user.email, user.first_name, otp);
+
+    // Audit log: OTP sent (maps to 'LOGIN_OTP_SENT' action – logged as pending)
     await auditLog({
       userId: user.id,
-      action: 'LOGIN',
+      action: 'LOGIN_OTP_SENT',
       resourceType: 'session',
       ip: req.ip,
     });
 
-    // Sign JWT
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      config.jwtSecret,
-      { expiresIn: config.jwtExpiresIn }
-    );
-
-    res.json({
-      status: 'success',
+    return res.status(200).json({
+      status: 'otp_required',
+      message: `A verification code has been sent to ${maskEmail(user.email)}. It expires in ${config.otp.ttlSeconds / 60} minutes.`,
       data: {
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          role: user.role,
-          isActive: user.is_active,
-        },
+        email: maskEmail(user.email),
       },
     });
   } catch (err) {
@@ -231,4 +248,108 @@ const login = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login };
+/**
+ * POST /auth/verify-otp
+ * Validates the emailed OTP and, on success, returns the JWT access token.
+ */
+const verifyOtp = async (req, res, next) => {
+  const { email, otp } = req.body;
+
+  try {
+    // Fetch user
+    const result = await db.query(
+      'SELECT id, email, first_name, last_name, role, is_active FROM users WHERE email = $1',
+      [email]
+    );
+    const user = result.rows[0];
+
+    if (!user || !user.is_active) {
+      throw new AppError('Invalid or expired verification code.', 401);
+    }
+
+    // Retrieve OTP record from Redis
+    const raw = await redis.get(otpKey(user.id));
+    if (!raw) {
+      throw new AppError('Verification code has expired. Please log in again.', 401);
+    }
+
+    const record = JSON.parse(raw);
+
+    // Enforce max-attempt limit (prevent brute-force)
+    if (record.attempts >= config.otp.maxAttempts) {
+      await redis.del(otpKey(user.id));
+      throw new AppError(
+        `Too many incorrect attempts. Please log in again to request a new code.`,
+        429
+      );
+    }
+
+    // Compare OTP
+    if (record.otp !== otp.trim()) {
+      // Increment attempt counter but keep the same TTL
+      const ttl = await redis.ttl(otpKey(user.id));
+      await redis.set(
+        otpKey(user.id),
+        JSON.stringify({ otp: record.otp, attempts: record.attempts + 1 }),
+        'EX',
+        ttl > 0 ? ttl : config.otp.ttlSeconds
+      );
+      const remaining = config.otp.maxAttempts - record.attempts - 1;
+      throw new AppError(
+        `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
+        401
+      );
+    }
+
+    // OTP is valid — delete it from Redis immediately (single-use)
+    await redis.del(otpKey(user.id));
+
+    // Audit log: successful login
+    await auditLog({
+      userId: user.id,
+      action: 'LOGIN',
+      resourceType: 'session',
+      ip: req.ip,
+    });
+
+    // Sign JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiresIn }
+    );
+
+    return res.json({
+      status: 'success',
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role,
+          isActive: user.is_active,
+        },
+      },
+    });
+  } catch (err) {
+    // Only log as failed LOGIN if it wasn't an OTP-stage error (to avoid duplicate entries)
+    if (!err.isOperational) {
+      await auditLog({
+        userId: null,
+        action: 'LOGIN',
+        resourceType: 'session',
+        ip: req.ip,
+        success: false,
+      });
+    }
+
+    if (err.isOperational) {
+      return next(err);
+    }
+    return next(err);
+  }
+};
+
+module.exports = { register, login, verifyOtp };

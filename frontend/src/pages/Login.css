@@ -92,3 +92,44 @@
 .login-button:hover {
   background: var(--color-primary-dark);
 }
+
+/* ── OTP verification step ─────────────────────────────────────────── */
+
+.login-otp-info {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  margin: 0 0 24px;
+  line-height: 1.6;
+}
+
+.login-otp-info strong {
+  color: var(--color-text-primary);
+}
+
+.login-otp-input {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 10px;
+  color: var(--color-primary);
+}
+
+.login-back-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.login-back-btn:hover {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+}

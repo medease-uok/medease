@@ -106,4 +106,16 @@ const loginValidation = [
     .notEmpty().withMessage('Password is required.'),
 ];
 
-module.exports = { registerValidation, loginValidation };
+const verifyOtpValidation = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required.')
+    .isEmail().withMessage('Please enter a valid email address.')
+    .normalizeEmail(),
+  body('otp')
+    .trim()
+    .notEmpty().withMessage('Verification code is required.')
+    .matches(/^\d{6}$/).withMessage('Verification code must be a 6-digit number.'),
+];
+
+module.exports = { registerValidation, loginValidation, verifyOtpValidation };
