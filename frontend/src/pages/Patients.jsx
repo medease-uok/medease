@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { patients } from '../data/patients';
+import api from '../services/api';
 import DataTable from '../components/DataTable';
 
 const columns = [
@@ -8,11 +9,22 @@ const columns = [
   { key: 'phone', label: 'Phone' },
   { key: 'gender', label: 'Gender' },
   { key: 'bloodType', label: 'Blood Type' },
-  { key: 'dateOfBirth', label: 'Date of Birth' },
+  { key: 'dateOfBirth', label: 'Date of Birth', render: (val) => val ? new Date(val).toLocaleDateString() : '' },
 ];
 
 export default function Patients() {
   const navigate = useNavigate();
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/patients')
+      .then((res) => setPatients(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ padding: 32 }}>Loading patients...</div>;
 
   return (
     <div>

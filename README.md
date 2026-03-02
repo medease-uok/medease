@@ -41,7 +41,7 @@ MedEase is a web-based hospital management system that streamlines patient care,
 
 ### Tech Stack
 
-- **Frontend**: React.js with Tailwind CSS
+- **Frontend**: React.js (Vite)
 - **Backend**: Node.js & Express (RESTful API)
 - **Database**: PostgreSQL (RDS)
 - **Cloud**: AWS (Fargate, S3, CloudFront, API Gateway, Cognito)
@@ -60,9 +60,29 @@ medease/
 │   ├── labels.yml         # GitHub labels configuration
 │   ├── labeler.yml        # Auto-labeling rules
 │   └── prettier.json      # Code formatting rules
+├── database/
+│   ├── init/              # PostgreSQL initialization scripts
+│   │   └── 01-init.sql    # Schema: users, patients, doctors, nurses, pharmacists, etc.
+│   └── seed.sql           # Test data for all tables
 ├── docs/                  # Project documentation
 ├── frontend/              # React.js frontend application
+│   └── src/
+│       ├── components/    # Reusable UI components (DataTable, DetailCard, StatusBadge, etc.)
+│       ├── constants.js   # Shared enums (roles, appointment/prescription statuses)
+│       ├── data/          # AuthContext (authentication state management)
+│       ├── pages/         # Page components (Dashboard, Patients, Doctors, etc.)
+│       └── services/      # API client with JWT auth headers
 ├── backend/               # Node.js & Express backend API
+│   └── src/
+│       ├── config/        # Database, Redis, and app configuration
+│       ├── controllers/   # Route handlers (auth, patients, doctors, appointments, etc.)
+│       ├── middleware/     # JWT authentication, role authorization, error handler
+│       ├── routes/        # API route definitions
+│       ├── validators/    # Request validation rules
+│       ├── utils/         # Shared utilities (AppError, etc.)
+│       └── index.js       # Express server entry point
+├── docker-compose.yml     # PostgreSQL, Redis, Adminer, Backend, Frontend services
+├── start.sh               # Interactive launcher (prompts for database seeding)
 ├── terraform/             # Infrastructure as Code
 └── README.md
 ```
@@ -88,95 +108,122 @@ git clone https://github.com/medease-uok/medease.git
 cd medease
 ```
 
-### 2. Install Dependencies
+### 2. Start Everything with Docker (Recommended)
 
-#### Frontend
+The easiest way to run the full stack is with the interactive launcher:
+
 ```bash
-cd frontend
-npm install
+./start.sh
 ```
 
-#### Backend
+This will:
+1. Install dependencies for both frontend and backend
+2. Ask if you want to seed the database with sample data
+3. Build and start all services (PostgreSQL, Redis, Backend, Frontend, Adminer)
+
+Alternatively, use Docker Compose directly:
+
 ```bash
-cd backend
-npm install
+# Without seeding
+docker compose up --build
+
+# With seeding
+docker compose --profile seed up --build
+
+# Detached mode
+./start.sh -d
 ```
 
-### 3. Environment Configuration
+#### Services
 
-Copy the example files to create your local environment config:
+| Service | URL | Description |
+|---------|-----|-------------|
+| Frontend | http://localhost:3000 | React app (Vite) with hot-reloading |
+| Backend | http://localhost:5001 | Express API with nodemon |
+| PostgreSQL | localhost:5433 | Database (schema auto-initialized) |
+| Redis | localhost:6379 | Session and data caching |
+| Adminer | http://localhost:5050 | Database web UI |
+
+> **Note:** PostgreSQL is mapped to port 5433 (not the default 5432) to avoid conflicts with any locally installed PostgreSQL.
+
+Code changes in `backend/src/` and `frontend/src/` are automatically picked up via hot-reloading.
+
+To stop services: `docker compose down`
+To reset all data: `docker compose down -v`
+
+### 3. Run Without Docker (Alternative)
+
+If you prefer running the backend and frontend directly on your machine:
+
+#### Start database services only
+```bash
+docker compose up -d postgres redis adminer
+```
+
+#### Environment Configuration
+
+The project includes pre-configured `.env.development` files that work out of the box. The backend reads `.env.development` automatically based on `NODE_ENV`, and the frontend uses `.env.development` as a fallback when no `.env` exists.
+
+If you need to override any values, copy the example files:
 
 ```bash
 cp frontend/.env.example frontend/.env
 cp backend/.env.example backend/.env
 ```
 
-Or use the pre-configured development defaults directly:
-
+#### Frontend (port 3000)
 ```bash
-cp frontend/.env.development frontend/.env
-cp backend/.env.development backend/.env
+cd frontend
+npm install
+npm run dev
 ```
 
-#### Frontend `.env`
-```env
-REACT_APP_API_URL=http://localhost:3000
-```
-
-#### Backend `.env`
-```env
-PORT=3000
-NODE_ENV=development
-DATABASE_URL=postgresql://medease_user:medease_dev_password@localhost:5432/medease
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=your-jwt-secret-here
-JWT_EXPIRES_IN=24h
-CORS_ORIGIN=http://localhost:3001
-LOG_LEVEL=debug
-```
-
-### 4. Start Database Services
-
+#### Backend (port 5001)
 ```bash
-docker compose up -d
+cd backend
+npm install
+npm run dev
 ```
 
-This starts:
-- **PostgreSQL 17** on port 5432 (database auto-initialized with schema)
-- **Redis 8** on port 6379 (session caching and data caching)
-- **pgAdmin** on http://localhost:5050 (login: admin@medease.com / admin)
-
-To stop services: `docker compose down`
-To reset data: `docker compose down -v`
+Verify the backend is connected:
+```bash
+curl http://localhost:5001/health
+```
 
 #### Seed Test Data (Optional)
-
-To populate the database with sample data for development:
 
 ```bash
 cd backend
 npm run db:seed
 ```
 
-This adds test users (all roles), patients, doctors, appointments, medical records, prescriptions, lab reports, and audit logs. All test accounts use the password `password123`.
+### 4. Test Data
+
+The seed data includes:
+
+| Table | Records | Description |
+|-------|---------|-------------|
+| Users | 19 | 2 admins, 4 doctors, 3 nurses, 2 lab technicians, 2 pharmacists, 6 patients |
+| Doctors | 4 | Cardiology, Neurology, Orthopedics, Pediatrics |
+| Patients | 6 | With emergency contacts, blood types, addresses |
+| Nurses | 3 | Emergency, ICU, Surgery departments |
+| Pharmacists | 2 | Licensed pharmacists |
+| Appointments | 12 | Mixed statuses: completed, confirmed, scheduled, in_progress, cancelled |
+| Medical Records | 8 | Diagnoses and treatment plans |
+| Prescriptions | 11 | Active, dispensed, expired, cancelled |
+| Lab Reports | 10 | CBC, MRI, ECG, X-Ray, and more |
+| Audit Logs | 15 | Login, view, create, update actions |
+
+All test accounts use the password `Password@123`. Key accounts:
+- **Admin**: admin@medease.com
+- **Doctor**: kamal.perera@medease.com
+- **Patient**: sarah.fernando@medease.com
+
+> **Warning:** These credentials are for local development only. Never use default passwords or secrets in production.
 
 To reset everything and start fresh: `npm run db:reset`
 
-### 5. Run the Application
-
-#### Frontend
-```bash
-cd frontend
-npm start
-```
-
-#### Backend
-```bash
-cd backend
-npm run dev
-```
-
-### 6. Infrastructure Setup (Optional)
+### 5. Infrastructure Setup (Optional - AWS Deployment)
 
 ```bash
 cd terraform
@@ -216,238 +263,11 @@ cd frontend
 npm run build
 ```
 
-## Contributing
-
-We welcome contributions! Please follow these guidelines:
-
-### 1. Create an Issue
-
-Before starting work, create an issue describing:
-- **Bug reports**: Steps to reproduce, expected vs actual behavior
-- **Feature requests**: Use case, proposed solution
-- **Documentation**: What needs to be added or clarified
-
-Use our [issue templates](.github/ISSUE_TEMPLATE/) for consistent reporting.
-
-### 2. Fork and Branch
-
-```bash
-# Fork the repository on GitHub, then:
-git clone https://github.com/medease-uok/medease.git
-cd medease
-git checkout -b feat/your-feature-name
-```
-
-### 3. Make Your Changes
-
-- Write clean, maintainable code
-- Follow existing code style and patterns
-- Add tests for new features
-- Update documentation as needed
-- Keep commits atomic and well-described
-
-### 4. Commit Guidelines
-
-**IMPORTANT: Include Jira Reference**
-
-All commits should reference a Jira issue for traceability:
-
-```bash
-git commit -m "MEDEASE-123: Add user authentication"
-git commit -m "MEDEASE-456: Fix payment validation bug"
-git commit -m "MEDEASE-789: Update API documentation"
-```
-
-Alternatively, follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
-
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
-```
-
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, etc.)
-- `refactor`: Code refactoring
-- `perf`: Performance improvements
-- `test`: Test changes
-- `chore`: Maintenance tasks
-- `ci`: CI/CD changes
-- `build`: Build system changes
-
-**Examples:**
-```bash
-git commit -m "feat(auth): add user login functionality"
-git commit -m "fix(api): resolve null pointer in user service"
-git commit -m "docs: update installation instructions"
-```
-
-**Setup Commit Template (Optional):**
-```bash
-git config --local commit.template .gitmessage
-```
-This will provide a template when you run `git commit`.
-
-### 5. Push and Create Pull Request
-
-```bash
-git push origin feat/your-feature-name
-```
-
-Then create a PR on GitHub with:
-- **Title**: Follow conventional commit format (e.g., `feat(api): add user endpoint`)
-- **Description**: Clear explanation of changes
-- **Link**: Reference the issue with `Fixes #123`, `Closes #123`, or `Resolves #123`
-
-### Pull Request Requirements
-
-All PRs must pass the following checks:
-
-- **PR Title Format**: Must follow conventional commit format
-- **Issue Linkage**: Must reference an issue
-- **Code Formatting**: Automatically formatted with Prettier
-- **Assignee**: PR author is auto-assigned
-
-### Code Review Process
-
-1. Automated checks run on every PR
-2. Request a code review from maintainers
-3. Address feedback and push changes
-4. Once approved and checks pass, your PR will be merged
-5. Branch is automatically deleted after merge
-
-### Getting AI Code Review
-
-You can request an AI-powered code review by commenting on your PR:
-
-```
-claude-review
-```
-
-This will trigger Claude AI to review your changes and provide feedback.
-
-## Jira Integration
-
-This repository is integrated with Jira for seamless project tracking:
-
-**Jira Board:** [https://medease-uok.atlassian.net](https://medease-uok.atlassian.net)
-
-### Automatic Features
-
-When you include Jira issue keys (e.g., `MEDEASE-123`) in your commits and PRs:
-
-- **Commits appear in Jira**: Every commit with a Jira key shows up in the Development panel
-- **PRs link automatically**: Pull requests are linked to Jira issues
-- **Status tracking**: Development progress is visible in Jira
-- **Auto-labeling**: PRs with Jira references get `jira-linked` label
-
-### Smart Commits
-
-Perform Jira actions directly from commit messages:
-
-```bash
-# Add comment to Jira issue
-git commit -m "MEDEASE-123 #comment Fixed authentication bug"
-
-# Log work time
-git commit -m "MEDEASE-123 #time 2h 30m Debugging API"
-
-# Close Jira issue
-git commit -m "MEDEASE-123 #close Completed feature implementation"
-```
-
-### PR Requirements
-
-All PRs must:
-- Include Jira reference (MEDEASE-XXX) in title or description
-- Link to related GitHub issue (if applicable)
-- Follow conventional commit format OR use Jira key format
-
-**Valid PR Titles:**
-- `MEDEASE-123: Add authentication feature`
-- `feat(auth): implement JWT authentication`
-
-**Invalid PR Titles:**
-- `Added new feature` (Missing Jira reference)
-
-See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for detailed workflow guide.
-
-## Workflows & Automation
-
-This project uses GitHub Actions for automation:
-
-### Automatic Workflows
-
-- **Auto-Format Code**: Formats changed files with Prettier
-- **Auto-Label PRs**: Labels based on files changed and PR title
-- **Validate PR**: Checks title format, issue linkage, and Jira reference
-- **Jira Integration**: Links commits and PRs to Jira issues
-- **Review Time Estimate**: Adds labels based on PR size
-- **Branch Cleanup**: Deletes branches after merge
-- **Claude AI Review**: On-demand code review (comment `claude-review`)
-
-### Manual Workflows
-
-- **Sync Labels**: Updates repository labels from config
-
-See [.github/workflows/](.github/workflows/) for workflow details.
-
-## Branch Protection
-
-The `main` branch is protected with required status checks. See [.github/BRANCH_PROTECTION.md](.github/BRANCH_PROTECTION.md) for setup instructions.
-
-Repository administrators can bypass checks when necessary for urgent fixes.
-
-## Project Labels
-
-We use labels to categorize issues and PRs:
-
-**Type Labels:**
-- `bug` - Something isn't working
-- `enhancement` - New feature or request
-- `documentation` - Documentation improvements
-- `refactor` - Code refactoring
-- `performance` - Performance improvements
-
-**Component Labels:**
-- `frontend` - Frontend changes
-- `backend` - Backend changes
-- `terraform` - Infrastructure changes
-- `database` - Database related
-- `api` - API changes
-
-**Status Labels:**
-- `wip` - Work in progress
-- `ready-for-review` - Ready for review
-- `needs-review` - Needs review
-- `blocked` - Blocked by something
-
-**Priority Labels:**
-- `priority/critical` - Critical priority
-- `priority/high` - High priority
-- `priority/medium` - Medium priority
-- `priority/low` - Low priority
-
-**Review Time Labels:**
-- `5min review` - Quick review (< 100 lines)
-- `15min review` - Short review (100-499 lines)
-- `30min review` - Medium review (500-1499 lines)
-- `1hr review` - Long review (1500+ lines)
-
 ## Support
 
 - Create an [issue](https://github.com/medease-uok/medease/issues) for bug reports or feature requests
 - Check existing issues before creating new ones
 - Use appropriate issue templates
-
-## License
-
-[Add your license here]
 
 ---
 

@@ -178,3 +178,53 @@
   font-size: 14px;
   color: var(--color-text-secondary);
 }
+
+/* Field-level validation errors */
+.login-input.input-error,
+.login-select.input-error {
+  border-color: #e53e3e;
+}
+.login-input.input-error:focus,
+.login-select.input-error:focus {
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.15);
+  border-color: #e53e3e;
+}
+.field-error {
+  color: #e53e3e;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Password strength meter */
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.password-strength-bar {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+.password-strength-segment {
+  height: 4px;
+  flex: 1;
+  border-radius: 2px;
+  background: var(--color-border);
+  transition: background 0.2s;
+}
+.password-strength-segment.strength-1 { background: #e53e3e; }
+.password-strength-segment.strength-2 { background: #dd6b20; }
+.password-strength-segment.strength-3 { background: #d69e2e; }
+.password-strength-segment.strength-4 { background: #38a169; }
+.password-strength-label {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 48px;
+}
+.strength-text-1 { color: #e53e3e; }
+.strength-text-2 { color: #dd6b20; }
+.strength-text-3 { color: #d69e2e; }
+.strength-text-4 { color: #38a169; }

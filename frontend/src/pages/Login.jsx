@@ -7,16 +7,19 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
       setError('Please enter both email and password.');
       return;
     }
-    const result = login(email, password);
+    setLoading(true);
+    const result = await login(email, password);
+    setLoading(false);
     if (result.success) {
       navigate('/dashboard');
     } else if (result.reason === 'pending') {
@@ -56,8 +59,8 @@ export default function Login() {
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
             />
           </div>
-          <button type="submit" className="login-button">
-            Sign In
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
         <div className="register-footer">

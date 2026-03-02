@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { appointments, appointmentStatuses } from '../data/appointments';
-import { patients } from '../data/patients';
+import { useState, useEffect } from 'react';
+import { appointmentStatuses } from '../constants';
 import { useAuth } from '../data/AuthContext';
+import api from '../services/api';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import './Appointments.css';
@@ -15,32 +15,36 @@ const formatDate = (iso) => {
 
 export default function Appointments() {
   const [filter, setFilter] = useState('all');
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { currentUser } = useAuth();
+  const isPatient = currentUser?.role === 'patient';
 
-  const patient = currentUser?.role === 'patient'
-    ? patients.find((p) => p.userId === currentUser.id)
-    : null;
-
-  const baseData = patient
-    ? appointments.filter((a) => a.patientId === patient.id)
-    : appointments;
+  useEffect(() => {
+    api.get('/appointments')
+      .then((res) => setAppointments(res.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = filter === 'all'
-    ? baseData
-    : baseData.filter((a) => a.status === filter);
+    ? appointments
+    : appointments.filter((a) => a.status === filter);
 
   const columns = [
-    ...(patient ? [] : [{ key: 'patientName', label: 'Patient' }]),
+    ...(isPatient ? [] : [{ key: 'patientName', label: 'Patient' }]),
     { key: 'doctorName', label: 'Doctor' },
     { key: 'scheduledAt', label: 'Scheduled', render: (val) => formatDate(val) },
     { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
     { key: 'notes', label: 'Notes', render: (val) => val?.substring(0, 50) + '...' },
   ];
 
+  if (loading) return <div style={{ padding: 32 }}>Loading appointments...</div>;
+
   return (
     <div>
       <div className="page-header">
-        <h2 className="page-title">{patient ? 'My Appointments' : 'Appointments'}</h2>
+        <h2 className="page-title">{isPatient ? 'My Appointments' : 'Appointments'}</h2>
         <span className="count-badge">{filtered.length}</span>
       </div>
       <div className="filter-bar">
