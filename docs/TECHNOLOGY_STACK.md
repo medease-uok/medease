@@ -60,7 +60,81 @@ Automation is handled through industry-standard "Infrastructure as Code" and aut
 
 ---
 
-## 5. Summary Architecture Overview
+## 5. Testing Framework & Strategy
+A comprehensive testing strategy ensures code reliability and prevents regressions across all application layers.
+
+| Testing Type | Tool/Framework | Purpose |
+| :--- | :--- | :--- |
+| **Unit Testing (Frontend)** | **Jest + React Testing Library** | Component-level testing with DOM assertions. |
+| **Unit Testing (Backend)** | **Jest + Supertest** | API endpoint and service layer testing. |
+| **Integration Testing** | **Jest** | Testing interactions between modules and services. |
+| **End-to-End Testing** | **Cypress** | Full user flow testing in real browser environments. |
+| **API Testing** | **Postman / Newman** | Automated API contract and regression testing. |
+| **Coverage Reporting** | **Istanbul (nyc)** | Code coverage metrics and reporting. |
+
+### Testing Strategy
+* **Approach:** Test Pyramid model prioritizing unit tests, supplemented by integration and E2E tests.
+* **Coverage Target:** Minimum 80% code coverage for critical business logic.
+* **CI Integration:** All tests run automatically in GitHub Actions pipelines before merge.
+
+---
+
+## 6. Linting & Code Quality Tools
+Automated code quality enforcement ensures consistency and catches issues early in the development cycle.
+
+| Tool | Purpose |
+| :--- | :--- |
+| **ESLint** | JavaScript/TypeScript linting with Airbnb style guide rules. |
+| **Prettier** | Automatic code formatting for consistent style. |
+| **Husky** | Git hooks for pre-commit linting and formatting. |
+| **lint-staged** | Run linters on staged files only for faster commits. |
+| **SonarQube** | Static code analysis for bugs, vulnerabilities, and code smells. |
+| **EditorConfig** | Cross-editor configuration consistency. |
+
+### Code Quality Practices
+* **Pre-commit Hooks:** ESLint and Prettier run automatically before each commit.
+* **Pull Request Checks:** Automated linting gates in CI pipeline.
+* **Code Reviews:** Mandatory peer reviews with minimum one approval required.
+
+---
+
+## 7. Communication & Project Management Tools
+Effective collaboration and project tracking tools streamline development workflows and stakeholder communication.
+
+| Tool | Purpose |
+| :--- | :--- |
+| **GitHub Issues** | Bug tracking, feature requests, and task management. |
+| **Jira** | Advanced project management, sprint tracking, and reporting. |
+| **Figma** | UI/UX design collaboration and handoff. |
+
+### Workflow Integration
+* **GitHub-Jira Sync:** Automatic issue linking between commits and Jira tickets.
+* **Sprint Cadence:** Two-week sprints with daily standups and retrospectives.
+
+---
+
+## 8. Browser Compatibility Targets
+The frontend application is designed to support modern browsers while maintaining accessibility standards.
+
+| Browser | Minimum Version | Support Level |
+| :--- | :--- | :--- |
+| **Google Chrome** | 90+ | Full Support |
+| **Mozilla Firefox** | 88+ | Full Support |
+| **Microsoft Edge** | 90+ (Chromium) | Full Support |
+| **Safari** | 14+ | Full Support |
+| **Safari iOS** | 14+ | Full Support |
+| **Chrome Android** | 90+ | Full Support |
+| **Internet Explorer** | - | Not Supported |
+
+### Compatibility Strategy
+* **CSS Approach:** Autoprefixer for vendor prefixes, Tailwind CSS for cross-browser consistency.
+* **JavaScript:** Babel transpilation targeting ES2020+ with polyfills as needed.
+* **Testing:** Cross-browser testing via BrowserStack for critical user flows.
+* **Progressive Enhancement:** Core functionality works without JavaScript; enhanced features require modern browsers.
+
+---
+
+## 9. Summary Architecture Overview
 * **Architecture Pattern:** Micro-services ready, Containerized REST API.
 * **Deployment Model:** AWS Cloud Native (Serverless Fargate).
 * **Workflow:** Git-based automation (GitOps) via GitHub Actions and Terraform.
