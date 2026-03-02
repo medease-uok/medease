@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { useAuth } from '../data/AuthContext';
 import { roles as allRoles } from '../constants';
 import './Login.css';
 import './Register.css';
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_CLOUDFLARE_SITE_KEY;
 
 const roles = allRoles.filter((r) => r !== 'admin');
 
@@ -86,6 +89,7 @@ export default function Register() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
   const { register } = useAuth();
 
   /* Helpers for per-field accessibility & error display */
@@ -208,10 +212,11 @@ export default function Register() {
     e.preventDefault();
     setError('');
     const errs = validateStep3();
+    if (!captchaToken) errs.captcha = 'Please complete the verification';
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
     setLoading(true);
-    const result = await register(form);
+    const result = await register({ ...form, captchaToken });
     setLoading(false);
     if (result.success) {
       setSuccess(true);
@@ -488,6 +493,16 @@ export default function Register() {
                 <label className="login-label" htmlFor="reg-confirmPassword">Confirm Password *</label>
                 <input id="reg-confirmPassword" type="password" name="confirmPassword" maxLength={72} {...fieldProps('confirmPassword')} value={form.confirmPassword} onChange={handleChange} />
                 {renderError('confirmPassword')}
+              </div>
+              <div className="register-captcha">
+                <Turnstile
+                  siteKey={TURNSTILE_SITE_KEY}
+                  options={{ theme: 'light' }}
+                  onSuccess={setCaptchaToken}
+                  onExpire={() => setCaptchaToken('')}
+                  onError={() => setCaptchaToken('')}
+                />
+                {renderError('captcha')}
               </div>
               <div className="register-nav">
                 <button type="button" className="register-btn-back" onClick={handleBack}>
