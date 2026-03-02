@@ -12,7 +12,7 @@ The application follows a decoupled architecture using the MERN stack for high p
 | **Frontend** | **React.js** | Functional components with Hooks for the user interface. |
 | **Styling** | **Tailwind CSS** | Utility-first styling for a responsive, mobile-first design. |
 | **Backend** | **Node.js & Express** | RESTful API handling business logic and routing. |
-| **Database** | **MongoDB / DocumentDB** | NoSQL document storage for flexible medical data schemas. |
+| Database | PostgreSQL / Redis | PostgreSQL for relational data storage and transactional consistency. Redis for caching, session management, and high-performance in-memory data access. |
 | **State Management** | **React Context API** | Global state management for user authentication and UI themes. |
 
 ---
