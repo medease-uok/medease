@@ -25,7 +25,7 @@ const PATTERNS = {
   name: /^[A-Za-z\s]+$/,
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
   phone: /^[7-9]\d{8,9}$/,
-  password: /^(?=.*[A-Z])(?=.*\d).+$/,
+  password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/,
   license: {
     doctor: /^SLMC-[A-Za-z0-9]{4,}-[A-Za-z0-9]{4,}$/,
     nurse: /^SLNC-[A-Za-z0-9]{4,}-[A-Za-z0-9]{4,}$/,
@@ -42,7 +42,7 @@ const MSG = {
   emailFormat: 'Please enter a valid email',
   phoneFormat: 'Enter 9-10 digits starting with 7, 8, or 9',
   passwordMin: `Must be at least ${MIN_PASSWORD_LENGTH} characters`,
-  passwordStrength: 'Must include at least one uppercase letter and one number',
+  passwordStrength: 'Must include uppercase, lowercase, number, and special character',
   passwordMatch: 'Passwords do not match',
   dobFuture: 'Date of birth cannot be in the future',
   dobRange: 'Please enter a valid date of birth',

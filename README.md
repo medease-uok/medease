@@ -184,7 +184,7 @@ This adds test data across all tables:
 | Lab Reports | 10 | CBC, MRI, ECG, X-Ray, and more |
 | Audit Logs | 15 | Login, view, create, update actions |
 
-All test accounts use the password `password123`. Key accounts:
+All test accounts use the password `Password@123`. Key accounts:
 - **Admin**: admin@medease.com
 - **Doctor**: kamal.perera@medease.com
 - **Patient**: sarah.fernando@medease.com

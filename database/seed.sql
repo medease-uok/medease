@@ -2,7 +2,7 @@
 -- Run manually: npm run db:seed (from backend/)
 -- Or directly: docker exec -i medease-db psql -U medease_user -d medease < database/seed.sql
 --
--- All test passwords are hashed using pgcrypto: "password123"
+-- All test passwords are hashed using pgcrypto: "Password@123"
 
 BEGIN;
 
@@ -12,40 +12,40 @@ BEGIN;
 
 -- Admin
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'admin@medease.com', crypt('password123', gen_salt('bf')), 'System', 'Admin', 'admin', '+94771000001', true),
-  ('a0000000-0000-0000-0000-000000000002', 'nimali.admin@medease.com', crypt('password123', gen_salt('bf')), 'Nimali', 'Jayawardena', 'admin', '+94771000002', true);
+  ('a0000000-0000-0000-0000-000000000001', 'admin@medease.com', crypt('Password@123', gen_salt('bf')), 'System', 'Admin', 'admin', '+94771000001', true),
+  ('a0000000-0000-0000-0000-000000000002', 'nimali.admin@medease.com', crypt('Password@123', gen_salt('bf')), 'Nimali', 'Jayawardena', 'admin', '+94771000002', true);
 
 -- Doctors
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('d0000000-0000-0000-0000-000000000001', 'kamal.perera@medease.com', crypt('password123', gen_salt('bf')), 'Kamal', 'Perera', 'doctor', '+94772000001', true),
-  ('d0000000-0000-0000-0000-000000000002', 'sithara.silva@medease.com', crypt('password123', gen_salt('bf')), 'Sithara', 'Silva', 'doctor', '+94772000002', true),
-  ('d0000000-0000-0000-0000-000000000003', 'ruwan.fernando@medease.com', crypt('password123', gen_salt('bf')), 'Ruwan', 'Fernando', 'doctor', '+94772000003', true),
-  ('d0000000-0000-0000-0000-000000000004', 'anjali.dissanayake@medease.com', crypt('password123', gen_salt('bf')), 'Anjali', 'Dissanayake', 'doctor', '+94772000004', true);
+  ('d0000000-0000-0000-0000-000000000001', 'kamal.perera@medease.com', crypt('Password@123', gen_salt('bf')), 'Kamal', 'Perera', 'doctor', '+94772000001', true),
+  ('d0000000-0000-0000-0000-000000000002', 'sithara.silva@medease.com', crypt('Password@123', gen_salt('bf')), 'Sithara', 'Silva', 'doctor', '+94772000002', true),
+  ('d0000000-0000-0000-0000-000000000003', 'ruwan.fernando@medease.com', crypt('Password@123', gen_salt('bf')), 'Ruwan', 'Fernando', 'doctor', '+94772000003', true),
+  ('d0000000-0000-0000-0000-000000000004', 'anjali.dissanayake@medease.com', crypt('Password@123', gen_salt('bf')), 'Anjali', 'Dissanayake', 'doctor', '+94772000004', true);
 
 -- Nurses
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('e0000000-0000-0000-0000-000000000001', 'malini.bandara@medease.com', crypt('password123', gen_salt('bf')), 'Malini', 'Bandara', 'nurse', '+94773000001', true),
-  ('e0000000-0000-0000-0000-000000000002', 'chamari.rathnayake@medease.com', crypt('password123', gen_salt('bf')), 'Chamari', 'Rathnayake', 'nurse', '+94773000002', true),
-  ('e0000000-0000-0000-0000-000000000003', 'priyanka.kumari@medease.com', crypt('password123', gen_salt('bf')), 'Priyanka', 'Kumari', 'nurse', '+94773000003', true);
+  ('e0000000-0000-0000-0000-000000000001', 'malini.bandara@medease.com', crypt('Password@123', gen_salt('bf')), 'Malini', 'Bandara', 'nurse', '+94773000001', true),
+  ('e0000000-0000-0000-0000-000000000002', 'chamari.rathnayake@medease.com', crypt('Password@123', gen_salt('bf')), 'Chamari', 'Rathnayake', 'nurse', '+94773000002', true),
+  ('e0000000-0000-0000-0000-000000000003', 'priyanka.kumari@medease.com', crypt('Password@123', gen_salt('bf')), 'Priyanka', 'Kumari', 'nurse', '+94773000003', true);
 
 -- Lab Technicians
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('10000000-0000-0000-0000-000000000001', 'nimal.wijesinghe@medease.com', crypt('password123', gen_salt('bf')), 'Nimal', 'Wijesinghe', 'lab_technician', '+94774000001', true),
-  ('10000000-0000-0000-0000-000000000002', 'sanduni.herath@medease.com', crypt('password123', gen_salt('bf')), 'Sanduni', 'Herath', 'lab_technician', '+94774000002', true);
+  ('10000000-0000-0000-0000-000000000001', 'nimal.wijesinghe@medease.com', crypt('Password@123', gen_salt('bf')), 'Nimal', 'Wijesinghe', 'lab_technician', '+94774000001', true),
+  ('10000000-0000-0000-0000-000000000002', 'sanduni.herath@medease.com', crypt('Password@123', gen_salt('bf')), 'Sanduni', 'Herath', 'lab_technician', '+94774000002', true);
 
 -- Pharmacists
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('b0000000-0000-0000-0000-000000000001', 'tharindu.gamage@medease.com', crypt('password123', gen_salt('bf')), 'Tharindu', 'Gamage', 'pharmacist', '+94775000001', true),
-  ('b0000000-0000-0000-0000-000000000002', 'dilani.mendis@medease.com', crypt('password123', gen_salt('bf')), 'Dilani', 'Mendis', 'pharmacist', '+94775000002', true);
+  ('b0000000-0000-0000-0000-000000000001', 'tharindu.gamage@medease.com', crypt('Password@123', gen_salt('bf')), 'Tharindu', 'Gamage', 'pharmacist', '+94775000001', true),
+  ('b0000000-0000-0000-0000-000000000002', 'dilani.mendis@medease.com', crypt('Password@123', gen_salt('bf')), 'Dilani', 'Mendis', 'pharmacist', '+94775000002', true);
 
 -- Patients
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('c0000000-0000-0000-0000-000000000001', 'sarah.fernando@medease.com', crypt('password123', gen_salt('bf')), 'Sarah', 'Fernando', 'patient', '+94776000001', true),
-  ('c0000000-0000-0000-0000-000000000002', 'dinesh.rajapaksa@medease.com', crypt('password123', gen_salt('bf')), 'Dinesh', 'Rajapaksa', 'patient', '+94776000002', true),
-  ('c0000000-0000-0000-0000-000000000003', 'kavindi.weerasinghe@medease.com', crypt('password123', gen_salt('bf')), 'Kavindi', 'Weerasinghe', 'patient', '+94776000003', true),
-  ('c0000000-0000-0000-0000-000000000004', 'nuwan.jayasuriya@medease.com', crypt('password123', gen_salt('bf')), 'Nuwan', 'Jayasuriya', 'patient', '+94776000004', true),
-  ('c0000000-0000-0000-0000-000000000005', 'hasini.abeywickrama@medease.com', crypt('password123', gen_salt('bf')), 'Hasini', 'Abeywickrama', 'patient', '+94776000005', true),
-  ('c0000000-0000-0000-0000-000000000006', 'lahiru.gunasekara@medease.com', crypt('password123', gen_salt('bf')), 'Lahiru', 'Gunasekara', 'patient', '+94776000006', true);
+  ('c0000000-0000-0000-0000-000000000001', 'sarah.fernando@medease.com', crypt('Password@123', gen_salt('bf')), 'Sarah', 'Fernando', 'patient', '+94776000001', true),
+  ('c0000000-0000-0000-0000-000000000002', 'dinesh.rajapaksa@medease.com', crypt('Password@123', gen_salt('bf')), 'Dinesh', 'Rajapaksa', 'patient', '+94776000002', true),
+  ('c0000000-0000-0000-0000-000000000003', 'kavindi.weerasinghe@medease.com', crypt('Password@123', gen_salt('bf')), 'Kavindi', 'Weerasinghe', 'patient', '+94776000003', true),
+  ('c0000000-0000-0000-0000-000000000004', 'nuwan.jayasuriya@medease.com', crypt('Password@123', gen_salt('bf')), 'Nuwan', 'Jayasuriya', 'patient', '+94776000004', true),
+  ('c0000000-0000-0000-0000-000000000005', 'hasini.abeywickrama@medease.com', crypt('Password@123', gen_salt('bf')), 'Hasini', 'Abeywickrama', 'patient', '+94776000005', true),
+  ('c0000000-0000-0000-0000-000000000006', 'lahiru.gunasekara@medease.com', crypt('Password@123', gen_salt('bf')), 'Lahiru', 'Gunasekara', 'patient', '+94776000006', true);
 
 -- ============================================
 -- DOCTORS (profiles)
