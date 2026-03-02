@@ -497,6 +497,7 @@ export default function Register() {
               <div className="register-captcha">
                 <Turnstile
                   siteKey={TURNSTILE_SITE_KEY}
+                  options={{ theme: 'light' }}
                   onSuccess={setCaptchaToken}
                   onExpire={() => setCaptchaToken('')}
                   onError={() => setCaptchaToken('')}
