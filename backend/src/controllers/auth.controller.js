@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 const config = require('../config');
 const AppError = require('../utils/AppError');
+const auditLog = require('../utils/auditLog');
 
 const SALT_ROUNDS = 12;
 
@@ -100,6 +101,15 @@ const register = async (req, res, next) => {
     // Commit transaction
     await client.query('COMMIT');
 
+    // Audit log: successful registration
+    await auditLog({
+      userId: user.id,
+      action: 'REGISTER',
+      resourceType: 'user',
+      resourceId: user.id,
+      ip: req.ip,
+    });
+
     res.status(201).json({
       status: 'success',
       message: 'Registration successful. Your account is pending admin approval.',
@@ -117,6 +127,15 @@ const register = async (req, res, next) => {
     });
   } catch (err) {
     await client.query('ROLLBACK');
+
+    // Audit log: failed registration attempt
+    await auditLog({
+      userId: null,
+      action: 'REGISTER',
+      resourceType: 'user',
+      ip: req.ip,
+      success: false,
+    });
 
     if (err.isOperational) {
       return next(err);
@@ -166,6 +185,14 @@ const login = async (req, res, next) => {
       throw new AppError('Your account is pending admin approval.', 403);
     }
 
+    // Audit log: successful login
+    await auditLog({
+      userId: user.id,
+      action: 'LOGIN',
+      resourceType: 'session',
+      ip: req.ip,
+    });
+
     // Sign JWT
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
@@ -188,6 +215,15 @@ const login = async (req, res, next) => {
       },
     });
   } catch (err) {
+    // Audit log: failed login attempt
+    await auditLog({
+      userId: null,
+      action: 'LOGIN',
+      resourceType: 'session',
+      ip: req.ip,
+      success: false,
+    });
+
     if (err.isOperational) {
       return next(err);
     }
