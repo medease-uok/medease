@@ -24,27 +24,30 @@ const stepLabels = ['Account', 'Details', 'Password'];
 const PATTERNS = {
   name: /^[A-Za-z\s]+$/,
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-  phone: /^\d{9,10}$/,
+  phone: /^[7-9]\d{8,9}$/,
+  password: /^(?=.*[A-Z])(?=.*\d).+$/,
   license: {
-    doctor: /^SLMC-[A-Za-z0-9]+-[A-Za-z0-9]+$/,
-    nurse: /^SLNC-[A-Za-z0-9]+-[A-Za-z0-9]+$/,
-    pharmacist: /^SLPC-[A-Za-z0-9]+-[A-Za-z0-9]+$/,
+    doctor: /^SLMC-[A-Za-z0-9]{4,}-[A-Za-z0-9]{4,}$/,
+    nurse: /^SLNC-[A-Za-z0-9]{4,}-[A-Za-z0-9]{4,}$/,
+    pharmacist: /^SLPC-[A-Za-z0-9]{4,}-[A-Za-z0-9]{4,}$/,
   },
 };
+
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_AGE_YEARS = 120;
 
 const MSG = {
   required: (field) => `${field} is required`,
   nameFormat: 'Only letters and spaces allowed',
   emailFormat: 'Please enter a valid email',
-  phoneFormat: 'Enter 9-10 digits without leading 0',
-  passwordMin: 'Must be at least 6 characters',
+  phoneFormat: 'Enter 9-10 digits starting with 7, 8, or 9',
+  passwordMin: `Must be at least ${MIN_PASSWORD_LENGTH} characters`,
+  passwordStrength: 'Must include at least one uppercase letter and one number',
   passwordMatch: 'Passwords do not match',
   dobFuture: 'Date of birth cannot be in the future',
   dobRange: 'Please enter a valid date of birth',
   licenseFormat: (prefix) => `Format: ${prefix}-XXXX-XXXX`,
 };
-
-const MAX_AGE_YEARS = 120;
 
 export default function Register() {
   const [step, setStep] = useState(1);
@@ -90,9 +93,13 @@ export default function Register() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
-    const cleared = { [name]: '' };
-    if (name === 'password') cleared.confirmPassword = '';
-    setFieldErrors((prev) => ({ ...prev, ...cleared }));
+    if (name === 'role') {
+      setFieldErrors({});
+    } else {
+      const cleared = { [name]: '' };
+      if (name === 'password') cleared.confirmPassword = '';
+      setFieldErrors((prev) => ({ ...prev, ...cleared }));
+    }
     setError('');
   };
 
@@ -117,10 +124,15 @@ export default function Register() {
         } else {
           const dob = new Date(form.dateOfBirth);
           const today = new Date();
-          if (dob > today) errs.dateOfBirth = MSG.dobFuture;
-          else {
-            const ageDiff = today.getFullYear() - dob.getFullYear();
-            if (ageDiff > MAX_AGE_YEARS) errs.dateOfBirth = MSG.dobRange;
+          if (dob > today) {
+            errs.dateOfBirth = MSG.dobFuture;
+          } else {
+            let age = today.getFullYear() - dob.getFullYear();
+            const monthDiff = today.getMonth() - dob.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+              age--;
+            }
+            if (age > MAX_AGE_YEARS) errs.dateOfBirth = MSG.dobRange;
           }
         }
         if (!form.gender) errs.gender = MSG.required('Gender');
@@ -158,7 +170,8 @@ export default function Register() {
   const validateStep3 = () => {
     const errs = {};
     if (!form.password) errs.password = MSG.required('Password');
-    else if (form.password.length < 6) errs.password = MSG.passwordMin;
+    else if (form.password.length < MIN_PASSWORD_LENGTH) errs.password = MSG.passwordMin;
+    else if (!PATTERNS.password.test(form.password)) errs.password = MSG.passwordStrength;
     if (!form.confirmPassword) errs.confirmPassword = MSG.required('Password confirmation');
     else if (form.password && form.password !== form.confirmPassword)
       errs.confirmPassword = MSG.passwordMatch;
@@ -249,25 +262,25 @@ export default function Register() {
               <div className="register-row">
                 <div className="login-field">
                   <label className="login-label" htmlFor="reg-firstName">First Name *</label>
-                  <input id="reg-firstName" type="text" name="firstName" {...fieldProps('firstName')} value={form.firstName} onChange={handleChange} />
+                  <input id="reg-firstName" type="text" name="firstName" maxLength={50} {...fieldProps('firstName')} value={form.firstName} onChange={handleChange} />
                   {renderError('firstName')}
                 </div>
                 <div className="login-field">
                   <label className="login-label" htmlFor="reg-lastName">Last Name *</label>
-                  <input id="reg-lastName" type="text" name="lastName" {...fieldProps('lastName')} value={form.lastName} onChange={handleChange} />
+                  <input id="reg-lastName" type="text" name="lastName" maxLength={50} {...fieldProps('lastName')} value={form.lastName} onChange={handleChange} />
                   {renderError('lastName')}
                 </div>
               </div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-email">Email *</label>
-                <input id="reg-email" type="email" name="email" {...fieldProps('email')} value={form.email} onChange={handleChange} />
+                <input id="reg-email" type="email" name="email" maxLength={100} {...fieldProps('email')} value={form.email} onChange={handleChange} />
                 {renderError('email')}
               </div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-phone">Phone</label>
                 <div className="register-phone-group">
                   <span className="register-phone-prefix">+94</span>
-                  <input id="reg-phone" type="tel" name="phone" {...fieldProps('phone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.phone} onChange={handleChange} />
+                  <input id="reg-phone" type="tel" name="phone" maxLength={10} {...fieldProps('phone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.phone} onChange={handleChange} />
                 </div>
                 {renderError('phone')}
               </div>
@@ -321,7 +334,7 @@ export default function Register() {
                   <div className="register-row">
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-emergencyContact">Emergency Contact Name</label>
-                      <input id="reg-emergencyContact" type="text" name="emergencyContact" className="login-input" placeholder="e.g. John Perera" value={form.emergencyContact} onChange={handleChange} />
+                      <input id="reg-emergencyContact" type="text" name="emergencyContact" maxLength={100} className="login-input" placeholder="e.g. John Perera" value={form.emergencyContact} onChange={handleChange} />
                     </div>
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-emergencyRelationship">Relationship</label>
@@ -340,13 +353,13 @@ export default function Register() {
                     <label className="login-label" htmlFor="reg-emergencyPhone">Emergency Phone</label>
                     <div className="register-phone-group">
                       <span className="register-phone-prefix">+94</span>
-                      <input id="reg-emergencyPhone" type="tel" name="emergencyPhone" {...fieldProps('emergencyPhone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.emergencyPhone} onChange={handleChange} />
+                      <input id="reg-emergencyPhone" type="tel" name="emergencyPhone" maxLength={10} {...fieldProps('emergencyPhone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.emergencyPhone} onChange={handleChange} />
                     </div>
                     {renderError('emergencyPhone')}
                   </div>
                   <div className="login-field">
                     <label className="login-label" htmlFor="reg-address">Address</label>
-                    <input id="reg-address" type="text" name="address" className="login-input" placeholder="Full address" value={form.address} onChange={handleChange} />
+                    <input id="reg-address" type="text" name="address" maxLength={200} className="login-input" placeholder="Full address" value={form.address} onChange={handleChange} />
                   </div>
                 </>
               )}
@@ -365,7 +378,7 @@ export default function Register() {
                   <div className="register-row">
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-licenseNumber">License Number (SLMC) *</label>
-                      <input id="reg-licenseNumber" type="text" name="licenseNumber" {...fieldProps('licenseNumber')} placeholder="SLMC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                      <input id="reg-licenseNumber" type="text" name="licenseNumber" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLMC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
                       {renderError('licenseNumber')}
                     </div>
                     <div className="login-field">
@@ -386,7 +399,7 @@ export default function Register() {
                   <div className="register-row">
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-licenseNumber">License Number (SLNC) *</label>
-                      <input id="reg-licenseNumber" type="text" name="licenseNumber" {...fieldProps('licenseNumber')} placeholder="SLNC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                      <input id="reg-licenseNumber" type="text" name="licenseNumber" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLNC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
                       {renderError('licenseNumber')}
                     </div>
                     <div className="login-field">
@@ -420,7 +433,7 @@ export default function Register() {
                   <div className="register-section-title">Professional Information</div>
                   <div className="login-field">
                     <label className="login-label" htmlFor="reg-licenseNumber">License Number (SLPC) *</label>
-                    <input id="reg-licenseNumber" type="text" name="licenseNumber" {...fieldProps('licenseNumber')} placeholder="SLPC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                    <input id="reg-licenseNumber" type="text" name="licenseNumber" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLPC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
                     {renderError('licenseNumber')}
                   </div>
                 </>
@@ -443,12 +456,12 @@ export default function Register() {
               <div className="register-section-title">Set Your Password</div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-password">Password *</label>
-                <input id="reg-password" type="password" name="password" {...fieldProps('password')} value={form.password} onChange={handleChange} />
+                <input id="reg-password" type="password" name="password" maxLength={72} {...fieldProps('password')} value={form.password} onChange={handleChange} />
                 {renderError('password')}
               </div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-confirmPassword">Confirm Password *</label>
-                <input id="reg-confirmPassword" type="password" name="confirmPassword" {...fieldProps('confirmPassword')} value={form.confirmPassword} onChange={handleChange} />
+                <input id="reg-confirmPassword" type="password" name="confirmPassword" maxLength={72} {...fieldProps('confirmPassword')} value={form.confirmPassword} onChange={handleChange} />
                 {renderError('confirmPassword')}
               </div>
               <div className="register-nav">
