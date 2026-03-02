@@ -20,6 +20,35 @@ const departments = [
 
 const stepLabels = ['Account', 'Details', 'Password'];
 
+/* Validation patterns and messages */
+const PATTERNS = {
+  name: /^[A-Za-z\s]+$/,
+  email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  phone: /^[7-9]\d{8,9}$/,
+  password: /^(?=.*[A-Z])(?=.*\d).+$/,
+  license: {
+    doctor: /^SLMC-[A-Za-z0-9]{4,}-[A-Za-z0-9]{4,}$/,
+    nurse: /^SLNC-[A-Za-z0-9]{4,}-[A-Za-z0-9]{4,}$/,
+    pharmacist: /^SLPC-[A-Za-z0-9]{4,}-[A-Za-z0-9]{4,}$/,
+  },
+};
+
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_AGE_YEARS = 120;
+
+const MSG = {
+  required: (field) => `${field} is required`,
+  nameFormat: 'Only letters and spaces allowed',
+  emailFormat: 'Please enter a valid email',
+  phoneFormat: 'Enter 9-10 digits starting with 7, 8, or 9',
+  passwordMin: `Must be at least ${MIN_PASSWORD_LENGTH} characters`,
+  passwordStrength: 'Must include at least one uppercase letter and one number',
+  passwordMatch: 'Passwords do not match',
+  dobFuture: 'Date of birth cannot be in the future',
+  dobRange: 'Please enter a valid date of birth',
+  licenseFormat: (prefix) => `Format: ${prefix}-XXXX-XXXX`,
+};
+
 export default function Register() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -42,86 +71,146 @@ export default function Register() {
     department: '',
   });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { register } = useAuth();
 
+  /* Helpers for per-field accessibility & error display */
+  const fieldProps = (name, baseClass = 'login-input') => ({
+    className: `${baseClass}${fieldErrors[name] ? ' input-error' : ''}`,
+    'aria-invalid': fieldErrors[name] ? 'true' : undefined,
+    'aria-describedby': fieldErrors[name] ? `err-${name}` : undefined,
+  });
+
+  const renderError = (name) =>
+    fieldErrors[name] ? (
+      <span id={`err-${name}`} className="field-error" role="alert">
+        {fieldErrors[name]}
+      </span>
+    ) : null;
+
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+    if (name === 'role') {
+      setFieldErrors({});
+    } else {
+      const cleared = { [name]: '' };
+      if (name === 'password') cleared.confirmPassword = '';
+      setFieldErrors((prev) => ({ ...prev, ...cleared }));
+    }
     setError('');
+  };
+
+  const validateStep1 = () => {
+    const errs = {};
+    if (!form.firstName.trim()) errs.firstName = MSG.required('First name');
+    else if (!PATTERNS.name.test(form.firstName.trim())) errs.firstName = MSG.nameFormat;
+    if (!form.lastName.trim()) errs.lastName = MSG.required('Last name');
+    else if (!PATTERNS.name.test(form.lastName.trim())) errs.lastName = MSG.nameFormat;
+    if (!form.email.trim()) errs.email = MSG.required('Email');
+    else if (!PATTERNS.email.test(form.email.trim())) errs.email = MSG.emailFormat;
+    if (form.phone && !PATTERNS.phone.test(form.phone)) errs.phone = MSG.phoneFormat;
+    return errs;
+  };
+
+  const validateStep2 = () => {
+    const errs = {};
+    switch (form.role) {
+      case 'patient': {
+        if (!form.dateOfBirth) {
+          errs.dateOfBirth = MSG.required('Date of birth');
+        } else {
+          const dob = new Date(form.dateOfBirth);
+          const today = new Date();
+          if (dob > today) {
+            errs.dateOfBirth = MSG.dobFuture;
+          } else {
+            let age = today.getFullYear() - dob.getFullYear();
+            const monthDiff = today.getMonth() - dob.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+              age--;
+            }
+            if (age > MAX_AGE_YEARS) errs.dateOfBirth = MSG.dobRange;
+          }
+        }
+        if (!form.gender) errs.gender = MSG.required('Gender');
+        if (form.emergencyPhone && !PATTERNS.phone.test(form.emergencyPhone))
+          errs.emergencyPhone = MSG.phoneFormat;
+        break;
+      }
+      case 'doctor':
+        if (!form.specialization) errs.specialization = MSG.required('Specialization');
+        if (!form.licenseNumber.trim()) errs.licenseNumber = MSG.required('License number');
+        else if (!PATTERNS.license.doctor.test(form.licenseNumber.trim()))
+          errs.licenseNumber = MSG.licenseFormat('SLMC');
+        if (!form.department) errs.department = MSG.required('Department');
+        break;
+      case 'nurse':
+        if (!form.licenseNumber.trim()) errs.licenseNumber = MSG.required('License number');
+        else if (!PATTERNS.license.nurse.test(form.licenseNumber.trim()))
+          errs.licenseNumber = MSG.licenseFormat('SLNC');
+        if (!form.department) errs.department = MSG.required('Department');
+        break;
+      case 'lab_technician':
+        if (!form.department) errs.department = MSG.required('Department');
+        break;
+      case 'pharmacist':
+        if (!form.licenseNumber.trim()) errs.licenseNumber = MSG.required('License number');
+        else if (!PATTERNS.license.pharmacist.test(form.licenseNumber.trim()))
+          errs.licenseNumber = MSG.licenseFormat('SLPC');
+        break;
+      default:
+        break;
+    }
+    return errs;
+  };
+
+  const validateStep3 = () => {
+    const errs = {};
+    if (!form.password) errs.password = MSG.required('Password');
+    else if (form.password.length < MIN_PASSWORD_LENGTH) errs.password = MSG.passwordMin;
+    else if (!PATTERNS.password.test(form.password)) errs.password = MSG.passwordStrength;
+    if (!form.confirmPassword) errs.confirmPassword = MSG.required('Password confirmation');
+    else if (form.password && form.password !== form.confirmPassword)
+      errs.confirmPassword = MSG.passwordMatch;
+    return errs;
   };
 
   const handleNext = () => {
     setError('');
-    if (step === 1) {
-      if (!form.firstName || !form.lastName || !form.email) {
-        setError('Please fill in all required fields.');
-        return;
-      }
-      setStep(2);
-    } else if (step === 2) {
-      if (form.role === 'patient') {
-        if (!form.dateOfBirth || !form.gender) {
-          setError('Please fill in date of birth and gender.');
-          return;
-        }
-      }
-      if (form.role === 'doctor') {
-        if (!form.specialization || !form.licenseNumber || !form.department) {
-          setError('Please fill in specialization, license number, and department.');
-          return;
-        }
-      }
-      if (form.role === 'nurse') {
-        if (!form.licenseNumber || !form.department) {
-          setError('Please fill in license number and department.');
-          return;
-        }
-      }
-      if (form.role === 'lab_technician') {
-        if (!form.department) {
-          setError('Please select a department.');
-          return;
-        }
-      }
-      if (form.role === 'pharmacist') {
-        if (!form.licenseNumber) {
-          setError('Please fill in your license number.');
-          return;
-        }
-      }
-      setStep(3);
-    }
+    const errs = step === 1 ? validateStep1() : validateStep2();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    setStep(step + 1);
   };
 
   const handleBack = () => {
     setError('');
+    setFieldErrors({});
     setStep(step - 1);
   };
-
-  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.password) {
-      setError('Please enter a password.');
-      return;
-    }
-    if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (form.password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
+    const errs = validateStep3();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     setLoading(true);
     const result = await register(form);
     setLoading(false);
     if (result.success) {
       setSuccess(true);
     } else {
-      setError(result.error);
+      /* If email already exists, show inline error and go back to step 1 */
+      if (result.error && result.error.toLowerCase().includes('email already exists')) {
+        setFieldErrors({ email: result.error });
+        setStep(1);
+      } else {
+        setError(result.error);
+      }
     }
   };
 
@@ -172,28 +261,32 @@ export default function Register() {
               <div className="register-section-title">Account Information</div>
               <div className="register-row">
                 <div className="login-field">
-                  <label className="login-label">First Name *</label>
-                  <input type="text" name="firstName" className="login-input" value={form.firstName} onChange={handleChange} />
+                  <label className="login-label" htmlFor="reg-firstName">First Name *</label>
+                  <input id="reg-firstName" type="text" name="firstName" maxLength={50} {...fieldProps('firstName')} value={form.firstName} onChange={handleChange} />
+                  {renderError('firstName')}
                 </div>
                 <div className="login-field">
-                  <label className="login-label">Last Name *</label>
-                  <input type="text" name="lastName" className="login-input" value={form.lastName} onChange={handleChange} />
+                  <label className="login-label" htmlFor="reg-lastName">Last Name *</label>
+                  <input id="reg-lastName" type="text" name="lastName" maxLength={50} {...fieldProps('lastName')} value={form.lastName} onChange={handleChange} />
+                  {renderError('lastName')}
                 </div>
               </div>
               <div className="login-field">
-                <label className="login-label">Email *</label>
-                <input type="email" name="email" className="login-input" value={form.email} onChange={handleChange} />
+                <label className="login-label" htmlFor="reg-email">Email *</label>
+                <input id="reg-email" type="email" name="email" maxLength={100} {...fieldProps('email')} value={form.email} onChange={handleChange} />
+                {renderError('email')}
               </div>
               <div className="login-field">
-                <label className="login-label">Phone</label>
+                <label className="login-label" htmlFor="reg-phone">Phone</label>
                 <div className="register-phone-group">
                   <span className="register-phone-prefix">+94</span>
-                  <input type="tel" name="phone" className="login-input register-phone-input" placeholder="7XXXXXXXX" value={form.phone} onChange={handleChange} />
+                  <input id="reg-phone" type="tel" name="phone" maxLength={10} {...fieldProps('phone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.phone} onChange={handleChange} />
                 </div>
+                {renderError('phone')}
               </div>
               <div className="login-field">
-                <label className="login-label">Role *</label>
-                <select name="role" className="login-select" value={form.role} onChange={handleChange}>
+                <label className="login-label" htmlFor="reg-role">Role *</label>
+                <select id="reg-role" name="role" className="login-select" value={form.role} onChange={handleChange}>
                   {roles.map((role) => (
                     <option key={role} value={role}>
                       {role.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
@@ -218,32 +311,34 @@ export default function Register() {
                   <div className="register-section-title">Patient Information</div>
                   <div className="register-row">
                     <div className="login-field">
-                      <label className="login-label">Date of Birth *</label>
-                      <input type="date" name="dateOfBirth" className="login-input" value={form.dateOfBirth} onChange={handleChange} />
+                      <label className="login-label" htmlFor="reg-dob">Date of Birth *</label>
+                      <input id="reg-dob" type="date" name="dateOfBirth" {...fieldProps('dateOfBirth')} value={form.dateOfBirth} onChange={handleChange} />
+                      {renderError('dateOfBirth')}
                     </div>
                     <div className="login-field">
-                      <label className="login-label">Gender *</label>
-                      <select name="gender" className="login-select" value={form.gender} onChange={handleChange}>
+                      <label className="login-label" htmlFor="reg-gender">Gender *</label>
+                      <select id="reg-gender" name="gender" {...fieldProps('gender', 'login-select')} value={form.gender} onChange={handleChange}>
                         <option value="">Select Gender</option>
                         {genderOptions.map((g) => <option key={g} value={g}>{g}</option>)}
                       </select>
+                      {renderError('gender')}
                     </div>
                   </div>
                   <div className="login-field">
-                    <label className="login-label">Blood Type</label>
-                    <select name="bloodType" className="login-select" value={form.bloodType} onChange={handleChange}>
+                    <label className="login-label" htmlFor="reg-bloodType">Blood Type</label>
+                    <select id="reg-bloodType" name="bloodType" className="login-select" value={form.bloodType} onChange={handleChange}>
                       <option value="">Select Blood Type</option>
                       {bloodTypes.map((bt) => <option key={bt} value={bt}>{bt}</option>)}
                     </select>
                   </div>
                   <div className="register-row">
                     <div className="login-field">
-                      <label className="login-label">Emergency Contact Name</label>
-                      <input type="text" name="emergencyContact" className="login-input" placeholder="e.g. John Perera" value={form.emergencyContact} onChange={handleChange} />
+                      <label className="login-label" htmlFor="reg-emergencyContact">Emergency Contact Name</label>
+                      <input id="reg-emergencyContact" type="text" name="emergencyContact" maxLength={100} className="login-input" placeholder="e.g. John Perera" value={form.emergencyContact} onChange={handleChange} />
                     </div>
                     <div className="login-field">
-                      <label className="login-label">Relationship</label>
-                      <select name="emergencyRelationship" className="login-select" value={form.emergencyRelationship} onChange={handleChange}>
+                      <label className="login-label" htmlFor="reg-emergencyRelationship">Relationship</label>
+                      <select id="reg-emergencyRelationship" name="emergencyRelationship" className="login-select" value={form.emergencyRelationship} onChange={handleChange}>
                         <option value="">Select Relationship</option>
                         <option value="Spouse">Spouse</option>
                         <option value="Parent">Parent</option>
@@ -255,15 +350,16 @@ export default function Register() {
                     </div>
                   </div>
                   <div className="login-field">
-                    <label className="login-label">Emergency Phone</label>
+                    <label className="login-label" htmlFor="reg-emergencyPhone">Emergency Phone</label>
                     <div className="register-phone-group">
                       <span className="register-phone-prefix">+94</span>
-                      <input type="tel" name="emergencyPhone" className="login-input register-phone-input" placeholder="7XXXXXXXX" value={form.emergencyPhone} onChange={handleChange} />
+                      <input id="reg-emergencyPhone" type="tel" name="emergencyPhone" maxLength={10} {...fieldProps('emergencyPhone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.emergencyPhone} onChange={handleChange} />
                     </div>
+                    {renderError('emergencyPhone')}
                   </div>
                   <div className="login-field">
-                    <label className="login-label">Address</label>
-                    <input type="text" name="address" className="login-input" placeholder="Full address" value={form.address} onChange={handleChange} />
+                    <label className="login-label" htmlFor="reg-address">Address</label>
+                    <input id="reg-address" type="text" name="address" maxLength={200} className="login-input" placeholder="Full address" value={form.address} onChange={handleChange} />
                   </div>
                 </>
               )}
@@ -272,23 +368,26 @@ export default function Register() {
                 <>
                   <div className="register-section-title">Professional Information</div>
                   <div className="login-field">
-                    <label className="login-label">Specialization *</label>
-                    <select name="specialization" className="login-select" value={form.specialization} onChange={handleChange}>
+                    <label className="login-label" htmlFor="reg-specialization">Specialization *</label>
+                    <select id="reg-specialization" name="specialization" {...fieldProps('specialization', 'login-select')} value={form.specialization} onChange={handleChange}>
                       <option value="">Select Specialization</option>
                       {specializations.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
+                    {renderError('specialization')}
                   </div>
                   <div className="register-row">
                     <div className="login-field">
-                      <label className="login-label">License Number (SLMC) *</label>
-                      <input type="text" name="licenseNumber" className="login-input" placeholder="SLMC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                      <label className="login-label" htmlFor="reg-licenseNumber">License Number (SLMC) *</label>
+                      <input id="reg-licenseNumber" type="text" name="licenseNumber" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLMC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                      {renderError('licenseNumber')}
                     </div>
                     <div className="login-field">
-                      <label className="login-label">Department *</label>
-                      <select name="department" className="login-select" value={form.department} onChange={handleChange}>
+                      <label className="login-label" htmlFor="reg-department">Department *</label>
+                      <select id="reg-department" name="department" {...fieldProps('department', 'login-select')} value={form.department} onChange={handleChange}>
                         <option value="">Select Department</option>
                         {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                       </select>
+                      {renderError('department')}
                     </div>
                   </div>
                 </>
@@ -299,15 +398,17 @@ export default function Register() {
                   <div className="register-section-title">Professional Information</div>
                   <div className="register-row">
                     <div className="login-field">
-                      <label className="login-label">License Number (SLNC) *</label>
-                      <input type="text" name="licenseNumber" className="login-input" placeholder="SLNC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                      <label className="login-label" htmlFor="reg-licenseNumber">License Number (SLNC) *</label>
+                      <input id="reg-licenseNumber" type="text" name="licenseNumber" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLNC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                      {renderError('licenseNumber')}
                     </div>
                     <div className="login-field">
-                      <label className="login-label">Department *</label>
-                      <select name="department" className="login-select" value={form.department} onChange={handleChange}>
+                      <label className="login-label" htmlFor="reg-department">Department *</label>
+                      <select id="reg-department" name="department" {...fieldProps('department', 'login-select')} value={form.department} onChange={handleChange}>
                         <option value="">Select Department</option>
                         {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                       </select>
+                      {renderError('department')}
                     </div>
                   </div>
                 </>
@@ -317,11 +418,12 @@ export default function Register() {
                 <>
                   <div className="register-section-title">Professional Information</div>
                   <div className="login-field">
-                    <label className="login-label">Department *</label>
-                    <select name="department" className="login-select" value={form.department} onChange={handleChange}>
+                    <label className="login-label" htmlFor="reg-department">Department *</label>
+                    <select id="reg-department" name="department" {...fieldProps('department', 'login-select')} value={form.department} onChange={handleChange}>
                       <option value="">Select Department</option>
                       {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                     </select>
+                    {renderError('department')}
                   </div>
                 </>
               )}
@@ -330,8 +432,9 @@ export default function Register() {
                 <>
                   <div className="register-section-title">Professional Information</div>
                   <div className="login-field">
-                    <label className="login-label">License Number (SLPC) *</label>
-                    <input type="text" name="licenseNumber" className="login-input" placeholder="SLPC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                    <label className="login-label" htmlFor="reg-licenseNumber">License Number (SLPC) *</label>
+                    <input id="reg-licenseNumber" type="text" name="licenseNumber" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLPC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                    {renderError('licenseNumber')}
                   </div>
                 </>
               )}
@@ -352,12 +455,14 @@ export default function Register() {
             <>
               <div className="register-section-title">Set Your Password</div>
               <div className="login-field">
-                <label className="login-label">Password *</label>
-                <input type="password" name="password" className="login-input" value={form.password} onChange={handleChange} />
+                <label className="login-label" htmlFor="reg-password">Password *</label>
+                <input id="reg-password" type="password" name="password" maxLength={72} {...fieldProps('password')} value={form.password} onChange={handleChange} />
+                {renderError('password')}
               </div>
               <div className="login-field">
-                <label className="login-label">Confirm Password *</label>
-                <input type="password" name="confirmPassword" className="login-input" value={form.confirmPassword} onChange={handleChange} />
+                <label className="login-label" htmlFor="reg-confirmPassword">Confirm Password *</label>
+                <input id="reg-confirmPassword" type="password" name="confirmPassword" maxLength={72} {...fieldProps('confirmPassword')} value={form.confirmPassword} onChange={handleChange} />
+                {renderError('confirmPassword')}
               </div>
               <div className="register-nav">
                 <button type="button" className="register-btn-back" onClick={handleBack}>

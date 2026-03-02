@@ -178,3 +178,20 @@
   font-size: 14px;
   color: var(--color-text-secondary);
 }
+
+/* Field-level validation errors */
+.login-input.input-error,
+.login-select.input-error {
+  border-color: #e53e3e;
+}
+.login-input.input-error:focus,
+.login-select.input-error:focus {
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.15);
+  border-color: #e53e3e;
+}
+.field-error {
+  color: #e53e3e;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
