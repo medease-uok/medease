@@ -180,10 +180,12 @@
 }
 
 /* Field-level validation errors */
-.input-error {
+.login-input.input-error,
+.login-select.input-error {
   border-color: #e53e3e;
 }
-.input-error:focus {
+.login-input.input-error:focus,
+.login-select.input-error:focus {
   box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.15);
   border-color: #e53e3e;
 }
