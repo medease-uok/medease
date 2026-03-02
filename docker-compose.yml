@@ -77,16 +77,14 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:5001
-      REACT_APP_CLOUDFLARE_SITE_KEY: 1x00000000000000000000AA
-      WATCHPACK_POLLING: "true"
-      WDS_SOCKET_HOST: "0.0.0.0"
+      VITE_API_URL: http://localhost:5001
+      VITE_CLOUDFLARE_SITE_KEY: 1x00000000000000000000AA
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
     depends_on:
       - backend
-    stdin_open: true
 
   db-seed:
     image: postgres:17-alpine

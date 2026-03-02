@@ -41,7 +41,7 @@ MedEase is a web-based hospital management system that streamlines patient care,
 
 ### Tech Stack
 
-- **Frontend**: React.js
+- **Frontend**: React.js (Vite)
 - **Backend**: Node.js & Express (RESTful API)
 - **Database**: PostgreSQL (RDS)
 - **Cloud**: AWS (Fargate, S3, CloudFront, API Gateway, Cognito)
@@ -138,7 +138,7 @@ docker compose --profile seed up --build
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| Frontend | http://localhost:3000 | React app with hot-reloading |
+| Frontend | http://localhost:3000 | React app (Vite) with hot-reloading |
 | Backend | http://localhost:5001 | Express API with nodemon |
 | PostgreSQL | localhost:5433 | Database (schema auto-initialized) |
 | Redis | localhost:6379 | Session and data caching |
@@ -175,7 +175,7 @@ cp backend/.env.example backend/.env
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev
 ```
 
 #### Backend (port 5001)
