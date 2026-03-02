@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
+const auditLog = require('../utils/auditLog');
 
 const getUsers = async (req, res, next) => {
   try {
@@ -53,11 +54,13 @@ const approveUser = async (req, res, next) => {
       throw new AppError('User not found or already active.', 404);
     }
 
-    await db.query(
-      `INSERT INTO audit_logs (user_id, action, resource_type, resource_id, ip_address, success)
-       VALUES ($1, $2, $3, $4, $5, true)`,
-      [req.user.id, 'APPROVE_USER', 'user', id, req.ip]
-    );
+    await auditLog({
+      userId: req.user.id,
+      action: 'APPROVE_USER',
+      resourceType: 'user',
+      resourceId: id,
+      ip: req.ip,
+    });
 
     res.json({ status: 'success', message: 'User approved successfully.' });
   } catch (err) {
@@ -79,11 +82,13 @@ const rejectUser = async (req, res, next) => {
       throw new AppError('User not found or already active.', 404);
     }
 
-    await db.query(
-      `INSERT INTO audit_logs (user_id, action, resource_type, resource_id, ip_address, success)
-       VALUES ($1, $2, $3, $4, $5, true)`,
-      [req.user.id, 'REJECT_USER', 'user', id, req.ip]
-    );
+    await auditLog({
+      userId: req.user.id,
+      action: 'REJECT_USER',
+      resourceType: 'user',
+      resourceId: id,
+      ip: req.ip,
+    });
 
     res.json({ status: 'success', message: 'User rejected and removed.' });
   } catch (err) {
