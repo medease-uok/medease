@@ -44,6 +44,9 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+# Vault password (saved locally by start.sh — never commit)
+.vault-password
+
 # Additional common ignores
 dist/
 *.swp
