@@ -278,14 +278,7 @@ jobs:
                 console.error(`Claude generation failed: ${error.message}`);
 
                 // Fallback: Use template-based description
-                let fallbackDescription = `## Description
-                ${primaryJira.summary}
-
-                ## Jira Reference
-                - Issue: [${primaryJira.key}](${primaryJira.url})
-
-                ## Description from Jira
-                ${primaryJira.description}`;
+                let fallbackDescription = `## Description\n${primaryJira.summary}\n\n## Jira Reference\n- Issue: [${primaryJira.key}](${primaryJira.url})\n\n## Description from Jira\n${primaryJira.description}`;
 
                 if (linkedIssues.length > 0) {
                   fallbackDescription += `\n\n## Related Issues\nFixes #${linkedIssues[0].number}`;
@@ -305,14 +298,7 @@ jobs:
               console.log('⚠️ ANTHROPIC_API_KEY not configured, using fallback');
 
               // Fallback without Claude
-              let fallbackDescription = `## Description
-                ${primaryJira.summary}
-
-                ## Jira Reference
-                - Issue: [${primaryJira.key}](${primaryJira.url})
-
-                ## Description from Jira
-                ${primaryJira.description}`;
+              let fallbackDescription = `## Description\n${primaryJira.summary}\n\n## Jira Reference\n- Issue: [${primaryJira.key}](${primaryJira.url})\n\n## Description from Jira\n${primaryJira.description}`;
 
               if (linkedIssues.length > 0) {
                 fallbackDescription += `\n\n## Related Issues\nFixes #${linkedIssues[0].number}`;
