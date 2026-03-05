@@ -100,6 +100,13 @@ const register = async (req, res, next) => {
         break;
     }
 
+    // Assign the matching role from the roles table
+    await client.query(
+      `INSERT INTO user_roles (user_id, role_id)
+       SELECT $1, id FROM roles WHERE name = $2`,
+      [user.id, role]
+    );
+
     // Commit transaction
     await client.query('COMMIT');
 

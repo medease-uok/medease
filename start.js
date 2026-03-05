@@ -26,6 +26,58 @@ function injectEnvVar(filePath, key, value) {
   fs.writeFileSync(filePath, content);
 }
 
+const DB_CONTAINER = 'medease-db';
+const DB_USER = 'medease_user';
+const DB_NAME = 'medease';
+
+function runSQL(sql) {
+  const escaped = sql.replace(/'/g, "'\\''");
+  execSync(
+    `docker exec ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc '${escaped}'`,
+    { stdio: 'pipe' }
+  );
+}
+
+function waitForDB(maxAttempts = 30) {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      execSync(
+        `docker exec ${DB_CONTAINER} pg_isready -U ${DB_USER} -d ${DB_NAME}`,
+        { stdio: 'pipe' }
+      );
+      // Also check that the roles table exists (schema init complete)
+      execSync(
+        `docker exec ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc "SELECT 1 FROM roles LIMIT 1"`,
+        { stdio: 'pipe' }
+      );
+      return;
+    } catch {
+      if (i < maxAttempts - 1) {
+        execSync('sleep 2');
+      }
+    }
+  }
+  console.error('Error: Database did not become ready in time.');
+  process.exit(1);
+}
+
+function createAdminUser({ firstName, lastName, email, phone, password }) {
+  const esc = (s) => s.replace(/'/g, "''");
+  const phoneVal = phone ? `'${esc(phone)}'` : 'NULL';
+
+  const sql = `
+    WITH new_user AS (
+      INSERT INTO users (email, password_hash, first_name, last_name, role, phone, is_active)
+      VALUES ('${esc(email)}', crypt('${esc(password)}', gen_salt('bf', 12)), '${esc(firstName)}', '${esc(lastName)}', 'admin', ${phoneVal}, true)
+      RETURNING id
+    )
+    INSERT INTO user_roles (user_id, role_id)
+    SELECT new_user.id, roles.id FROM new_user, roles WHERE roles.name = 'admin';
+  `;
+
+  runSQL(sql);
+}
+
 async function main() {
   console.log('===============================');
   console.log('  MedEase Development Setup');
@@ -55,9 +107,39 @@ async function main() {
 
   // Seed prompt
   const seedChoice = await ask('Do you want to seed the database with sample data? (y/N): ');
-  const profileArgs = /^y(es)?$/i.test(seedChoice.trim()) ? ['--profile', 'seed'] : [];
+  const wantSeed = /^y(es)?$/i.test(seedChoice.trim());
+  const profileArgs = wantSeed ? ['--profile', 'seed'] : [];
 
-  if (profileArgs.length) {
+  // If not seeding, an admin user is required (otherwise there's no way to approve users)
+  let adminDetails = null;
+  if (!wantSeed) {
+    console.log();
+    console.log('No seed data — you need an initial admin account.');
+    console.log('Enter details for the admin user:');
+    const firstName = await ask('  First name: ');
+    const lastName = await ask('  Last name: ');
+    const email = await ask('  Email: ');
+    const phone = await ask('  Phone (optional, press Enter to skip): ');
+
+    let adminPassword;
+    while (true) {
+      const pass1 = await readPassword('  Password: ');
+      if (pass1.length < 8) {
+        console.log('  Password must be at least 8 characters.');
+        console.log();
+        continue;
+      }
+      const pass2 = await readPassword('  Confirm password: ');
+      if (pass1 === pass2) {
+        adminPassword = pass1;
+        break;
+      }
+      console.log('  Passwords do not match. Try again.');
+      console.log();
+    }
+
+    adminDetails = { firstName, lastName, email, phone, password: adminPassword };
+  } else {
     console.log();
     console.log('Database will be seeded with sample data.');
   }
@@ -117,13 +199,41 @@ async function main() {
   console.log();
 
   const args = ['compose', ...profileArgs, 'up', '--build', ...process.argv.slice(2)];
-  const child = spawn('docker', args, { stdio: 'inherit', shell: true });
 
-  for (const sig of ['SIGINT', 'SIGTERM']) {
-    process.on(sig, () => child.kill(sig));
+  // If we need to create an admin, start in detached mode first, create admin, then attach
+  if (adminDetails) {
+    execSync(`docker compose up --build -d`, { stdio: 'inherit', shell: true });
+
+    console.log();
+    console.log('Waiting for database to be ready...');
+    waitForDB();
+
+    console.log('Creating admin user...');
+    createAdminUser(adminDetails);
+    console.log();
+    console.log('Admin user created successfully!');
+    console.log(`  Email: ${adminDetails.email}`);
+    console.log('  Role:  admin (active, no approval needed)');
+    console.log();
+
+    // Now attach to logs (or exit if -d was passed)
+    if (process.argv.slice(2).includes('-d')) {
+      console.log('Services running in background.');
+      process.exit(0);
+    }
+
+    const child = spawn('docker', ['compose', 'logs', '-f'], { stdio: 'inherit', shell: true });
+    for (const sig of ['SIGINT', 'SIGTERM']) {
+      process.on(sig, () => child.kill(sig));
+    }
+    child.on('close', (code) => process.exit(code ?? 0));
+  } else {
+    const child = spawn('docker', args, { stdio: 'inherit', shell: true });
+    for (const sig of ['SIGINT', 'SIGTERM']) {
+      process.on(sig, () => child.kill(sig));
+    }
+    child.on('close', (code) => process.exit(code ?? 1));
   }
-
-  child.on('close', (code) => process.exit(code ?? 1));
 }
 
 main().catch((err) => {
