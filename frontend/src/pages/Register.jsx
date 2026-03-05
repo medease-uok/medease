@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { useAuth } from '../data/AuthContext';
 import { roles as allRoles } from '../constants';
+import TermsModal from '../components/TermsModal';
 import './Login.css';
 import './Register.css';
 
@@ -90,6 +91,8 @@ export default function Register() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const { register } = useAuth();
 
   /* Helpers for per-field accessibility & error display */
@@ -212,6 +215,7 @@ export default function Register() {
     e.preventDefault();
     setError('');
     const errs = validateStep3();
+    if (!termsAccepted) errs.terms = 'You must accept the Terms & Conditions';
     if (!captchaToken) errs.captcha = 'Please complete the verification';
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
@@ -504,6 +508,26 @@ export default function Register() {
                 />
                 {renderError('captcha')}
               </div>
+              <div className="register-terms">
+                <label className="register-terms-label">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(e) => {
+                      setTermsAccepted(e.target.checked);
+                      setFieldErrors((prev) => ({ ...prev, terms: '' }));
+                    }}
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <button type="button" className="register-terms-link" onClick={() => setTermsOpen(true)}>
+                      Terms &amp; Conditions
+                    </button>
+                  </span>
+                </label>
+                {renderError('terms')}
+              </div>
+              <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
               <div className="register-nav">
                 <button type="button" className="register-btn-back" onClick={handleBack}>
                   Back
