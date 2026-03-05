@@ -12,10 +12,12 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     try {
       const data = await api.post('/auth/login', { email, password });
-      const { token, user } = data.data;
+      const { token, refreshToken, user } = data.data;
       setCurrentUser(user);
       localStorage.setItem('medease_user', JSON.stringify(user));
       localStorage.setItem('medease_token', token);
+      localStorage.setItem('medease_refresh_token', refreshToken);
+      localStorage.setItem('medease_last_activity', String(Date.now()));
       return { success: true };
     } catch (err) {
       if (err.status === 403) {
@@ -37,10 +39,18 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const refreshToken = localStorage.getItem('medease_refresh_token');
+    try {
+      await api.post('/auth/logout', { refreshToken });
+    } catch {
+      // Proceed with local cleanup even if API call fails
+    }
     setCurrentUser(null);
     localStorage.removeItem('medease_user');
     localStorage.removeItem('medease_token');
+    localStorage.removeItem('medease_refresh_token');
+    localStorage.removeItem('medease_last_activity');
   };
 
   return (
