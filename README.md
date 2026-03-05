@@ -8,7 +8,6 @@ A cloud-based hospital management system designed for Sri Lankan government hosp
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
-- [API Reference](#api-reference)
 - [Authentication & Authorization](#authentication--authorization)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -287,92 +286,6 @@ docker compose logs -f       # Follow logs
 cd backend && npm run db:seed   # Seed database manually
 ```
 
-## API Reference
-
-Base URL: `http://localhost:5001/api`
-
-### Auth
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| POST | `/auth/register` | No (CAPTCHA) | Register a new user |
-| POST | `/auth/login` | No | Login, returns JWT + refresh token |
-| POST | `/auth/refresh` | No | Rotate refresh token, get new JWT |
-| POST | `/auth/logout` | Yes | Invalidate refresh token |
-
-### Patients
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/patients/me` | Patient | Get own profile |
-| GET | `/patients` | Doctor, Nurse, Admin | List all patients |
-| GET | `/patients/:id` | Doctor, Nurse, Admin | Get patient by ID |
-
-### Doctors
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/doctors` | Authenticated | List all doctors |
-| GET | `/doctors/:id` | Authenticated | Get doctor by ID |
-
-### Appointments
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/appointments` | Authenticated | List appointments |
-
-### Medical Records
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/medical-records` | Authenticated | List medical records |
-
-### Prescriptions
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/prescriptions` | Authenticated | List prescriptions |
-
-### Lab Reports
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/lab-reports` | Authenticated | List lab reports |
-
-### Dashboard
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/dashboard/stats` | Authenticated | Get dashboard statistics |
-
-### Admin
-
-All admin endpoints require `admin` role.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/admin/users` | List all users |
-| GET | `/admin/users/pending` | List pending approvals |
-| PATCH | `/admin/users/:id/approve` | Approve a user |
-| DELETE | `/admin/users/:id/reject` | Reject a user |
-| GET | `/admin/audit-logs` | View audit logs |
-
-### Roles & Permissions (RBAC)
-
-All roles endpoints require `admin` role.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/roles` | List all roles |
-| GET | `/roles/:id` | Get role with permissions |
-| POST | `/roles` | Create custom role |
-| PATCH | `/roles/:id` | Update role and/or permissions |
-| DELETE | `/roles/:id` | Delete custom role (system roles protected) |
-| GET | `/roles/permissions` | List all 26 permissions |
-| GET | `/roles/users/:id/roles` | Get roles assigned to a user |
-| POST | `/roles/users/:id/roles` | Assign role to a user |
-| DELETE | `/roles/users/:id/roles/:roleId` | Remove role from a user |
-
 ## Authentication & Authorization
 
 ### Token Flow
@@ -412,38 +325,6 @@ permissions          roles              user_roles
 ```
 
 26 permissions across 6 categories: `patients`, `appointments`, `medical_records`, `prescriptions`, `lab_reports`, `admin`.
-
-## Development
-
-### Code Style
-
-This project uses Prettier for code formatting. Code is automatically formatted on pull requests.
-
-```bash
-npx prettier --write "**/*.{js,jsx,ts,tsx,json,css,scss,md,yml,yaml}"
-```
-
-### Running Tests
-
-```bash
-cd frontend && npm test
-cd backend && npm test
-```
-
-### Building for Production
-
-```bash
-cd frontend && npm run build
-```
-
-### Infrastructure (AWS)
-
-```bash
-cd terraform
-terraform init
-terraform plan
-terraform apply
-```
 
 ## Support
 
