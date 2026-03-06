@@ -8,7 +8,8 @@ import {
   FileText,
   Pill,
   FlaskConical,
-  Activity
+  Activity,
+  Shield
 } from 'lucide-react';
 
 
@@ -20,6 +21,7 @@ const navConfig = [
   { path: '/medical-records', label: 'Medical Records', icon: FileText, roles: ['patient', 'doctor', 'nurse', 'admin'] },
   { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: ['patient', 'doctor', 'pharmacist', 'admin'] },
   { path: '/lab-reports', label: 'Lab Reports', icon: FlaskConical, roles: ['patient', 'doctor', 'lab_technician', 'admin'] },
+  { path: '/permissions', label: 'Permissions', icon: Shield, roles: ['admin'] },
 ];
 
 const roleColors = {
