@@ -5,6 +5,7 @@
   "description": "MedEase Hospital Management System",
   "scripts": {
     "start": "node start.js",
-    "encrypt-secrets": "node scripts/encrypt-secrets.js"
+    "encrypt-secrets": "node scripts/encrypt-secrets.js",
+    "create-admin": "node scripts/create-admin.js"
   }
 }
