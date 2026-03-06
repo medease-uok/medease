@@ -114,15 +114,18 @@ medease/
 │       │   ├── Sidebar.jsx     # Left navigation menu
 │       │   ├── DataTable.jsx   # Reusable data table
 │       │   ├── DetailCard.jsx  # Detail display card
-│       │   ├── StatsCard.jsx   # Dashboard statistics card
+│       │   ├── AnimatedStatsCard.jsx  # Animated dashboard stats card
+│       │   ├── ActivityFeed.jsx       # Role-filtered activity feed
+│       │   ├── QuickActions.jsx       # Role-aware quick action buttons
+│       │   ├── PatientCard.jsx        # Patient card with avatar
 │       │   ├── StatusBadge.jsx # Status indicator badge
-│       │   └── TermsModal.jsx  # Terms & Conditions modal
+│       │   ├── TermsModal.jsx  # Terms & Conditions modal
+│       │   └── ui/             # Shared UI primitives (Card, Badge, Table)
 │       ├── pages/              # Page components
 │       │   ├── Login.jsx       # Login with credentials
-│       │   ├── Register.jsx    # Registration with CAPTCHA & T&C
-│       │   ├── Dashboard.jsx   # Role-based dashboard
-│       │   ├── AdminPanel.jsx  # User approval & management
-│       │   ├── Patients.jsx / PatientDetail.jsx
+│       │   ├── RegisterEnhanced.jsx  # Registration with CAPTCHA & T&C
+│       │   ├── DashboardEnhanced.jsx # Role-based dashboard with admin panel
+│       │   ├── PatientsEnhanced.jsx / PatientDetail.jsx
 │       │   ├── Doctors.jsx / DoctorDetail.jsx
 │       │   ├── Appointments.jsx
 │       │   ├── MedicalRecords.jsx

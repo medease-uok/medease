@@ -94,9 +94,6 @@ const register = async (req, res, next) => {
         break;
 
       case 'lab_technician':
-        // No dedicated table for lab technicians in the current schema.
-        // Department is accepted but not persisted beyond the user record.
-        // TODO: Add lab_technicians table or department column to users table.
         break;
     }
 
@@ -240,9 +237,6 @@ const login = async (req, res, next) => {
       success: false,
     });
 
-    if (err.isOperational) {
-      return next(err);
-    }
     return next(err);
   }
 };
@@ -295,9 +289,6 @@ const refresh = async (req, res, next) => {
       },
     });
   } catch (err) {
-    if (err.isOperational) {
-      return next(err);
-    }
     return next(err);
   }
 };
