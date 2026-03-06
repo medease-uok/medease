@@ -20,7 +20,6 @@ const register = async (req, res, next) => {
   const client = await db.getClient();
 
   try {
-    // Check for duplicate email
     const existing = await client.query(
       'SELECT id FROM users WHERE email = $1',
       [email]
@@ -29,7 +28,6 @@ const register = async (req, res, next) => {
       throw new AppError('An account with this email already exists.', 409);
     }
 
-    // Check for duplicate license number if applicable
     if (licenseNumber && ['doctor', 'nurse', 'pharmacist'].includes(role)) {
       const tableMap = { doctor: 'doctors', nurse: 'nurses', pharmacist: 'pharmacists' };
       const table = tableMap[role];
@@ -42,13 +40,10 @@ const register = async (req, res, next) => {
       }
     }
 
-    // Hash password
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // Begin transaction
     await client.query('BEGIN');
 
-    // Insert user
     const userResult = await client.query(
       `INSERT INTO users (email, password_hash, first_name, last_name, role, phone, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, false)
@@ -57,7 +52,6 @@ const register = async (req, res, next) => {
     );
     const user = userResult.rows[0];
 
-    // Insert role-specific profile
     switch (role) {
       case 'patient':
         await client.query(
@@ -97,17 +91,14 @@ const register = async (req, res, next) => {
         break;
     }
 
-    // Assign the matching role from the roles table
     await client.query(
       `INSERT INTO user_roles (user_id, role_id)
        SELECT $1, id FROM roles WHERE name = $2`,
       [user.id, role]
     );
 
-    // Commit transaction
     await client.query('COMMIT');
 
-    // Audit log: successful registration
     await auditLog({
       userId: user.id,
       action: 'REGISTER',
@@ -134,7 +125,6 @@ const register = async (req, res, next) => {
   } catch (err) {
     await client.query('ROLLBACK');
 
-    // Audit log: failed registration attempt
     await auditLog({
       userId: null,
       action: 'REGISTER',
@@ -316,4 +306,15 @@ const logout = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refresh, logout };
+const { getUserPermissions } = require('../utils/permissions');
+
+const getMyPermissions = async (req, res, next) => {
+  try {
+    const permissions = await getUserPermissions(req.user.id);
+    res.json({ status: 'success', data: permissions });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { register, login, refresh, logout, getMyPermissions };

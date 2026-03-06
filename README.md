@@ -83,7 +83,7 @@ medease/
 │       │   ├── database.js     # PostgreSQL connection pool
 │       │   └── redis.js        # Redis client
 │       ├── controllers/        # Route handlers
-│       │   ├── auth.controller.js        # Login, register, refresh, logout
+│       │   ├── auth.controller.js        # Login, register, refresh, logout, permissions
 │       │   ├── admin.controller.js       # User management, audit logs
 │       │   ├── roles.controller.js       # RBAC management
 │       │   ├── patients.controller.js
@@ -118,9 +118,13 @@ medease/
 │       │   ├── ActivityFeed.jsx       # Role-filtered activity feed
 │       │   ├── QuickActions.jsx       # Role-aware quick action buttons
 │       │   ├── PatientCard.jsx        # Patient card with avatar
+│       │   ├── RoleGuard.jsx         # Route-level role protection
+│       │   ├── Can.jsx               # Permission-based conditional rendering
 │       │   ├── StatusBadge.jsx # Status indicator badge
 │       │   ├── TermsModal.jsx  # Terms & Conditions modal
 │       │   └── ui/             # Shared UI primitives (Card, Badge, Table)
+│       ├── hooks/
+│       │   └── usePermissions.js # Permission checking hook (can, canAny, canAll)
 │       ├── pages/              # Page components
 │       │   ├── Login.jsx       # Login with credentials
 │       │   ├── RegisterEnhanced.jsx  # Registration with CAPTCHA & T&C
@@ -314,6 +318,20 @@ router.post('/prescriptions', requirePermission('create_prescription'));
 ```
 
 Permissions are resolved from `user_roles` -> `role_permissions` -> `permissions` tables, cached in Redis for 5 minutes.
+
+**Frontend route guards** (role-based):
+```jsx
+<Route path="patients" element={<RoleGuard roles={['doctor', 'nurse', 'admin']}><Patients /></RoleGuard>} />
+```
+
+**Frontend permission checks** (dynamic):
+```jsx
+import { usePermissions } from './hooks/usePermissions';
+const { can, canAny } = usePermissions();
+
+<Can permission="create_appointment"><button>New Appointment</button></Can>
+<Can any={['view_prescriptions', 'view_own_prescriptions']}>...</Can>
+```
 
 ### Database Schema (RBAC)
 

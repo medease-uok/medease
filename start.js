@@ -101,7 +101,6 @@ async function main() {
   console.log('===============================');
   console.log();
 
-  // Check Docker
   try {
     execSync('docker info', { stdio: 'ignore' });
   } catch {
@@ -109,7 +108,6 @@ async function main() {
     process.exit(1);
   }
 
-  // Install dependencies
   console.log('Installing dependencies...');
   console.log();
 
@@ -122,7 +120,6 @@ async function main() {
 
   console.log();
 
-  // Seed prompt
   const seedChoice = await ask('Do you want to seed the database with sample data? (y/N): ');
   const wantSeed = /^y(es)?$/i.test(seedChoice.trim());
   const profileArgs = wantSeed ? ['--profile', 'seed'] : [];
@@ -161,11 +158,9 @@ async function main() {
     console.log('Database will be seeded with sample data.');
   }
 
-  // Copy .env.example → .env.development
   fs.copyFileSync(path.join(ROOT, 'backend', '.env.example'), path.join(ROOT, 'backend', '.env.development'));
   fs.copyFileSync(path.join(ROOT, 'frontend', '.env.example'), path.join(ROOT, 'frontend', '.env.development'));
 
-  // Secrets
   const backendEnv = path.join(ROOT, 'backend', '.env.development');
   const frontendEnv = path.join(ROOT, 'frontend', '.env.development');
 
@@ -210,12 +205,10 @@ async function main() {
     console.log('An admin can create it with: npm run encrypt-secrets');
   }
 
-  // Start services
   console.log();
   console.log('Starting all services...');
   console.log();
 
-  // Start services in detached mode, ensure DB is ready, then attach
   execSync(`docker compose ${profileArgs.join(' ')} up --build -d`, { stdio: 'inherit', shell: true });
 
   console.log();
@@ -232,13 +225,11 @@ async function main() {
     console.log();
   }
 
-  // Exit if detached mode was requested
   if (process.argv.slice(2).includes('-d')) {
     console.log('Services running in background.');
     process.exit(0);
   }
 
-  // Attach to logs
   const child = spawn('docker', ['compose', 'logs', '-f'], { stdio: 'inherit', shell: true });
   for (const sig of ['SIGINT', 'SIGTERM']) {
     process.on(sig, () => child.kill(sig));

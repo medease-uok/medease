@@ -36,7 +36,6 @@ export default function Sidebar() {
   const role = currentUser?.role || 'patient';
   const links = navConfig.filter((item) => item.roles.includes(role));
 
-  // Get user initials for avatar
   const initials = currentUser
     ? `${currentUser.firstName?.[0] || ''}${currentUser.lastName?.[0] || ''}`.toUpperCase()
     : 'U';
@@ -58,7 +57,6 @@ export default function Sidebar() {
 
       <div className="p-6 border-b border-slate-700">
         <div className="flex items-center gap-3">
-          {/* Avatar */}
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-cta flex items-center justify-center text-white font-semibold text-sm">
             {initials}
           </div>
@@ -89,7 +87,6 @@ export default function Sidebar() {
                   }`
                 }
               >
-                {/* Active indicator bar */}
                 {({ isActive }) => (
                   <>
                     {isActive && (

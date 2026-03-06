@@ -26,7 +26,6 @@ const getPendingUsers = async (req, res, next) => {
        ORDER BY created_at DESC`
     );
 
-    // Enrich with role-specific profile data for display
     const users = await Promise.all(result.rows.map(async (user) => {
       const mapped = mapUser(user);
       mapped.profileData = await getProfileData(user.id, user.role);
@@ -155,7 +154,6 @@ async function getProfileData(userId, role) {
   const row = result.rows[0];
   const data = {};
 
-  // Map snake_case to camelCase display keys
   const keyMap = {
     date_of_birth: 'dateOfBirth',
     gender: 'gender',

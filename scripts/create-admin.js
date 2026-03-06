@@ -30,7 +30,6 @@ async function main() {
   console.log('================================');
   console.log();
 
-  // Check Docker container is running
   try {
     execSync(`docker inspect --format='{{.State.Running}}' ${CONTAINER}`, { stdio: 'pipe' });
   } catch {
@@ -61,7 +60,6 @@ async function main() {
     console.log();
   }
 
-  // Check if email already exists
   const existing = querySQL(
     `SELECT id FROM users WHERE email = '${email.replace(/'/g, "''")}'`
   );
@@ -71,8 +69,6 @@ async function main() {
     process.exit(1);
   }
 
-  // Insert the admin user (is_active = true, bypasses approval)
-  // Uses pgcrypto's crypt() for bcrypt hashing, same as seed.sql
   const escapedFirst = firstName.replace(/'/g, "''");
   const escapedLast = lastName.replace(/'/g, "''");
   const escapedEmail = email.replace(/'/g, "''");

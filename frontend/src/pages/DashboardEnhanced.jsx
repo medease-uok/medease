@@ -110,7 +110,6 @@ const adminTabs = [
   { id: 'logs', label: 'Audit Logs', icon: ClipboardList },
 ];
 
-// Appointment table column config per role
 const appointmentTableConfig = {
   patient: {
     title: 'My Appointments',
@@ -142,7 +141,6 @@ export default function DashboardEnhanced() {
   const [activityData, setActivityData] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Admin state
   const [adminTab, setAdminTab] = useState('pending');
   const [pendingUsers, setPendingUsers] = useState([]);
   const [activeUsers, setActiveUsers] = useState([]);
@@ -238,7 +236,6 @@ export default function DashboardEnhanced() {
 
   const tableConfig = appointmentTableConfig[role] || appointmentTableConfig.default;
 
-  // Admin search filters
   const filteredUsers = activeUsers.filter((u) =>
     `${u.firstName} ${u.lastName} ${u.email} ${u.role}`.toLowerCase().includes(adminSearch.toLowerCase())
   );
@@ -248,7 +245,6 @@ export default function DashboardEnhanced() {
 
   return (
     <div className="space-y-8">
-      {/* PAGE HEADER */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
           Welcome, {currentUser?.firstName || 'User'}
@@ -258,19 +254,15 @@ export default function DashboardEnhanced() {
         </p>
       </div>
 
-      {/* ANIMATED STATS GRID */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, index) => (
           <AnimatedStatsCard key={stat.label} stat={stat} index={index} />
         ))}
       </div>
 
-      {/* QUICK ACTIONS (role-filtered) */}
       <QuickActions onActionClick={handleQuickAction} role={role} />
 
-      {/* MAIN CONTENT GRID */}
       <div className="grid gap-6 lg:grid-cols-3 items-stretch">
-        {/* Recent Appointments (role-specific columns) */}
         <div className="lg:col-span-2 h-full">
           <Card className="h-full flex flex-col hover:shadow-lg transition-shadow duration-300">
             <CardHeader>
@@ -315,13 +307,11 @@ export default function DashboardEnhanced() {
           </Card>
         </div>
 
-        {/* Activity Feed (real role-filtered data from API) */}
         <div className="h-full">
           <ActivityFeed activities={activityData} maxItems={8} />
         </div>
       </div>
 
-      {/* ADMIN PANEL (admin users only) */}
       {isAdmin && (
         <Card className="hover:shadow-lg transition-shadow duration-300">
           <CardHeader>
@@ -342,7 +332,6 @@ export default function DashboardEnhanced() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Admin Tabs */}
                 <div className="flex gap-1 border-b border-slate-200">
                   {adminTabs.map((tab) => {
                     const Icon = tab.icon;
@@ -368,7 +357,6 @@ export default function DashboardEnhanced() {
                   })}
                 </div>
 
-                {/* Search bar for users and logs tabs */}
                 {adminTab !== 'pending' && (
                   <input
                     type="text"
@@ -379,7 +367,6 @@ export default function DashboardEnhanced() {
                   />
                 )}
 
-                {/* User Management Tab */}
                 {adminTab === 'users' && (
                   <div className="rounded-md border border-slate-200">
                     <Table>
@@ -413,7 +400,6 @@ export default function DashboardEnhanced() {
                   </div>
                 )}
 
-                {/* Pending Approvals Tab */}
                 {adminTab === 'pending' && (
                   pendingUsers.length > 0 ? (
                     <div className="space-y-4">
@@ -464,7 +450,6 @@ export default function DashboardEnhanced() {
                   )
                 )}
 
-                {/* Audit Logs Tab */}
                 {adminTab === 'logs' && (
                   <div className="rounded-md border border-slate-200">
                     <Table>

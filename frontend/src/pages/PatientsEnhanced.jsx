@@ -14,15 +14,14 @@ export default function PatientsEnhanced() {
   useEffect(() => {
     api.get('/patients')
       .then((res) => {
-        // Transform data to include additional info for cards
         const enhancedPatients = res.data.map(patient => ({
           ...patient,
           name: `${patient.firstName} ${patient.lastName}`,
           id: patient.id,
-          status: 'active', // You can determine this from your data
+          status: 'active',
           lastVisit: patient.lastVisit || new Date().toISOString(),
           conditions: patient.conditions || [],
-          avatarUrl: null, // Add if you have avatar URLs
+          avatarUrl: null,
         }));
         setPatients(enhancedPatients);
       })
@@ -30,7 +29,6 @@ export default function PatientsEnhanced() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Filter patients by search
   const filteredPatients = patients.filter(patient =>
     patient.name.toLowerCase().includes(search.toLowerCase()) ||
     patient.email?.toLowerCase().includes(search.toLowerCase()) ||
@@ -50,7 +48,6 @@ export default function PatientsEnhanced() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 font-heading">
@@ -76,7 +73,6 @@ export default function PatientsEnhanced() {
         </button>
       </div>
 
-      {/* Search Bar */}
       <Card>
         <CardContent className="p-4">
           <div className="relative">
@@ -97,7 +93,6 @@ export default function PatientsEnhanced() {
         </CardContent>
       </Card>
 
-      {/* Patients Grid */}
       {filteredPatients.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredPatients.map((patient) => (

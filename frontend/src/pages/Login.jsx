@@ -35,7 +35,6 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-2xl shadow-primary/20 overflow-hidden">
 
-          {/* Header with gradient */}
           <div className="bg-gradient-to-r from-primary to-cta p-8 text-center">
             <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
               <Activity className="w-8 h-8 text-white" />
@@ -48,7 +47,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Form Section */}
           <div className="p-8">
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -58,7 +56,6 @@ export default function Login() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Email Field */}
               <div>
                 <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-2">
                   Email Address
@@ -84,7 +81,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Password Field */}
               <div>
                 <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-2">
                   Password
@@ -110,7 +106,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
@@ -135,7 +130,6 @@ export default function Login() {
               </button>
             </form>
 
-            {/* Footer */}
             <div className="mt-6 text-center">
               <p className="text-sm text-slate-600">
                 Don't have an account?{' '}

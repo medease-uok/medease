@@ -7,7 +7,6 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Healthcare Trust Theme
         primary: {
           DEFAULT: '#0F766E',
           50: '#F0FDFA',
