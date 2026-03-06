@@ -61,25 +61,39 @@ async function getUserPermissions(userId) {
   let permissions;
 
   try {
-    // Try user_roles first (new RBAC system)
+    // Recursive CTE walks the role hierarchy (child -> parent -> grandparent...)
+    // collecting permissions from each level
     let result = await db.query(
-      `SELECT DISTINCT p.name
-       FROM user_roles ur
-       JOIN role_permissions rp ON rp.role_id = ur.role_id
-       JOIN permissions p ON p.id = rp.permission_id
-       WHERE ur.user_id = $1`,
+      `WITH RECURSIVE role_chain AS (
+         SELECT ur.role_id FROM user_roles ur WHERE ur.user_id = $1
+         UNION
+         SELECT r.parent_role_id FROM roles r
+         JOIN role_chain rc ON rc.role_id = r.id
+         WHERE r.parent_role_id IS NOT NULL
+       )
+       SELECT DISTINCT p.name
+       FROM role_chain rc
+       JOIN role_permissions rp ON rp.role_id = rc.role_id
+       JOIN permissions p ON p.id = rp.permission_id`,
       [userId]
     );
 
     // Fallback: if no user_roles entry, resolve via users.role column
     if (result.rows.length === 0) {
       result = await db.query(
-        `SELECT DISTINCT p.name
-         FROM users u
-         JOIN roles r ON r.name = u.role::text
-         JOIN role_permissions rp ON rp.role_id = r.id
-         JOIN permissions p ON p.id = rp.permission_id
-         WHERE u.id = $1`,
+        `WITH RECURSIVE role_chain AS (
+           SELECT r.id AS role_id FROM users u
+           JOIN roles r ON r.name = u.role::text
+           WHERE u.id = $1
+           UNION
+           SELECT r.parent_role_id FROM roles r
+           JOIN role_chain rc ON rc.role_id = r.id
+           WHERE r.parent_role_id IS NOT NULL
+         )
+         SELECT DISTINCT p.name
+         FROM role_chain rc
+         JOIN role_permissions rp ON rp.role_id = rc.role_id
+         JOIN permissions p ON p.id = rp.permission_id`,
         [userId]
       );
     }

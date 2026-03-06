@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Plus, Save, Trash2, ChevronDown, ChevronRight,
-  Check, X, AlertCircle, Loader2,
+  Check, X, AlertCircle, Loader2, GitBranch,
 } from 'lucide-react';
 import api from '../services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -30,6 +30,7 @@ export default function PermissionManagement() {
   const [allPermissions, setAllPermissions] = useState([]);
   const [selectedRoleId, setSelectedRoleId] = useState(null);
   const [rolePermissions, setRolePermissions] = useState([]);
+  const [inheritedPermissions, setInheritedPermissions] = useState([]);
   const [roleDetail, setRoleDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,7 +41,9 @@ export default function PermissionManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleDescription, setNewRoleDescription] = useState('');
+  const [newRoleParent, setNewRoleParent] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [editingParent, setEditingParent] = useState(null);
 
   const fetchRoles = useCallback(async () => {
     try {
@@ -72,12 +75,14 @@ export default function PermissionManagement() {
     setSelectedRoleId(roleId);
     setDetailLoading(true);
     setDirty(false);
+    setEditingParent(null);
     setError('');
     setSuccess('');
     try {
       const res = await api.get(`/roles/${roleId}`);
       setRoleDetail(res.data);
       setRolePermissions(res.data.permissions.map((p) => p.id));
+      setInheritedPermissions(res.data.inheritedPermissions || []);
     } catch {
       setError('Failed to load role details.');
     } finally {
@@ -86,6 +91,7 @@ export default function PermissionManagement() {
   };
 
   const togglePermission = (permId) => {
+    if (inheritedPermIds.has(permId)) return;
     setDirty(true);
     setSuccess('');
     setRolePermissions((prev) =>
@@ -99,15 +105,15 @@ export default function PermissionManagement() {
 
   const toggleAllInCategory = (category) => {
     const categoryPerms = allPermissions.filter((p) => p.category === category);
-    const categoryIds = categoryPerms.map((p) => p.id);
-    const allSelected = categoryIds.every((id) => rolePermissions.includes(id));
+    const toggleableIds = categoryPerms.map((p) => p.id).filter((id) => !inheritedPermIds.has(id));
+    const allSelected = toggleableIds.every((id) => rolePermissions.includes(id));
 
     setDirty(true);
     setSuccess('');
     if (allSelected) {
-      setRolePermissions((prev) => prev.filter((id) => !categoryIds.includes(id)));
+      setRolePermissions((prev) => prev.filter((id) => !toggleableIds.includes(id)));
     } else {
-      setRolePermissions((prev) => [...new Set([...prev, ...categoryIds])]);
+      setRolePermissions((prev) => [...new Set([...prev, ...toggleableIds])]);
     }
   };
 
@@ -117,10 +123,20 @@ export default function PermissionManagement() {
     setError('');
     setSuccess('');
     try {
-      await api.patch(`/roles/${selectedRoleId}`, { permissionIds: rolePermissions });
+      const payload = { permissionIds: rolePermissions };
+      if (editingParent !== null) {
+        payload.parentRoleId = editingParent || null;
+      }
+      await api.patch(`/roles/${selectedRoleId}`, payload);
       setDirty(false);
+      setEditingParent(null);
       setSuccess('Permissions updated successfully.');
-      fetchRoles();
+      await fetchRoles();
+      // Re-fetch role detail to get updated inherited permissions
+      const res = await api.get(`/roles/${selectedRoleId}`);
+      setRoleDetail(res.data);
+      setRolePermissions(res.data.permissions.map((p) => p.id));
+      setInheritedPermissions(res.data.inheritedPermissions || []);
     } catch (err) {
       setError(err.data?.message || 'Failed to save permissions.');
     } finally {
@@ -136,10 +152,12 @@ export default function PermissionManagement() {
         name: newRoleName.trim(),
         description: newRoleDescription.trim() || null,
         permissionIds: [],
+        parentRoleId: newRoleParent || null,
       });
       setShowCreateModal(false);
       setNewRoleName('');
       setNewRoleDescription('');
+      setNewRoleParent('');
       await fetchRoles();
       setSuccess('Role created successfully.');
     } catch (err) {
@@ -159,6 +177,7 @@ export default function PermissionManagement() {
         setSelectedRoleId(null);
         setRoleDetail(null);
         setRolePermissions([]);
+        setInheritedPermissions([]);
       }
       await fetchRoles();
       setSuccess('Role deleted successfully.');
@@ -167,7 +186,34 @@ export default function PermissionManagement() {
     }
   };
 
+  const handleParentChange = (newParentId) => {
+    setEditingParent(newParentId);
+    setDirty(true);
+    setSuccess('');
+  };
+
   const grouped = groupByCategory(allPermissions);
+  const inheritedPermIds = new Set(inheritedPermissions.map((p) => p.id));
+
+  // Build hierarchy indentation helper
+  const getRoleDepth = (roleId, visited = new Set()) => {
+    if (visited.has(roleId)) return 0;
+    visited.add(roleId);
+    const role = roles.find((r) => r.id === roleId);
+    if (!role?.parentRoleId) return 0;
+    return 1 + getRoleDepth(role.parentRoleId, visited);
+  };
+
+  // Roles available as parent for the currently selected role (exclude self and descendants)
+  const getAvailableParents = (roleId) => {
+    const descendants = new Set();
+    const collectDescendants = (id) => {
+      descendants.add(id);
+      roles.filter((r) => r.parentRoleId === id).forEach((r) => collectDescendants(r.id));
+    };
+    if (roleId) collectDescendants(roleId);
+    return roles.filter((r) => !descendants.has(r.id));
+  };
 
   if (loading) {
     return (
@@ -180,6 +226,9 @@ export default function PermissionManagement() {
     );
   }
 
+  const currentParentId = editingParent !== null ? editingParent : roleDetail?.parentRoleId;
+  const effectivePermCount = rolePermissions.length + inheritedPermissions.length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -188,7 +237,7 @@ export default function PermissionManagement() {
             Permission Management
           </h1>
           <p className="text-slate-500 mt-1">
-            Manage roles and their permissions across the system.
+            Manage roles, hierarchy, and permissions across the system.
           </p>
         </div>
         <button
@@ -228,49 +277,59 @@ export default function PermissionManagement() {
           </CardHeader>
           <CardContent>
             <div className="space-y-1">
-              {roles.map((role) => (
-                <div
-                  key={role.id}
-                  onClick={() => selectRole(role.id)}
-                  className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
-                    selectedRoleId === role.id
-                      ? 'bg-primary/10 border border-primary/30'
-                      : 'hover:bg-slate-50 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              {roles.map((role) => {
+                const depth = getRoleDepth(role.id);
+                return (
+                  <div
+                    key={role.id}
+                    onClick={() => selectRole(role.id)}
+                    style={{ paddingLeft: `${12 + depth * 16}px` }}
+                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
                       selectedRoleId === role.id
-                        ? 'bg-primary text-white'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      <Shield className="w-4 h-4" />
+                        ? 'bg-primary/10 border border-primary/30'
+                        : 'hover:bg-slate-50 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {depth > 0 && (
+                        <GitBranch className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                      )}
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        selectedRoleId === role.id
+                          ? 'bg-primary text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <Shield className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-slate-900 capitalize truncate">
+                          {role.name.replace('_', ' ')}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {role.permissionCount} permission{role.permissionCount !== 1 ? 's' : ''}
+                          {role.parentRoleName && (
+                            <span className="text-slate-400"> · inherits {role.parentRoleName}</span>
+                          )}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm text-slate-900 capitalize truncate">
-                        {role.name.replace('_', ' ')}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {role.permissionCount} permission{role.permissionCount !== 1 ? 's' : ''}
-                      </p>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {role.isSystem && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">System</Badge>
+                      )}
+                      {!role.isSystem && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
+                          className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                          title="Delete role"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {role.isSystem && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">System</Badge>
-                    )}
-                    {!role.isSystem && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
-                        className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                        title="Delete role"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -301,7 +360,8 @@ export default function PermissionManagement() {
                     <CardDescription>
                       {roleDetail.description || 'No description'}
                       {' '}&middot;{' '}
-                      {rolePermissions.length} of {allPermissions.length} permissions enabled
+                      {effectivePermCount} effective ({rolePermissions.length} own
+                      {inheritedPermissions.length > 0 && ` + ${inheritedPermissions.length} inherited`})
                     </CardDescription>
                   </div>
                   <button
@@ -319,78 +379,118 @@ export default function PermissionManagement() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {Object.entries(grouped).map(([category, perms]) => {
-                    const isExpanded = expandedCategories[category];
-                    const selectedInCategory = perms.filter((p) => rolePermissions.includes(p.id)).length;
-                    const allInCategorySelected = selectedInCategory === perms.length;
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <GitBranch className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    <label className="text-sm font-medium text-slate-700 flex-shrink-0">Inherits from:</label>
+                    <select
+                      value={currentParentId || ''}
+                      onChange={(e) => handleParentChange(e.target.value)}
+                      className="flex-1 px-3 py-1.5 border border-slate-300 rounded-md text-sm bg-white focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">None (standalone role)</option>
+                      {getAvailableParents(selectedRoleId).map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name.replace('_', ' ')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    return (
-                      <div key={category} className="border border-slate-200 rounded-lg overflow-hidden">
-                        <div
-                          className="flex items-center justify-between px-4 py-3 bg-slate-50 cursor-pointer select-none"
-                          onClick={() => toggleCategory(category)}
-                        >
-                          <div className="flex items-center gap-3">
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4 text-slate-500" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-slate-500" />
-                            )}
-                            <span className="font-semibold text-sm text-slate-700">
-                              {categoryLabels[category] || category}
-                            </span>
-                            <Badge variant={selectedInCategory === perms.length ? 'success' : selectedInCategory > 0 ? 'warning' : 'secondary'}>
-                              {selectedInCategory}/{perms.length}
-                            </Badge>
-                          </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleAllInCategory(category); }}
-                            className="text-xs font-medium text-primary hover:text-primary-700 transition-colors"
+                  <div className="space-y-2">
+                    {Object.entries(grouped).map(([category, perms]) => {
+                      const isExpanded = expandedCategories[category];
+                      const ownInCategory = perms.filter((p) => rolePermissions.includes(p.id)).length;
+                      const inheritedInCategory = perms.filter((p) => inheritedPermIds.has(p.id)).length;
+                      const totalInCategory = ownInCategory + inheritedInCategory;
+                      const toggleableIds = perms.map((p) => p.id).filter((id) => !inheritedPermIds.has(id));
+                      const allToggleableSelected = toggleableIds.every((id) => rolePermissions.includes(id));
+
+                      return (
+                        <div key={category} className="border border-slate-200 rounded-lg overflow-hidden">
+                          <div
+                            className="flex items-center justify-between px-4 py-3 bg-slate-50 cursor-pointer select-none"
+                            onClick={() => toggleCategory(category)}
                           >
-                            {allInCategorySelected ? 'Deselect All' : 'Select All'}
-                          </button>
-                        </div>
-                        {isExpanded && (
-                          <div className="divide-y divide-slate-100">
-                            {perms.map((perm) => {
-                              const isChecked = rolePermissions.includes(perm.id);
-                              return (
-                                <label
-                                  key={perm.id}
-                                  className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
-                                >
-                                  <div className="relative flex-shrink-0">
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={() => togglePermission(perm.id)}
-                                      className="sr-only peer"
-                                    />
-                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                      isChecked
-                                        ? 'bg-primary border-primary'
-                                        : 'border-slate-300 peer-hover:border-slate-400'
-                                    }`}>
-                                      {isChecked && <Check className="w-3 h-3 text-white" />}
-                                    </div>
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium text-slate-900">
-                                      {perm.name.replace(/_/g, ' ')}
-                                    </p>
-                                    {perm.description && (
-                                      <p className="text-xs text-slate-500 mt-0.5">{perm.description}</p>
-                                    )}
-                                  </div>
-                                </label>
-                              );
-                            })}
+                            <div className="flex items-center gap-3">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 text-slate-500" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 text-slate-500" />
+                              )}
+                              <span className="font-semibold text-sm text-slate-700">
+                                {categoryLabels[category] || category}
+                              </span>
+                              <Badge variant={totalInCategory === perms.length ? 'success' : totalInCategory > 0 ? 'warning' : 'secondary'}>
+                                {totalInCategory}/{perms.length}
+                              </Badge>
+                            </div>
+                            {toggleableIds.length > 0 && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleAllInCategory(category); }}
+                                className="text-xs font-medium text-primary hover:text-primary-700 transition-colors"
+                              >
+                                {allToggleableSelected ? 'Deselect All' : 'Select All'}
+                              </button>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          {isExpanded && (
+                            <div className="divide-y divide-slate-100">
+                              {perms.map((perm) => {
+                                const isOwn = rolePermissions.includes(perm.id);
+                                const isInherited = inheritedPermIds.has(perm.id);
+                                const isChecked = isOwn || isInherited;
+                                return (
+                                  <label
+                                    key={perm.id}
+                                    className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                                      isInherited
+                                        ? 'bg-blue-50/50 cursor-default'
+                                        : 'hover:bg-slate-50 cursor-pointer'
+                                    }`}
+                                  >
+                                    <div className="relative flex-shrink-0">
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => togglePermission(perm.id)}
+                                        disabled={isInherited}
+                                        className="sr-only peer"
+                                      />
+                                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                        isInherited
+                                          ? 'bg-blue-400 border-blue-400'
+                                          : isOwn
+                                            ? 'bg-primary border-primary'
+                                            : 'border-slate-300 peer-hover:border-slate-400'
+                                      }`}>
+                                        {isChecked && <Check className="w-3 h-3 text-white" />}
+                                      </div>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium text-slate-900">
+                                          {perm.name.replace(/_/g, ' ')}
+                                        </p>
+                                        {isInherited && (
+                                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                            Inherited
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      {perm.description && (
+                                        <p className="text-xs text-slate-500 mt-0.5">{perm.description}</p>
+                                      )}
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </CardContent>
             </>
@@ -404,7 +504,7 @@ export default function PermissionManagement() {
             <div className="p-6 border-b border-slate-200">
               <h2 className="text-lg font-semibold font-heading text-slate-900">Create New Role</h2>
               <p className="text-sm text-slate-500 mt-1">
-                Custom roles can be assigned to users and configured with specific permissions.
+                Custom roles can inherit permissions from a parent role.
               </p>
             </div>
             <div className="p-6 space-y-4">
@@ -429,10 +529,25 @@ export default function PermissionManagement() {
                   className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Inherits From</label>
+                <select
+                  value={newRoleParent}
+                  onChange={(e) => setNewRoleParent(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                >
+                  <option value="">None (standalone role)</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name.replace('_', ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="flex justify-end gap-3 p-6 border-t border-slate-200">
               <button
-                onClick={() => { setShowCreateModal(false); setNewRoleName(''); setNewRoleDescription(''); }}
+                onClick={() => { setShowCreateModal(false); setNewRoleName(''); setNewRoleDescription(''); setNewRoleParent(''); }}
                 className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancel

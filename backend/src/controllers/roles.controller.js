@@ -3,15 +3,16 @@ const AppError = require('../utils/AppError');
 const auditLog = require('../utils/auditLog');
 const { invalidatePermissionCache } = require('../utils/permissions');
 
-// GET /roles — list all roles with their permission counts
 const getRoles = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT r.id, r.name, r.description, r.is_system, r.created_at,
-              COUNT(rp.permission_id) AS permission_count
+      `SELECT r.id, r.name, r.description, r.is_system, r.parent_role_id, r.created_at,
+              COUNT(rp.permission_id) AS permission_count,
+              pr.name AS parent_role_name
        FROM roles r
        LEFT JOIN role_permissions rp ON rp.role_id = r.id
-       GROUP BY r.id
+       LEFT JOIN roles pr ON pr.id = r.parent_role_id
+       GROUP BY r.id, pr.name
        ORDER BY r.is_system DESC, r.name`
     );
 
@@ -22,6 +23,8 @@ const getRoles = async (req, res, next) => {
         name: r.name,
         description: r.description,
         isSystem: r.is_system,
+        parentRoleId: r.parent_role_id,
+        parentRoleName: r.parent_role_name,
         permissionCount: parseInt(r.permission_count, 10),
         createdAt: r.created_at,
       })),
@@ -31,13 +34,12 @@ const getRoles = async (req, res, next) => {
   }
 };
 
-// GET /roles/:id — get a single role with its permissions
 const getRole = async (req, res, next) => {
   try {
     const { id } = req.params;
 
     const roleResult = await db.query(
-      'SELECT id, name, description, is_system, created_at FROM roles WHERE id = $1',
+      'SELECT id, name, description, is_system, parent_role_id, created_at FROM roles WHERE id = $1',
       [id]
     );
     if (roleResult.rows.length === 0) {
@@ -53,7 +55,27 @@ const getRole = async (req, res, next) => {
       [id]
     );
 
+    // Collect inherited permissions from parent chain
+    const inheritedResult = await db.query(
+      `WITH RECURSIVE ancestors AS (
+         SELECT parent_role_id FROM roles WHERE id = $1
+         UNION
+         SELECT r.parent_role_id FROM roles r
+         JOIN ancestors a ON a.parent_role_id = r.id
+         WHERE r.parent_role_id IS NOT NULL
+       )
+       SELECT DISTINCT p.id, p.name, p.description, p.category
+       FROM ancestors a
+       JOIN role_permissions rp ON rp.role_id = a.parent_role_id
+       JOIN permissions p ON p.id = rp.permission_id
+       WHERE a.parent_role_id IS NOT NULL
+       ORDER BY p.category, p.name`,
+      [id]
+    );
+
     const role = roleResult.rows[0];
+    const ownPermIds = new Set(permResult.rows.map((p) => p.id));
+
     res.json({
       status: 'success',
       data: {
@@ -61,6 +83,7 @@ const getRole = async (req, res, next) => {
         name: role.name,
         description: role.description,
         isSystem: role.is_system,
+        parentRoleId: role.parent_role_id,
         createdAt: role.created_at,
         permissions: permResult.rows.map((p) => ({
           id: p.id,
@@ -68,6 +91,14 @@ const getRole = async (req, res, next) => {
           description: p.description,
           category: p.category,
         })),
+        inheritedPermissions: inheritedResult.rows
+          .filter((p) => !ownPermIds.has(p.id))
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            category: p.category,
+          })),
       },
     });
   } catch (err) {
@@ -75,9 +106,8 @@ const getRole = async (req, res, next) => {
   }
 };
 
-// POST /roles — create a custom role
 const createRole = async (req, res, next) => {
-  const { name, description, permissionIds } = req.body;
+  const { name, description, permissionIds, parentRoleId } = req.body;
   const client = await db.getClient();
 
   try {
@@ -85,13 +115,20 @@ const createRole = async (req, res, next) => {
       throw new AppError('Role name is required.', 400);
     }
 
+    if (parentRoleId) {
+      const parentExists = await client.query('SELECT id FROM roles WHERE id = $1', [parentRoleId]);
+      if (parentExists.rows.length === 0) {
+        throw new AppError('Parent role not found.', 404);
+      }
+    }
+
     await client.query('BEGIN');
 
     const roleResult = await client.query(
-      `INSERT INTO roles (name, description, is_system)
-       VALUES ($1, $2, false)
-       RETURNING id, name, description, is_system, created_at`,
-      [name.trim().toLowerCase(), description || null]
+      `INSERT INTO roles (name, description, is_system, parent_role_id)
+       VALUES ($1, $2, false, $3)
+       RETURNING id, name, description, is_system, parent_role_id, created_at`,
+      [name.trim().toLowerCase(), description || null, parentRoleId || null]
     );
     const role = roleResult.rows[0];
 
@@ -125,10 +162,9 @@ const createRole = async (req, res, next) => {
   }
 };
 
-// PATCH /roles/:id — update role name/description/permissions
 const updateRole = async (req, res, next) => {
   const { id } = req.params;
-  const { name, description, permissionIds } = req.body;
+  const { name, description, permissionIds, parentRoleId } = req.body;
   const client = await db.getClient();
 
   try {
@@ -137,22 +173,55 @@ const updateRole = async (req, res, next) => {
       throw new AppError('Role not found.', 404);
     }
 
-    // System roles cannot be renamed, but their permissions CAN be changed
     if (existing.rows[0].is_system && name && name !== existing.rows[0].name) {
       throw new AppError('System role names cannot be changed.', 400);
     }
 
+    // Validate parent role and detect cycles
+    if (parentRoleId !== undefined) {
+      if (parentRoleId === id) {
+        throw new AppError('A role cannot be its own parent.', 400);
+      }
+      if (parentRoleId) {
+        const parentExists = await client.query('SELECT id FROM roles WHERE id = $1', [parentRoleId]);
+        if (parentExists.rows.length === 0) {
+          throw new AppError('Parent role not found.', 404);
+        }
+        // Walk up from the proposed parent to detect if `id` appears (cycle)
+        const cycleCheck = await client.query(
+          `WITH RECURSIVE ancestors AS (
+             SELECT parent_role_id FROM roles WHERE id = $1
+             UNION
+             SELECT r.parent_role_id FROM roles r
+             JOIN ancestors a ON a.parent_role_id = r.id
+             WHERE r.parent_role_id IS NOT NULL
+           )
+           SELECT 1 FROM ancestors WHERE parent_role_id = $2 LIMIT 1`,
+          [parentRoleId, id]
+        );
+        if (cycleCheck.rows.length > 0) {
+          throw new AppError('This parent assignment would create a circular hierarchy.', 400);
+        }
+      }
+    }
+
     await client.query('BEGIN');
 
-    // Update role metadata
-    if (name || description !== undefined) {
+    if (name || description !== undefined || parentRoleId !== undefined) {
       await client.query(
         `UPDATE roles SET
            name = COALESCE($2, name),
            description = COALESCE($3, description),
+           parent_role_id = CASE WHEN $4::boolean THEN $5::uuid ELSE parent_role_id END,
            updated_at = NOW()
          WHERE id = $1`,
-        [id, name ? name.trim().toLowerCase() : null, description !== undefined ? description : null]
+        [
+          id,
+          name ? name.trim().toLowerCase() : null,
+          description !== undefined ? description : null,
+          parentRoleId !== undefined,
+          parentRoleId || null,
+        ]
       );
     }
 
@@ -170,12 +239,19 @@ const updateRole = async (req, res, next) => {
 
     await client.query('COMMIT');
 
-    // Invalidate permission cache for all users with this role
-    const usersWithRole = await db.query(
-      'SELECT user_id FROM user_roles WHERE role_id = $1',
+    // Invalidate caches for users of this role AND all descendant roles
+    const affectedUsers = await db.query(
+      `WITH RECURSIVE descendants AS (
+         SELECT id FROM roles WHERE id = $1
+         UNION
+         SELECT r.id FROM roles r
+         JOIN descendants d ON r.parent_role_id = d.id
+       )
+       SELECT DISTINCT ur.user_id FROM user_roles ur
+       JOIN descendants d ON ur.role_id = d.id`,
       [id]
     );
-    await Promise.all(usersWithRole.rows.map((r) => invalidatePermissionCache(r.user_id)));
+    await Promise.all(affectedUsers.rows.map((r) => invalidatePermissionCache(r.user_id)));
 
     await auditLog({
       userId: req.user.id,

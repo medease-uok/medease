@@ -10,12 +10,13 @@ CREATE TABLE permissions (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Roles table: named roles that group permissions
+-- Roles table: named roles that group permissions (supports single-parent hierarchy)
 CREATE TABLE roles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(50) UNIQUE NOT NULL,
   description TEXT,
   is_system BOOLEAN DEFAULT false,
+  parent_role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
