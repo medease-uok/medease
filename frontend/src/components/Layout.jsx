@@ -2,7 +2,17 @@ import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import './Layout.css';
+
+/**
+ * ✨ MODERNIZED LAYOUT
+ *
+ * IMPROVEMENTS:
+ * - Fixed sidebar and header positioning
+ * - Better spacing with Tailwind
+ * - Smooth background gradient
+ * - Proper content padding for fixed elements
+ * - Responsive design
+ */
 
 const pageTitles = {
   '/dashboard': 'Dashboard',
@@ -27,11 +37,18 @@ export default function Layout() {
   const title = pageTitles[basePath] || 'MedEase';
 
   return (
-    <div className="layout">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      {/* ✨ FIXED SIDEBAR */}
       <Sidebar />
+
+      {/* ✨ FIXED HEADER */}
       <Header title={title} />
-      <main className="layout-content">
-        <Outlet />
+
+      {/* ✨ MAIN CONTENT with proper padding */}
+      <main className="ml-64 pt-16 min-h-screen">
+        <div className="p-8">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

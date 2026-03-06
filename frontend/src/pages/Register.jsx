@@ -100,6 +100,7 @@ export default function Register() {
     className: `${baseClass}${fieldErrors[name] ? ' input-error' : ''}`,
     'aria-invalid': fieldErrors[name] ? 'true' : undefined,
     'aria-describedby': fieldErrors[name] ? `err-${name}` : undefined,
+    onFocus: () => clearFieldError(name),
   });
 
   const renderError = (name) =>
@@ -111,15 +112,22 @@ export default function Register() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    setForm((prev) => ({ ...prev, [name]: value }));
     if (name === 'role') {
       setFieldErrors({});
-    } else {
-      const cleared = { [name]: '' };
-      if (name === 'password') cleared.confirmPassword = '';
-      setFieldErrors((prev) => ({ ...prev, ...cleared }));
+      setError('');
     }
-    setError('');
+  };
+
+  const clearFieldError = (name) => {
+    if (fieldErrors[name] || error) {
+      setFieldErrors((prev) => {
+        const next = { ...prev, [name]: '' };
+        if (name === 'password') next.confirmPassword = '';
+        return next;
+      });
+      setError('');
+    }
   };
 
   const validateStep1 = () => {
@@ -275,7 +283,7 @@ export default function Register() {
 
         {error && <div className="register-error">{error}</div>}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off">
           {/* Step 1: Account Information */}
           {step === 1 && (
             <>
@@ -283,31 +291,31 @@ export default function Register() {
               <div className="register-row">
                 <div className="login-field">
                   <label className="login-label" htmlFor="reg-firstName">First Name *</label>
-                  <input id="reg-firstName" type="text" name="firstName" maxLength={50} {...fieldProps('firstName')} value={form.firstName} onChange={handleChange} />
+                  <input id="reg-firstName" type="text" name="firstName" autoComplete="off" maxLength={50} {...fieldProps('firstName')} value={form.firstName} onChange={handleChange} />
                   {renderError('firstName')}
                 </div>
                 <div className="login-field">
                   <label className="login-label" htmlFor="reg-lastName">Last Name *</label>
-                  <input id="reg-lastName" type="text" name="lastName" maxLength={50} {...fieldProps('lastName')} value={form.lastName} onChange={handleChange} />
+                  <input id="reg-lastName" type="text" name="lastName" autoComplete="off" maxLength={50} {...fieldProps('lastName')} value={form.lastName} onChange={handleChange} />
                   {renderError('lastName')}
                 </div>
               </div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-email">Email *</label>
-                <input id="reg-email" type="email" name="email" maxLength={100} {...fieldProps('email')} value={form.email} onChange={handleChange} />
+                <input id="reg-email" type="email" name="email" autoComplete="off" maxLength={100} {...fieldProps('email')} value={form.email} onChange={handleChange} />
                 {renderError('email')}
               </div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-phone">Phone</label>
                 <div className="register-phone-group">
                   <span className="register-phone-prefix">+94</span>
-                  <input id="reg-phone" type="tel" name="phone" maxLength={10} {...fieldProps('phone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.phone} onChange={handleChange} />
+                  <input id="reg-phone" type="tel" name="phone" autoComplete="tel-local" maxLength={10} {...fieldProps('phone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.phone} onChange={handleChange} />
                 </div>
                 {renderError('phone')}
               </div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-role">Role *</label>
-                <select id="reg-role" name="role" className="login-select" value={form.role} onChange={handleChange}>
+                <select id="reg-role" name="role" autoComplete="off" className="login-select" value={form.role} onChange={handleChange}>
                   {roles.map((role) => (
                     <option key={role} value={role}>
                       {role.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
@@ -333,12 +341,12 @@ export default function Register() {
                   <div className="register-row">
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-dob">Date of Birth *</label>
-                      <input id="reg-dob" type="date" name="dateOfBirth" {...fieldProps('dateOfBirth')} value={form.dateOfBirth} onChange={handleChange} />
+                      <input id="reg-dob" type="date" name="dateOfBirth" autoComplete="bday" {...fieldProps('dateOfBirth')} value={form.dateOfBirth} onChange={handleChange} />
                       {renderError('dateOfBirth')}
                     </div>
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-gender">Gender *</label>
-                      <select id="reg-gender" name="gender" {...fieldProps('gender', 'login-select')} value={form.gender} onChange={handleChange}>
+                      <select id="reg-gender" name="gender" autoComplete="sex" {...fieldProps('gender', 'login-select')} value={form.gender} onChange={handleChange}>
                         <option value="">Select Gender</option>
                         {genderOptions.map((g) => <option key={g} value={g}>{g}</option>)}
                       </select>
@@ -347,7 +355,7 @@ export default function Register() {
                   </div>
                   <div className="login-field">
                     <label className="login-label" htmlFor="reg-bloodType">Blood Type</label>
-                    <select id="reg-bloodType" name="bloodType" className="login-select" value={form.bloodType} onChange={handleChange}>
+                    <select id="reg-bloodType" name="bloodType" autoComplete="off" className="login-select" value={form.bloodType} onChange={handleChange}>
                       <option value="">Select Blood Type</option>
                       {bloodTypes.map((bt) => <option key={bt} value={bt}>{bt}</option>)}
                     </select>
@@ -355,11 +363,11 @@ export default function Register() {
                   <div className="register-row">
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-emergencyContact">Emergency Contact Name</label>
-                      <input id="reg-emergencyContact" type="text" name="emergencyContact" maxLength={100} className="login-input" placeholder="e.g. John Perera" value={form.emergencyContact} onChange={handleChange} />
+                      <input id="reg-emergencyContact" type="text" name="emergencyContact" autoComplete="off" maxLength={100} className="login-input" placeholder="e.g. John Perera" value={form.emergencyContact} onChange={handleChange} />
                     </div>
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-emergencyRelationship">Relationship</label>
-                      <select id="reg-emergencyRelationship" name="emergencyRelationship" className="login-select" value={form.emergencyRelationship} onChange={handleChange}>
+                      <select id="reg-emergencyRelationship" name="emergencyRelationship" autoComplete="off" className="login-select" value={form.emergencyRelationship} onChange={handleChange}>
                         <option value="">Select Relationship</option>
                         <option value="Spouse">Spouse</option>
                         <option value="Parent">Parent</option>
@@ -374,13 +382,13 @@ export default function Register() {
                     <label className="login-label" htmlFor="reg-emergencyPhone">Emergency Phone</label>
                     <div className="register-phone-group">
                       <span className="register-phone-prefix">+94</span>
-                      <input id="reg-emergencyPhone" type="tel" name="emergencyPhone" maxLength={10} {...fieldProps('emergencyPhone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.emergencyPhone} onChange={handleChange} />
+                      <input id="reg-emergencyPhone" type="tel" name="emergencyPhone" autoComplete="off" maxLength={10} {...fieldProps('emergencyPhone', 'login-input register-phone-input')} placeholder="7XXXXXXXX" value={form.emergencyPhone} onChange={handleChange} />
                     </div>
                     {renderError('emergencyPhone')}
                   </div>
                   <div className="login-field">
                     <label className="login-label" htmlFor="reg-address">Address</label>
-                    <input id="reg-address" type="text" name="address" maxLength={200} className="login-input" placeholder="Full address" value={form.address} onChange={handleChange} />
+                    <input id="reg-address" type="text" name="address" autoComplete="street-address" maxLength={200} className="login-input" placeholder="Full address" value={form.address} onChange={handleChange} />
                   </div>
                 </>
               )}
@@ -390,7 +398,7 @@ export default function Register() {
                   <div className="register-section-title">Professional Information</div>
                   <div className="login-field">
                     <label className="login-label" htmlFor="reg-specialization">Specialization *</label>
-                    <select id="reg-specialization" name="specialization" {...fieldProps('specialization', 'login-select')} value={form.specialization} onChange={handleChange}>
+                    <select id="reg-specialization" name="specialization" autoComplete="off" {...fieldProps('specialization', 'login-select')} value={form.specialization} onChange={handleChange}>
                       <option value="">Select Specialization</option>
                       {specializations.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -399,12 +407,12 @@ export default function Register() {
                   <div className="register-row">
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-licenseNumber">License Number (SLMC) *</label>
-                      <input id="reg-licenseNumber" type="text" name="licenseNumber" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLMC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                      <input id="reg-licenseNumber" type="text" name="licenseNumber" autoComplete="off" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLMC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
                       {renderError('licenseNumber')}
                     </div>
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-department">Department *</label>
-                      <select id="reg-department" name="department" {...fieldProps('department', 'login-select')} value={form.department} onChange={handleChange}>
+                      <select id="reg-department" name="department" autoComplete="off" {...fieldProps('department', 'login-select')} value={form.department} onChange={handleChange}>
                         <option value="">Select Department</option>
                         {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                       </select>
@@ -420,12 +428,12 @@ export default function Register() {
                   <div className="register-row">
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-licenseNumber">License Number (SLNC) *</label>
-                      <input id="reg-licenseNumber" type="text" name="licenseNumber" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLNC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                      <input id="reg-licenseNumber" type="text" name="licenseNumber" autoComplete="off" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLNC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
                       {renderError('licenseNumber')}
                     </div>
                     <div className="login-field">
                       <label className="login-label" htmlFor="reg-department">Department *</label>
-                      <select id="reg-department" name="department" {...fieldProps('department', 'login-select')} value={form.department} onChange={handleChange}>
+                      <select id="reg-department" name="department" autoComplete="off" {...fieldProps('department', 'login-select')} value={form.department} onChange={handleChange}>
                         <option value="">Select Department</option>
                         {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                       </select>
@@ -440,7 +448,7 @@ export default function Register() {
                   <div className="register-section-title">Professional Information</div>
                   <div className="login-field">
                     <label className="login-label" htmlFor="reg-department">Department *</label>
-                    <select id="reg-department" name="department" {...fieldProps('department', 'login-select')} value={form.department} onChange={handleChange}>
+                    <select id="reg-department" name="department" autoComplete="off" {...fieldProps('department', 'login-select')} value={form.department} onChange={handleChange}>
                       <option value="">Select Department</option>
                       {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                     </select>
@@ -454,7 +462,7 @@ export default function Register() {
                   <div className="register-section-title">Professional Information</div>
                   <div className="login-field">
                     <label className="login-label" htmlFor="reg-licenseNumber">License Number (SLPC) *</label>
-                    <input id="reg-licenseNumber" type="text" name="licenseNumber" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLPC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
+                    <input id="reg-licenseNumber" type="text" name="licenseNumber" autoComplete="off" maxLength={30} {...fieldProps('licenseNumber')} placeholder="SLPC-XXXX-XXXX" value={form.licenseNumber} onChange={handleChange} />
                     {renderError('licenseNumber')}
                   </div>
                 </>
@@ -477,7 +485,7 @@ export default function Register() {
               <div className="register-section-title">Set Your Password</div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-password">Password *</label>
-                <input id="reg-password" type="password" name="password" maxLength={72} {...fieldProps('password')} value={form.password} onChange={handleChange} />
+                <input id="reg-password" type="password" name="password" autoComplete="new-password" maxLength={72} {...fieldProps('password')} value={form.password} onChange={handleChange} />
                 {renderError('password')}
                 {form.password && (() => {
                   const { score, label } = getPasswordStrength(form.password);
@@ -495,7 +503,7 @@ export default function Register() {
               </div>
               <div className="login-field">
                 <label className="login-label" htmlFor="reg-confirmPassword">Confirm Password *</label>
-                <input id="reg-confirmPassword" type="password" name="confirmPassword" maxLength={72} {...fieldProps('confirmPassword')} value={form.confirmPassword} onChange={handleChange} />
+                <input id="reg-confirmPassword" type="password" name="confirmPassword" autoComplete="new-password" maxLength={72} {...fieldProps('confirmPassword')} value={form.confirmPassword} onChange={handleChange} />
                 {renderError('confirmPassword')}
               </div>
               <div className="register-captcha">
@@ -509,8 +517,9 @@ export default function Register() {
                 {renderError('captcha')}
               </div>
               <div className="register-terms">
-                <label className="register-terms-label">
+                <label className="register-terms-label" htmlFor="reg-terms">
                   <input
+                    id="reg-terms"
                     type="checkbox"
                     checked={termsAccepted}
                     onChange={(e) => {
