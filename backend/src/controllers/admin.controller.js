@@ -64,7 +64,6 @@ const approveUser = async (req, res, next) => {
 
     res.json({ status: 'success', message: 'User approved successfully.' });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -92,7 +91,6 @@ const rejectUser = async (req, res, next) => {
 
     res.json({ status: 'success', message: 'User rejected and removed.' });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };

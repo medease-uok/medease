@@ -84,7 +84,6 @@ const getById = async (req, res, next) => {
       },
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -107,7 +106,6 @@ const getMe = async (req, res, next) => {
 
     res.json({ status: 'success', data: mapPatient(result.rows[0]) });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };

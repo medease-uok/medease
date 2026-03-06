@@ -71,7 +71,6 @@ const getRole = async (req, res, next) => {
       },
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -120,7 +119,6 @@ const createRole = async (req, res, next) => {
     if (err.code === '23505') {
       return next(new AppError('A role with this name already exists.', 409));
     }
-    if (err.isOperational) return next(err);
     return next(err);
   } finally {
     client.release();
@@ -193,7 +191,6 @@ const updateRole = async (req, res, next) => {
     if (err.code === '23505') {
       return next(new AppError('A role with this name already exists.', 409));
     }
-    if (err.isOperational) return next(err);
     return next(err);
   } finally {
     client.release();
@@ -232,7 +229,6 @@ const deleteRole = async (req, res, next) => {
 
     res.json({ status: 'success', message: 'Role deleted successfully.' });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -280,7 +276,6 @@ const assignRoleToUser = async (req, res, next) => {
     if (err.code === '23503') {
       return next(new AppError('User or role not found.', 404));
     }
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -311,7 +306,6 @@ const removeRoleFromUser = async (req, res, next) => {
 
     res.json({ status: 'success', message: 'Role removed successfully.' });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
