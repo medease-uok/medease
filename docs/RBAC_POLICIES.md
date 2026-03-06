@@ -164,18 +164,39 @@ Roles support single-parent inheritance via the `parent_role_id` column on the `
 
 If `senior_nurse` has parent `nurse`, and `nurse` has permissions `[view_patients, view_appointments]`, then `senior_nurse` inherits those permissions in addition to any directly assigned to it.
 
+```mermaid
+graph BT
+    SN["senior_nurse<br/><i>own: create_medical_record</i>"] --> N["nurse<br/><i>own: view_patients, view_appointments,<br/>view_medical_records, view_prescriptions,<br/>update_appointment_status, view_lab_reports</i>"]
+
+    style SN fill:#dbeafe,stroke:#3b82f6
+    style N fill:#e0e7ff,stroke:#6366f1
+```
+
+**Effective permissions for `senior_nurse`:** all nurse permissions + `create_medical_record`.
+
 ---
 
 ## Permission Resolution
 
 When a permission check is needed, the system resolves the user's effective permissions through this flow:
 
-```
-User
-  → user_roles table (maps user to role IDs)
-  → Recursive CTE walks parent_role_id chain upward
-  → Collects role_permissions from every role in the chain
-  → Returns DISTINCT permission names
+```mermaid
+flowchart TD
+    A[User requests action] --> B{Cached in Redis?}
+    B -- Yes --> C[Return cached permissions]
+    B -- No --> D{user_roles entry exists?}
+    D -- Yes --> E[Get role IDs from user_roles]
+    D -- No --> F{RBAC tables exist?}
+    F -- Yes --> G[Resolve role via users.role column]
+    F -- No --> H[Use hardcoded ROLE_PERMISSIONS_FALLBACK]
+    E --> I[Walk parent chain via recursive CTE]
+    G --> I
+    I --> J[Collect role_permissions from each role]
+    J --> K[Return DISTINCT permission names]
+    H --> L[Return fallback permissions]
+    K --> M[Cache in Redis with 5-min TTL]
+    L --> M
+    M --> C
 ```
 
 ### Fallback behavior
@@ -213,7 +234,17 @@ Cache is invalidated when:
 - A role is deleted (via `deleteRole`)
 - A role is assigned to or removed from a user (`assignRoleToUser`, `removeRoleFromUser`)
 
-When a role's permissions change, the system invalidates caches for **all users assigned to that role and all descendant roles** using a recursive descendant query:
+When a role's permissions change, the system invalidates caches for **all users assigned to that role and all descendant roles**:
+
+```mermaid
+flowchart LR
+    A[Role permissions updated] --> B[Find all descendant roles via recursive CTE]
+    B --> C[Query user_roles for affected users]
+    C --> D["Delete Redis keys: perms:&lt;userId&gt;"]
+    D --> E[Next request triggers fresh resolution]
+```
+
+The descendant query:
 
 ```sql
 WITH RECURSIVE descendants AS (
@@ -289,30 +320,42 @@ Available at `/permissions` (admin only). Provides a visual interface for:
 
 ## Database Schema
 
-```
-permissions
-  id          UUID PK
-  name        VARCHAR(100) UNIQUE
-  description TEXT
-  category    VARCHAR(50)
+```mermaid
+erDiagram
+    users {
+        UUID id PK
+        VARCHAR role
+    }
+    roles {
+        UUID id PK
+        VARCHAR name UK
+        TEXT description
+        BOOLEAN is_system
+        UUID parent_role_id FK
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+    permissions {
+        UUID id PK
+        VARCHAR name UK
+        TEXT description
+        VARCHAR category
+    }
+    role_permissions {
+        UUID role_id FK
+        UUID permission_id FK
+    }
+    user_roles {
+        UUID user_id FK
+        UUID role_id FK
+        TIMESTAMP assigned_at
+    }
 
-roles
-  id             UUID PK
-  name           VARCHAR(50) UNIQUE
-  description    TEXT
-  is_system      BOOLEAN
-  parent_role_id UUID FK → roles.id (hierarchy)
-
-role_permissions
-  role_id       UUID FK → roles.id
-  permission_id UUID FK → permissions.id
-  PK (role_id, permission_id)
-
-user_roles
-  user_id     UUID FK → users.id
-  role_id     UUID FK → roles.id
-  assigned_at TIMESTAMP
-  PK (user_id, role_id)
+    users ||--o{ user_roles : "assigned"
+    roles ||--o{ user_roles : "has users"
+    roles ||--o{ role_permissions : "grants"
+    permissions ||--o{ role_permissions : "granted by"
+    roles ||--o| roles : "parent_role_id"
 ```
 
 ---
