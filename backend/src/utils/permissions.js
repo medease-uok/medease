@@ -3,43 +3,95 @@ const redis = require('../config/redis');
 
 const CACHE_TTL = 300; // 5 minutes
 
+// Fallback when RBAC tables don't exist yet.
+// Mirrors database/init/02-roles-permissions.sql assignments.
+const ROLE_PERMISSIONS_FALLBACK = {
+  admin: [
+    'view_patients', 'view_own_profile', 'edit_own_profile', 'edit_patient',
+    'view_appointments', 'view_own_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status',
+    'view_medical_records', 'view_own_medical_records', 'create_medical_record', 'edit_medical_record',
+    'view_prescriptions', 'view_own_prescriptions', 'create_prescription', 'dispense_prescription', 'cancel_prescription',
+    'view_lab_reports', 'view_own_lab_reports', 'create_lab_report', 'edit_lab_report',
+    'manage_users', 'manage_roles', 'view_audit_logs', 'view_dashboard',
+  ],
+  doctor: [
+    'view_patients', 'edit_patient',
+    'view_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status',
+    'view_medical_records', 'create_medical_record', 'edit_medical_record',
+    'view_prescriptions', 'create_prescription', 'cancel_prescription',
+    'view_lab_reports',
+  ],
+  nurse: [
+    'view_patients',
+    'view_appointments', 'update_appointment_status',
+    'view_medical_records',
+    'view_prescriptions',
+    'view_lab_reports',
+  ],
+  patient: [
+    'view_own_profile', 'edit_own_profile',
+    'view_own_appointments', 'create_appointment', 'cancel_appointment',
+    'view_own_medical_records',
+    'view_own_prescriptions',
+    'view_own_lab_reports',
+  ],
+  lab_technician: [
+    'view_patients',
+    'view_lab_reports', 'create_lab_report', 'edit_lab_report',
+  ],
+  pharmacist: [
+    'view_patients',
+    'view_prescriptions', 'dispense_prescription',
+  ],
+};
+
 /**
  * Get all permission names for a user (via their role assignments).
- * Results are cached in Redis to avoid hitting the DB on every request.
+ * Results are cached in Redis. Falls back to ROLE_PERMISSIONS_FALLBACK
+ * when the RBAC tables (roles, permissions, etc.) don't exist yet.
  */
 async function getUserPermissions(userId) {
   const cacheKey = `perms:${userId}`;
 
-  // Check cache first
   const cached = await redis.get(cacheKey);
   if (cached) {
     return JSON.parse(cached);
   }
 
-  // Try user_roles first (new system)
-  let result = await db.query(
-    `SELECT DISTINCT p.name
-     FROM user_roles ur
-     JOIN role_permissions rp ON rp.role_id = ur.role_id
-     JOIN permissions p ON p.id = rp.permission_id
-     WHERE ur.user_id = $1`,
-    [userId]
-  );
+  let permissions;
 
-  // Fallback: if no user_roles entry, resolve via users.role column
-  if (result.rows.length === 0) {
-    result = await db.query(
+  try {
+    // Try user_roles first (new RBAC system)
+    let result = await db.query(
       `SELECT DISTINCT p.name
-       FROM users u
-       JOIN roles r ON r.name = u.role::text
-       JOIN role_permissions rp ON rp.role_id = r.id
+       FROM user_roles ur
+       JOIN role_permissions rp ON rp.role_id = ur.role_id
        JOIN permissions p ON p.id = rp.permission_id
-       WHERE u.id = $1`,
+       WHERE ur.user_id = $1`,
       [userId]
     );
+
+    // Fallback: if no user_roles entry, resolve via users.role column
+    if (result.rows.length === 0) {
+      result = await db.query(
+        `SELECT DISTINCT p.name
+         FROM users u
+         JOIN roles r ON r.name = u.role::text
+         JOIN role_permissions rp ON rp.role_id = r.id
+         JOIN permissions p ON p.id = rp.permission_id
+         WHERE u.id = $1`,
+        [userId]
+      );
+    }
+
+    permissions = result.rows.map((r) => r.name);
+  } catch {
+    // RBAC tables don't exist yet — resolve from users.role column
+    const userResult = await db.query('SELECT role FROM users WHERE id = $1', [userId]);
+    const role = userResult.rows[0]?.role;
+    permissions = ROLE_PERMISSIONS_FALLBACK[role] || [];
   }
 
-  const permissions = result.rows.map((r) => r.name);
   await redis.set(cacheKey, JSON.stringify(permissions), 'EX', CACHE_TTL);
   return permissions;
 }
