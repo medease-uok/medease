@@ -1,4 +1,4 @@
-import { UserPlus, Calendar, FileText, Bell, Search, Pill, FlaskConical, Stethoscope, Users } from 'lucide-react'
+import { Calendar, FileText, Pill, FlaskConical, Stethoscope, Users } from 'lucide-react'
 
 const allActions = [
   {
