@@ -134,7 +134,8 @@ medease/
 │       │   ├── Appointments.jsx
 │       │   ├── MedicalRecords.jsx
 │       │   ├── Prescriptions.jsx
-│       │   └── LabReports.jsx
+│       │   ├── LabReports.jsx
+│       │   └── PermissionManagement.jsx  # Role & permission management (admin)
 │       ├── data/
 │       │   └── AuthContext.jsx # Auth state, login/logout/register
 │       ├── services/
@@ -317,7 +318,7 @@ const { requirePermission } = require('../middleware/authorize');
 router.post('/prescriptions', requirePermission('create_prescription'));
 ```
 
-Permissions are resolved from `user_roles` -> `role_permissions` -> `permissions` tables, cached in Redis for 5 minutes.
+Permissions are resolved from `user_roles` -> `role_permissions` -> `permissions` tables, cached in Redis for 5 minutes. Roles support **single-parent hierarchy** — a child role inherits all permissions from its parent chain.
 
 **Frontend route guards** (role-based):
 ```jsx
@@ -336,13 +337,14 @@ const { can, canAny } = usePermissions();
 ### Database Schema (RBAC)
 
 ```
-permissions          roles              user_roles
-├── id               ├── id             ├── user_id → users.id
-├── name             ├── name           └── role_id → roles.id
+permissions          roles                  user_roles
+├── id               ├── id                 ├── user_id → users.id
+├── name             ├── name               └── role_id → roles.id
 ├── description      ├── description
-├── category         ├── is_system      role_permissions
-└── created_at       └── created_at     ├── role_id → roles.id
-                                        └── permission_id → permissions.id
+├── category         ├── is_system          role_permissions
+└── created_at       ├── parent_role_id →   ├── role_id → roles.id
+                     │   roles.id (hierarchy)└── permission_id → permissions.id
+                     └── created_at
 ```
 
 26 permissions across 6 categories: `patients`, `appointments`, `medical_records`, `prescriptions`, `lab_reports`, `admin`.
