@@ -11,18 +11,6 @@ import {
   Activity
 } from 'lucide-react';
 
-/**
- * ✨ MODERNIZED SIDEBAR
- *
- * IMPROVEMENTS:
- * - Tailwind CSS styling (no separate CSS file needed)
- * - Modern icons from Lucide React
- * - Smooth hover effects and transitions
- * - Better visual hierarchy
- * - Gradient logo
- * - Active state with border indicator
- * - Role badge with color
- */
 
 const navConfig = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['patient', 'doctor', 'nurse', 'lab_technician', 'pharmacist', 'admin'] },
@@ -56,7 +44,6 @@ export default function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-slate-900 to-slate-800 text-white shadow-xl z-50 flex flex-col">
 
-      {/* ✨ BRAND SECTION with gradient */}
       <div className="p-6 border-b border-slate-700">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
@@ -69,7 +56,6 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* ✨ USER SECTION with avatar */}
       <div className="p-6 border-b border-slate-700">
         <div className="flex items-center gap-3">
           {/* Avatar */}
@@ -87,7 +73,6 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* ✨ NAVIGATION with icons */}
       <nav className="flex-1 p-4 overflow-y-auto">
         <div className="space-y-1">
           {links.map((item) => {
@@ -120,13 +105,6 @@ export default function Sidebar() {
         </div>
       </nav>
 
-      {/* ✨ FOOTER with version */}
-      <div className="p-4 border-t border-slate-700">
-        <div className="text-xs text-slate-400 text-center">
-          <p>Version 2.0</p>
-          <p className="text-primary">Modern UI ✨</p>
-        </div>
-      </div>
     </aside>
   );
 }

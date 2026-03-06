@@ -2,41 +2,17 @@ import { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
-/**
- * ✨ IMPROVEMENT: Animated Stats Card with Number Counting
- *
- * CHANGES FROM BASIC VERSION:
- * 1. ✅ Smooth number counting animation (0 → target value)
- * 2. ✅ Hover effect with scale and shadow
- * 3. ✅ Pulse animation on initial load
- * 4. ✅ Color-coded trend indicators
- * 5. ✅ Gradient background on hover
- * 6. ✅ Better accessibility with ARIA labels
- *
- * WHY THESE CHANGES:
- * - Number animation draws attention to metrics
- * - Hover effects improve interactivity
- * - Visual feedback enhances user engagement
- * - Makes dashboard feel more "alive" and modern
- */
-
 export function AnimatedStatsCard({ stat, index = 0 }) {
   const Icon = stat.icon
   const isPositive = stat.trend === 'up'
 
-  // State for animated number counting
   const [displayValue, setDisplayValue] = useState(0)
 
-  /**
-   * ✨ NUMBER COUNTING ANIMATION
-   * Animates from 0 to target value over 1 second
-   * Creates a "counting up" effect that's visually engaging
-   */
   useEffect(() => {
     let start = 0
     const end = stat.value
-    const duration = 1000 // 1 second
-    const increment = end / (duration / 16) // 60fps
+    const duration = 1000
+    const increment = end / (duration / 16)
 
     const timer = setInterval(() => {
       start += increment
@@ -61,11 +37,9 @@ export function AnimatedStatsCard({ stat, index = 0 }) {
         group
       "
       style={{
-        /* ✨ STAGGERED ANIMATION: Each card appears with a delay */
         animation: `fadeInUp 0.5s ease-out ${index * 0.1}s backwards`
       }}
     >
-      {/* ✨ GRADIENT OVERLAY: Subtle gradient that appears on hover */}
       <div className="
         absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent
         opacity-0 group-hover:opacity-100 transition-opacity duration-300
@@ -76,7 +50,6 @@ export function AnimatedStatsCard({ stat, index = 0 }) {
           {stat.label}
         </CardTitle>
 
-        {/* ✨ ICON WITH ROTATION EFFECT on hover */}
         <div className="
           p-2 rounded-lg bg-primary/10
           group-hover:bg-primary/20
@@ -91,12 +64,10 @@ export function AnimatedStatsCard({ stat, index = 0 }) {
       </CardHeader>
 
       <CardContent className="relative z-10">
-        {/* ✨ ANIMATED NUMBER with smooth counting */}
         <div className="text-3xl font-bold font-heading text-slate-900 mb-2">
           {displayValue.toLocaleString()}
         </div>
 
-        {/* ✨ TREND INDICATOR with color coding */}
         <div className="flex items-center gap-2">
           <div className={`
             flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
@@ -115,7 +86,6 @@ export function AnimatedStatsCard({ stat, index = 0 }) {
           <span className="text-xs text-slate-500">vs last month</span>
         </div>
 
-        {/* ✨ PROGRESS BAR showing percentage visually */}
         <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-1000 ease-out ${
@@ -129,7 +99,6 @@ export function AnimatedStatsCard({ stat, index = 0 }) {
         </div>
       </CardContent>
 
-      {/* ✨ SHINE EFFECT on hover (optional decorative element) */}
       <div className="
         absolute top-0 -left-full w-1/2 h-full
         bg-gradient-to-r from-transparent via-white/20 to-transparent
@@ -140,10 +109,6 @@ export function AnimatedStatsCard({ stat, index = 0 }) {
   )
 }
 
-/**
- * 💡 CSS ANIMATION KEYFRAMES
- * Add this to your global CSS or Tailwind config
- */
 const styles = `
   @keyframes fadeInUp {
     from {
@@ -157,7 +122,6 @@ const styles = `
   }
 `
 
-// Inject styles
 if (typeof document !== 'undefined') {
   const styleSheet = document.createElement("style")
   styleSheet.textContent = styles

@@ -1,15 +1,3 @@
-/**
- * ✨ ENHANCED PATIENTS PAGE
- *
- * IMPROVEMENTS:
- * - PatientCard components with avatars
- * - Modern grid layout
- * - Search and filter
- * - Add patient button
- * - Loading states
- * - Empty state
- */
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';

@@ -1,29 +1,8 @@
-import { User, Calendar, Droplet, Phone, Mail } from 'lucide-react'
+import { User, Calendar, Droplet, Phone } from 'lucide-react'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
 
-/**
- * ✨ IMPROVEMENT: Patient Card with Avatar & Rich Details
- *
- * CHANGES FROM BASIC VERSION:
- * 1. ✅ Avatar with fallback initials
- * 2. ✅ Rich patient information (ID, blood type, age, phone)
- * 3. ✅ Status badge (Active/Inactive)
- * 4. ✅ Last visit indicator
- * 5. ✅ Hover effect with border highlight
- * 6. ✅ Clickable with cursor pointer
- * 7. ✅ Icons for better visual scanning
- *
- * WHY THESE CHANGES:
- * - Avatar makes it more personal and professional
- * - Icons improve visual hierarchy and scanning
- * - Status badge provides quick status check
- * - Hover effect shows interactivity
- * - Complete info reduces need to click for details
- */
-
 export function PatientCard({ patient, onClick }) {
-  // Generate initials from name for avatar fallback
   const getInitials = (name) => {
     return name
       .split(' ')
@@ -33,7 +12,6 @@ export function PatientCard({ patient, onClick }) {
       .slice(0, 2)
   }
 
-  // Calculate days since last visit
   const getDaysSinceVisit = (date) => {
     const days = Math.floor((new Date() - new Date(date)) / (1000 * 60 * 60 * 24))
     if (days === 0) return 'Today'
@@ -54,7 +32,6 @@ export function PatientCard({ patient, onClick }) {
     >
       <CardContent className="p-6">
         <div className="flex items-start gap-4">
-          {/* ✨ AVATAR with gradient background and initials */}
           <div className="relative">
             {patient.avatarUrl ? (
               <img
@@ -74,7 +51,6 @@ export function PatientCard({ patient, onClick }) {
               </div>
             )}
 
-            {/* ✨ STATUS INDICATOR (green dot for active) */}
             {patient.status === 'active' && (
               <div className="
                 absolute bottom-0 right-0
@@ -85,9 +61,7 @@ export function PatientCard({ patient, onClick }) {
             )}
           </div>
 
-          {/* ✨ PATIENT INFO */}
           <div className="flex-1 min-w-0">
-            {/* Name & Status Badge */}
             <div className="flex items-start justify-between gap-2 mb-2">
               <div>
                 <h3 className="font-semibold text-lg text-slate-900 group-hover:text-primary transition-colors">
@@ -98,7 +72,6 @@ export function PatientCard({ patient, onClick }) {
                 </p>
               </div>
 
-              {/* ✨ STATUS BADGE */}
               <Badge
                 variant={patient.status === 'active' ? 'success' : 'secondary'}
                 className="text-xs"
@@ -107,9 +80,7 @@ export function PatientCard({ patient, onClick }) {
               </Badge>
             </div>
 
-            {/* ✨ PATIENT DETAILS GRID */}
             <div className="grid grid-cols-2 gap-3 text-sm">
-              {/* Blood Type */}
               {patient.bloodType && (
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded bg-red-50">
@@ -122,7 +93,6 @@ export function PatientCard({ patient, onClick }) {
                 </div>
               )}
 
-              {/* Age */}
               {patient.age && (
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded bg-blue-50">
@@ -135,7 +105,6 @@ export function PatientCard({ patient, onClick }) {
                 </div>
               )}
 
-              {/* Phone */}
               {patient.phone && (
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded bg-green-50">
@@ -150,7 +119,6 @@ export function PatientCard({ patient, onClick }) {
                 </div>
               )}
 
-              {/* Last Visit */}
               {patient.lastVisit && (
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded bg-purple-50">
@@ -166,7 +134,6 @@ export function PatientCard({ patient, onClick }) {
               )}
             </div>
 
-            {/* ✨ MEDICAL CONDITIONS (if any) */}
             {patient.conditions && patient.conditions.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1">
                 {patient.conditions.map((condition, idx) => (
@@ -186,7 +153,6 @@ export function PatientCard({ patient, onClick }) {
           </div>
         </div>
 
-        {/* ✨ HOVER INDICATOR */}
         <div className="
           mt-4 pt-3 border-t border-slate-100
           flex items-center justify-between
@@ -200,21 +166,3 @@ export function PatientCard({ patient, onClick }) {
     </Card>
   )
 }
-
-/**
- * 💡 USAGE EXAMPLE:
- *
- * <PatientCard
- *   patient={{
- *     id: 'PAT-001',
- *     name: 'John Doe',
- *     bloodType: 'O+',
- *     age: 45,
- *     phone: '+1 234 567 8900',
- *     status: 'active',
- *     lastVisit: '2024-03-01',
- *     conditions: ['Diabetes', 'Hypertension']
- *   }}
- *   onClick={(patient) => console.log('Clicked:', patient)}
- * />
- */

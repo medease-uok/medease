@@ -13,34 +13,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 
-// Icon mapping for every possible stat label the backend returns per role
 const iconMap = {
-  // admin
   'Total Patients': Users,
   'Total Doctors': Stethoscope,
   'Appointments Today': Calendar,
   'Active Prescriptions': Pill,
-  // doctor
-  'Total Patients': Users,
   'Lab Reports': FlaskConical,
-  // nurse
   'Medical Records': FileText,
-  'Completed Appointments': CheckCircle2,
-  // lab_technician
+  'Completed': CheckCircle2,
   'Total Reports': FlaskConical,
   'Patients Tested': Users,
   'Tests This Month': FlaskConical,
   'Pending Reviews': FileText,
-  // pharmacist
   'Dispensed': Pill,
   'Expired': Pill,
   'Total Medications': Pill,
-  // patient
   'My Appointments': Calendar,
   'My Prescriptions': Pill,
   'My Lab Reports': FlaskConical,
   'My Records': FileText,
-  // fallbacks
   'Appointments': Calendar,
   'Active Cases': Activity,
 };

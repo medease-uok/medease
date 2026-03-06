@@ -1,15 +1,5 @@
 import { Badge } from './ui/badge';
 
-/**
- * ✨ MODERNIZED STATUS BADGE
- *
- * IMPROVEMENTS:
- * - Uses shadcn/ui Badge component
- * - Consistent with design system
- * - Semantic color variants
- * - Better accessibility
- * - No separate CSS file needed
- */
 
 const statusVariants = {
   scheduled: 'default',

@@ -4,7 +4,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import RegisterEnhanced from './pages/RegisterEnhanced';
 import DashboardEnhanced from './pages/DashboardEnhanced';
-import PatientsEnhanced from './pages/PatientsEnhanced'; // ✨ NEW
+import PatientsEnhanced from './pages/PatientsEnhanced';
 import PatientDetail from './pages/PatientDetail';
 import Doctors from './pages/Doctors';
 import DoctorDetail from './pages/DoctorDetail';
@@ -14,25 +14,6 @@ import Prescriptions from './pages/Prescriptions';
 import LabReports from './pages/LabReports';
 import './App.css';
 
-/**
- * ✨ FULLY MODERNIZED APP
- *
- * UPDATED COMPONENTS:
- * ✅ Login - Modern with gradient
- * ✅ Sidebar - Icons, avatar, modern nav
- * ✅ Header - Search, notifications, user menu
- * ✅ Layout - Fixed positioning
- * ✅ Dashboard - Animated stats, quick actions, activity feed
- * ✅ Patients - Patient cards with avatars
- * ✅ StatusBadge - Consistent design system
- *
- * STILL USING ORIGINAL (can be enhanced later):
- * - Register, PatientDetail, Doctors, DoctorDetail
- * - Appointments, MedicalRecords, Prescriptions, LabReports
- * - AdminPanel
- *
- * These will work fine with the new layout!
- */
 
 function App() {
   return (

@@ -3,18 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
 import { Activity, Mail, Lock, AlertCircle } from 'lucide-react';
 
-/**
- * ✨ MODERNIZED LOGIN PAGE
- *
- * IMPROVEMENTS:
- * - Tailwind CSS styling (no CSS file needed)
- * - Modern healthcare gradient background
- * - Icons from Lucide React
- * - Better form styling
- * - Loading spinner
- * - Error message with icon
- * - Smooth animations
- */
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -45,7 +33,6 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-white to-cta/10 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* ✨ LOGIN CARD */}
         <div className="bg-white rounded-2xl shadow-2xl shadow-primary/20 overflow-hidden">
 
           {/* Header with gradient */}
@@ -63,7 +50,6 @@ export default function Login() {
 
           {/* Form Section */}
           <div className="p-8">
-            {/* ✨ ERROR MESSAGE */}
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />

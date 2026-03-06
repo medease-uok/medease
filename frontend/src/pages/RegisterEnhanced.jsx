@@ -19,19 +19,6 @@ import {
   ChevronLeft
 } from 'lucide-react';
 
-/**
- * ✨ MODERNIZED REGISTRATION PAGE
- *
- * IMPROVEMENTS:
- * - Beautiful Tailwind CSS styling
- * - Step indicator with progress bar
- * - Icons for all fields
- * - Modern gradient design
- * - Better error handling
- * - Password strength meter
- * - Smooth animations
- * - Responsive design
- */
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_CLOUDFLARE_SITE_KEY;
 
@@ -302,7 +289,6 @@ export default function RegisterEnhanced() {
             </div>
           ) : (
             <div className="p-8">
-              {/* ✨ STEP INDICATOR */}
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-2">
                   {stepLabels.map((label, i) => {
