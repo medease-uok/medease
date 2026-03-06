@@ -12,7 +12,6 @@ import Appointments from './pages/Appointments';
 import MedicalRecords from './pages/MedicalRecords';
 import Prescriptions from './pages/Prescriptions';
 import LabReports from './pages/LabReports';
-import AdminPanel from './pages/AdminPanel';
 import './App.css';
 
 function App() {
@@ -33,7 +32,6 @@ function App() {
             <Route path="medical-records" element={<MedicalRecords />} />
             <Route path="prescriptions" element={<Prescriptions />} />
             <Route path="lab-reports" element={<LabReports />} />
-            <Route path="admin" element={<AdminPanel />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

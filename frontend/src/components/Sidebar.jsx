@@ -10,7 +10,6 @@ const navConfig = [
   { path: '/medical-records', label: 'Medical Records', roles: ['patient', 'doctor', 'nurse', 'admin'] },
   { path: '/prescriptions', label: 'Prescriptions', roles: ['patient', 'doctor', 'pharmacist', 'admin'] },
   { path: '/lab-reports', label: 'Lab Reports', roles: ['patient', 'doctor', 'lab_technician', 'admin'] },
-  { path: '/admin', label: 'Admin Panel', roles: ['admin'] },
 ];
 
 export default function Sidebar() {
