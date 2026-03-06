@@ -184,4 +184,217 @@ const getStats = async (req, res, next) => {
   }
 };
 
-module.exports = { getStats };
+/**
+ * GET /dashboard/activity
+ * Returns a role-filtered combined activity feed (appointments, prescriptions,
+ * medical records, lab reports).  For admin, also includes audit-log entries.
+ */
+const getActivity = async (req, res, next) => {
+  try {
+    const { role, id: userId } = req.user;
+    const activities = [];
+
+    /* ───── helpers ───── */
+    const patientId = async () => {
+      const r = await db.query('SELECT id FROM patients WHERE user_id = $1', [userId]);
+      return r.rows[0]?.id;
+    };
+    const doctorId = async () => {
+      const r = await db.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+      return r.rows[0]?.id;
+    };
+
+    /* ───── 1. Appointments ───── */
+    {
+      const base = `
+        SELECT a.id, a.scheduled_at AS ts, a.status,
+               pu.first_name || ' ' || pu.last_name AS patient_name,
+               'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name,
+               a.notes
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        JOIN users pu ON p.user_id = pu.id
+        JOIN doctors d ON a.doctor_id = d.id
+        JOIN users du ON d.user_id = du.id`;
+
+      let q, params = [];
+      if (role === 'patient') {
+        const pid = await patientId();
+        if (pid) { q = `${base} WHERE a.patient_id = $1 ORDER BY a.scheduled_at DESC LIMIT 15`; params = [pid]; }
+      } else if (role === 'doctor') {
+        const did = await doctorId();
+        if (did) { q = `${base} WHERE a.doctor_id = $1 ORDER BY a.scheduled_at DESC LIMIT 15`; params = [did]; }
+      } else {
+        q = `${base} ORDER BY a.scheduled_at DESC LIMIT 15`;
+      }
+
+      if (q) {
+        const rows = (await db.query(q, params)).rows;
+        for (const r of rows) {
+          const typeMap = { scheduled: 'appointment-scheduled', completed: 'appointment-completed', cancelled: 'appointment-cancelled', in_progress: 'appointment-scheduled' };
+          activities.push({
+            id: `apt-${r.id}`,
+            type: typeMap[r.status] || 'appointment-scheduled',
+            user: r.doctor_name,
+            description: `${r.patient_name} — ${r.status} with ${r.doctor_name}`,
+            timestamp: r.ts,
+            details: r.notes || null,
+          });
+        }
+      }
+    }
+
+    /* ───── 2. Prescriptions ───── */
+    {
+      const base = `
+        SELECT pr.id, pr.created_at AS ts, pr.medication, pr.status,
+               pu.first_name || ' ' || pu.last_name AS patient_name,
+               'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
+        FROM prescriptions pr
+        JOIN patients p ON pr.patient_id = p.id
+        JOIN users pu ON p.user_id = pu.id
+        JOIN doctors d ON pr.doctor_id = d.id
+        JOIN users du ON d.user_id = du.id`;
+
+      let q, params = [];
+      if (role === 'patient') {
+        const pid = await patientId();
+        if (pid) { q = `${base} WHERE pr.patient_id = $1 ORDER BY pr.created_at DESC LIMIT 10`; params = [pid]; }
+      } else if (role === 'doctor') {
+        const did = await doctorId();
+        if (did) { q = `${base} WHERE pr.doctor_id = $1 ORDER BY pr.created_at DESC LIMIT 10`; params = [did]; }
+      } else if (role === 'pharmacist' || role === 'admin' || role === 'nurse') {
+        q = `${base} ORDER BY pr.created_at DESC LIMIT 10`;
+      }
+
+      if (q) {
+        const rows = (await db.query(q, params)).rows;
+        for (const r of rows) {
+          activities.push({
+            id: `rx-${r.id}`,
+            type: 'prescription',
+            user: r.doctor_name,
+            description: `${r.medication} prescribed to ${r.patient_name} (${r.status})`,
+            timestamp: r.ts,
+            details: null,
+          });
+        }
+      }
+    }
+
+    /* ───── 3. Medical Records ───── */
+    {
+      const base = `
+        SELECT mr.id, mr.created_at AS ts, mr.diagnosis,
+               pu.first_name || ' ' || pu.last_name AS patient_name,
+               'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
+        FROM medical_records mr
+        JOIN patients p ON mr.patient_id = p.id
+        JOIN users pu ON p.user_id = pu.id
+        JOIN doctors d ON mr.doctor_id = d.id
+        JOIN users du ON d.user_id = du.id`;
+
+      let q, params = [];
+      if (role === 'patient') {
+        const pid = await patientId();
+        if (pid) { q = `${base} WHERE mr.patient_id = $1 ORDER BY mr.created_at DESC LIMIT 10`; params = [pid]; }
+      } else if (role === 'doctor') {
+        const did = await doctorId();
+        if (did) { q = `${base} WHERE mr.doctor_id = $1 ORDER BY mr.created_at DESC LIMIT 10`; params = [did]; }
+      } else if (role === 'admin' || role === 'nurse') {
+        q = `${base} ORDER BY mr.created_at DESC LIMIT 10`;
+      }
+
+      if (q) {
+        const rows = (await db.query(q, params)).rows;
+        for (const r of rows) {
+          activities.push({
+            id: `mr-${r.id}`,
+            type: 'record-created',
+            user: r.doctor_name,
+            description: `Record created for ${r.patient_name}: ${r.diagnosis}`,
+            timestamp: r.ts,
+            details: null,
+          });
+        }
+      }
+    }
+
+    /* ───── 4. Lab Reports ───── */
+    {
+      const base = `
+        SELECT lr.id, lr.report_date AS ts, lr.test_name, lr.result,
+               pu.first_name || ' ' || pu.last_name AS patient_name,
+               COALESCE(tu.first_name || ' ' || tu.last_name, 'Lab') AS tech_name
+        FROM lab_reports lr
+        JOIN patients p ON lr.patient_id = p.id
+        JOIN users pu ON p.user_id = pu.id
+        LEFT JOIN users tu ON lr.technician_id = tu.id`;
+
+      let q, params = [];
+      if (role === 'patient') {
+        const pid = await patientId();
+        if (pid) { q = `${base} WHERE lr.patient_id = $1 ORDER BY lr.report_date DESC LIMIT 10`; params = [pid]; }
+      } else if (role === 'lab_technician') {
+        q = `${base} ORDER BY lr.report_date DESC LIMIT 10`;
+      } else if (role === 'doctor' || role === 'admin') {
+        q = `${base} ORDER BY lr.report_date DESC LIMIT 10`;
+      }
+
+      if (q) {
+        const rows = (await db.query(q, params)).rows;
+        for (const r of rows) {
+          activities.push({
+            id: `lr-${r.id}`,
+            type: 'lab-report',
+            user: r.tech_name,
+            description: `${r.test_name} for ${r.patient_name}: ${r.result || 'Pending'}`,
+            timestamp: r.ts,
+            details: null,
+          });
+        }
+      }
+    }
+
+    /* ───── 5. Audit logs (admin only) ───── */
+    if (role === 'admin') {
+      const rows = (await db.query(`
+        SELECT al.id, al.created_at AS ts, al.action, al.resource_type,
+               COALESCE(u.first_name || ' ' || u.last_name, 'System') AS user_name
+        FROM audit_logs al
+        LEFT JOIN users u ON al.user_id = u.id
+        ORDER BY al.created_at DESC LIMIT 15
+      `)).rows;
+
+      for (const r of rows) {
+        const actionLower = r.action.toLowerCase();
+        let type = 'audit';
+        if (actionLower.includes('login')) type = 'audit-login';
+        else if (actionLower.includes('logout')) type = 'audit-logout';
+        else if (actionLower.includes('approve') || actionLower.includes('reject') || actionLower.includes('role')) type = 'audit-admin';
+        else if (actionLower.includes('view') || actionLower.includes('read') || actionLower.includes('get')) type = 'audit-view';
+        else if (actionLower.includes('create') || actionLower.includes('register')) type = 'audit-create';
+        else if (actionLower.includes('update') || actionLower.includes('edit')) type = 'audit-update';
+        else if (actionLower.includes('delete') || actionLower.includes('remove')) type = 'audit-delete';
+
+        activities.push({
+          id: `audit-${r.id}`,
+          type,
+          user: r.user_name,
+          description: `${r.action.replace(/_/g, ' ')} (${r.resource_type})`,
+          timestamp: r.ts,
+          details: null,
+        });
+      }
+    }
+
+    /* Sort everything by timestamp descending and limit */
+    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    res.json({ status: 'success', data: activities.slice(0, 20) });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getStats, getActivity };

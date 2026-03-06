@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
-import './Login.css';
+import { Activity, Mail, Lock, AlertCircle } from 'lucide-react';
+
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -30,42 +31,125 @@ export default function Login() {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="login-brand">
-          <span className="login-logo">+</span>
-          <h1 className="login-title">MedEase</h1>
-          <p className="login-subtitle">Hospital Management System</p>
-        </div>
-        {error && <div className="register-error">{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <div className="login-field">
-            <label className="login-label">Email</label>
-            <input
-              type="email"
-              className="login-input"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setError(''); }}
-            />
+    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-white to-cta/10 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-2xl shadow-2xl shadow-primary/20 overflow-hidden">
+
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-primary to-cta p-8 text-center">
+            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <Activity className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white font-heading mb-2">
+              MedEase
+            </h1>
+            <p className="text-white/90 text-sm">
+              Hospital Management System
+            </p>
           </div>
-          <div className="login-field">
-            <label className="login-label">Password</label>
-            <input
-              type="password"
-              className="login-input"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setError(''); }}
-            />
+
+          {/* Form Section */}
+          <div className="p-8">
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Email Field */}
+              <div>
+                <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    id="login-email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    placeholder="Enter your email"
+                    className="
+                      w-full pl-11 pr-4 py-3
+                      border border-slate-300 rounded-lg
+                      focus:ring-2 focus:ring-primary focus:border-transparent
+                      transition-all
+                      placeholder:text-slate-400
+                    "
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div>
+                <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    id="login-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    placeholder="Enter your password"
+                    className="
+                      w-full pl-11 pr-4 py-3
+                      border border-slate-300 rounded-lg
+                      focus:ring-2 focus:ring-primary focus:border-transparent
+                      transition-all
+                      placeholder:text-slate-400
+                    "
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="
+                  w-full py-3 px-4
+                  bg-gradient-to-r from-primary to-cta
+                  text-white font-semibold rounded-lg
+                  hover:shadow-lg hover:shadow-primary/30
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  transition-all duration-300
+                  flex items-center justify-center gap-2
+                "
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </button>
+            </form>
+
+            {/* Footer */}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-slate-600">
+                Don't have an account?{' '}
+                <Link
+                  to="/register"
+                  className="text-primary hover:text-primary/80 font-semibold transition-colors"
+                >
+                  Create Account
+                </Link>
+              </p>
+            </div>
           </div>
-          <button type="submit" className="login-button" disabled={loading}>
-            {loading ? 'Signing In...' : 'Sign In'}
-          </button>
-        </form>
-        <div className="register-footer">
-          Don't have an account? <Link to="/register">Create Account</Link>
         </div>
+
       </div>
     </div>
   );
