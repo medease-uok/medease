@@ -269,15 +269,15 @@ export default function DashboardEnhanced() {
       <QuickActions onActionClick={handleQuickAction} role={role} />
 
       {/* MAIN CONTENT GRID */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 items-stretch">
         {/* Recent Appointments (role-specific columns) */}
-        <div className="lg:col-span-2">
-          <Card className="hover:shadow-lg transition-shadow duration-300">
+        <div className="lg:col-span-2 h-full">
+          <Card className="h-full flex flex-col hover:shadow-lg transition-shadow duration-300">
             <CardHeader>
               <CardTitle>{tableConfig.title}</CardTitle>
               <CardDescription>{tableConfig.subtitle}</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1">
               <div className="rounded-md border border-slate-200">
                 <Table>
                   <TableHeader>
@@ -316,7 +316,7 @@ export default function DashboardEnhanced() {
         </div>
 
         {/* Activity Feed (real role-filtered data from API) */}
-        <div>
+        <div className="h-full">
           <ActivityFeed activities={activityData} maxItems={8} />
         </div>
       </div>

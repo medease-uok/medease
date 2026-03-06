@@ -116,7 +116,7 @@ export function ActivityFeed({ activities = [], maxItems = 10 }) {
   const displayActivities = activities.slice(0, maxItems)
 
   return (
-    <Card className="h-full">
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -135,7 +135,7 @@ export function ActivityFeed({ activities = [], maxItems = 10 }) {
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="flex-1 overflow-y-auto">
         {displayActivities.length === 0 ? (
           <div className="text-center py-8">
             <Clock className="w-10 h-10 text-slate-300 mx-auto mb-3" />
