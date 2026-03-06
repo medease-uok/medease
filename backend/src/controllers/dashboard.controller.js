@@ -367,9 +367,19 @@ const getActivity = async (req, res, next) => {
       `)).rows;
 
       for (const r of rows) {
+        const actionLower = r.action.toLowerCase();
+        let type = 'audit';
+        if (actionLower.includes('login')) type = 'audit-login';
+        else if (actionLower.includes('logout')) type = 'audit-logout';
+        else if (actionLower.includes('approve') || actionLower.includes('reject') || actionLower.includes('role')) type = 'audit-admin';
+        else if (actionLower.includes('view') || actionLower.includes('read') || actionLower.includes('get')) type = 'audit-view';
+        else if (actionLower.includes('create') || actionLower.includes('register')) type = 'audit-create';
+        else if (actionLower.includes('update') || actionLower.includes('edit')) type = 'audit-update';
+        else if (actionLower.includes('delete') || actionLower.includes('remove')) type = 'audit-delete';
+
         activities.push({
           id: `audit-${r.id}`,
-          type: 'audit',
+          type,
           user: r.user_name,
           description: `${r.action.replace(/_/g, ' ')} (${r.resource_type})`,
           timestamp: r.ts,

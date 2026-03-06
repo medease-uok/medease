@@ -1,4 +1,7 @@
-import { UserPlus, Calendar, FileText, AlertCircle, CheckCircle, Clock, Pill, FlaskConical, Shield } from 'lucide-react'
+import {
+  UserPlus, Calendar, FileText, AlertCircle, CheckCircle, Clock,
+  Pill, FlaskConical, Shield, LogIn, LogOut, UserCog, Eye, Pencil, Trash2,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card'
 
 const activityConfig = {
@@ -49,6 +52,48 @@ const activityConfig = {
     color: 'text-slate-600',
     bgColor: 'bg-slate-100',
     label: 'Audit'
+  },
+  'audit-login': {
+    icon: LogIn,
+    color: 'text-cyan-600',
+    bgColor: 'bg-cyan-100',
+    label: 'Login'
+  },
+  'audit-logout': {
+    icon: LogOut,
+    color: 'text-gray-600',
+    bgColor: 'bg-gray-100',
+    label: 'Logout'
+  },
+  'audit-admin': {
+    icon: UserCog,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100',
+    label: 'Admin'
+  },
+  'audit-view': {
+    icon: Eye,
+    color: 'text-sky-600',
+    bgColor: 'bg-sky-100',
+    label: 'Viewed'
+  },
+  'audit-create': {
+    icon: UserPlus,
+    color: 'text-green-600',
+    bgColor: 'bg-green-100',
+    label: 'Created'
+  },
+  'audit-update': {
+    icon: Pencil,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-100',
+    label: 'Updated'
+  },
+  'audit-delete': {
+    icon: Trash2,
+    color: 'text-red-600',
+    bgColor: 'bg-red-100',
+    label: 'Deleted'
   },
 }
 
