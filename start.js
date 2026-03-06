@@ -45,20 +45,37 @@ function waitForDB(maxAttempts = 30) {
         `docker exec ${DB_CONTAINER} pg_isready -U ${DB_USER} -d ${DB_NAME}`,
         { stdio: 'pipe' }
       );
-      // Also check that the roles table exists (schema init complete)
+      // Check that core schema exists (users table from 01-init.sql)
       execSync(
-        `docker exec ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc "SELECT 1 FROM roles LIMIT 1"`,
+        `docker exec ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc "SELECT 1 FROM users LIMIT 1"`,
         { stdio: 'pipe' }
       );
-      return;
+      break;
     } catch {
       if (i < maxAttempts - 1) {
         execSync('sleep 2');
+      } else {
+        console.error('Error: Database did not become ready in time.');
+        process.exit(1);
       }
     }
   }
-  console.error('Error: Database did not become ready in time.');
-  process.exit(1);
+
+  // Ensure RBAC tables exist (may be missing if DB was created before 02-roles-permissions.sql)
+  try {
+    execSync(
+      `docker exec ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc "SELECT 1 FROM roles LIMIT 1"`,
+      { stdio: 'pipe' }
+    );
+  } catch {
+    console.log('RBAC tables not found — applying roles & permissions schema...');
+    const sqlFile = '/docker-entrypoint-initdb.d/02-roles-permissions.sql';
+    execSync(
+      `docker exec ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -f ${sqlFile}`,
+      { stdio: 'inherit' }
+    );
+    console.log('RBAC schema applied successfully.');
+  }
 }
 
 function createAdminUser({ firstName, lastName, email, phone, password }) {
@@ -198,16 +215,14 @@ async function main() {
   console.log('Starting all services...');
   console.log();
 
-  const args = ['compose', ...profileArgs, 'up', '--build', ...process.argv.slice(2)];
+  // Start services in detached mode, ensure DB is ready, then attach
+  execSync(`docker compose ${profileArgs.join(' ')} up --build -d`, { stdio: 'inherit', shell: true });
 
-  // If we need to create an admin, start in detached mode first, create admin, then attach
+  console.log();
+  console.log('Waiting for database to be ready...');
+  waitForDB();
+
   if (adminDetails) {
-    execSync(`docker compose up --build -d`, { stdio: 'inherit', shell: true });
-
-    console.log();
-    console.log('Waiting for database to be ready...');
-    waitForDB();
-
     console.log('Creating admin user...');
     createAdminUser(adminDetails);
     console.log();
@@ -215,25 +230,20 @@ async function main() {
     console.log(`  Email: ${adminDetails.email}`);
     console.log('  Role:  admin (active, no approval needed)');
     console.log();
-
-    // Now attach to logs (or exit if -d was passed)
-    if (process.argv.slice(2).includes('-d')) {
-      console.log('Services running in background.');
-      process.exit(0);
-    }
-
-    const child = spawn('docker', ['compose', 'logs', '-f'], { stdio: 'inherit', shell: true });
-    for (const sig of ['SIGINT', 'SIGTERM']) {
-      process.on(sig, () => child.kill(sig));
-    }
-    child.on('close', (code) => process.exit(code ?? 0));
-  } else {
-    const child = spawn('docker', args, { stdio: 'inherit', shell: true });
-    for (const sig of ['SIGINT', 'SIGTERM']) {
-      process.on(sig, () => child.kill(sig));
-    }
-    child.on('close', (code) => process.exit(code ?? 1));
   }
+
+  // Exit if detached mode was requested
+  if (process.argv.slice(2).includes('-d')) {
+    console.log('Services running in background.');
+    process.exit(0);
+  }
+
+  // Attach to logs
+  const child = spawn('docker', ['compose', 'logs', '-f'], { stdio: 'inherit', shell: true });
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.on(sig, () => child.kill(sig));
+  }
+  child.on('close', (code) => process.exit(code ?? 0));
 }
 
 main().catch((err) => {

@@ -360,6 +360,7 @@ const getActivity = async (req, res, next) => {
     if (role === 'admin') {
       const rows = (await db.query(`
         SELECT al.id, al.created_at AS ts, al.action, al.resource_type,
+               al.ip_address,
                COALESCE(u.first_name || ' ' || u.last_name, 'System') AS user_name
         FROM audit_logs al
         LEFT JOIN users u ON al.user_id = u.id
@@ -377,13 +378,15 @@ const getActivity = async (req, res, next) => {
         else if (actionLower.includes('update') || actionLower.includes('edit')) type = 'audit-update';
         else if (actionLower.includes('delete') || actionLower.includes('remove')) type = 'audit-delete';
 
+        const ip = r.ip_address ? `IP: ${r.ip_address}` : null;
+
         activities.push({
           id: `audit-${r.id}`,
           type,
           user: r.user_name,
           description: `${r.action.replace(/_/g, ' ')} (${r.resource_type})`,
           timestamp: r.ts,
-          details: null,
+          details: ip,
         });
       }
     }
