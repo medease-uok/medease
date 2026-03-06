@@ -1,72 +1,75 @@
-import { Plus, UserPlus, Calendar, FileText, Bell, Search } from 'lucide-react'
+import { UserPlus, Calendar, FileText, Bell, Search, Pill, FlaskConical, Stethoscope, Users } from 'lucide-react'
 
-/**
- * ✨ IMPROVEMENT: Quick Actions Floating Menu
- *
- * CHANGES FROM BASIC VERSION:
- * 1. ✅ Floating action buttons for common tasks
- * 2. ✅ Icon + label for clarity
- * 3. ✅ Hover effects with scale and color change
- * 4. ✅ Keyboard accessible
- * 5. ✅ Tooltips for guidance
- * 6. ✅ Grid layout for organization
- *
- * WHY THESE CHANGES:
- * - Quick access to common actions saves time
- * - Visual icons help quick recognition
- * - Reduces clicks to perform tasks
- * - Improves workflow efficiency for staff
- * - Modern, app-like experience
- */
-
-const quickActions = [
+const allActions = [
   {
     id: 'new-appointment',
-    label: 'New Appointment',
+    label: 'Appointments',
     icon: Calendar,
     color: 'from-blue-500 to-blue-600',
     hoverColor: 'hover:from-blue-600 hover:to-blue-700',
-    description: 'Schedule a new appointment'
+    description: 'View appointments',
+    path: '/appointments',
+    roles: ['patient', 'doctor', 'nurse', 'admin'],
   },
   {
-    id: 'add-patient',
-    label: 'Add Patient',
-    icon: UserPlus,
+    id: 'patients',
+    label: 'Patients',
+    icon: Users,
     color: 'from-green-500 to-green-600',
     hoverColor: 'hover:from-green-600 hover:to-green-700',
-    description: 'Register a new patient'
+    description: 'View patients',
+    path: '/patients',
+    roles: ['doctor', 'nurse', 'admin'],
   },
   {
-    id: 'new-record',
-    label: 'New Record',
+    id: 'doctors',
+    label: 'Doctors',
+    icon: Stethoscope,
+    color: 'from-teal-500 to-teal-600',
+    hoverColor: 'hover:from-teal-600 hover:to-teal-700',
+    description: 'View doctors',
+    path: '/doctors',
+    roles: ['patient', 'admin'],
+  },
+  {
+    id: 'medical-records',
+    label: 'Records',
     icon: FileText,
     color: 'from-purple-500 to-purple-600',
     hoverColor: 'hover:from-purple-600 hover:to-purple-700',
-    description: 'Create medical record'
+    description: 'Medical records',
+    path: '/medical-records',
+    roles: ['patient', 'doctor', 'nurse', 'admin'],
   },
   {
-    id: 'search',
-    label: 'Search',
-    icon: Search,
+    id: 'prescriptions',
+    label: 'Prescriptions',
+    icon: Pill,
     color: 'from-orange-500 to-orange-600',
     hoverColor: 'hover:from-orange-600 hover:to-orange-700',
-    description: 'Search patients or records'
+    description: 'View prescriptions',
+    path: '/prescriptions',
+    roles: ['patient', 'doctor', 'pharmacist', 'admin'],
   },
   {
-    id: 'notifications',
-    label: 'Notifications',
-    icon: Bell,
+    id: 'lab-reports',
+    label: 'Lab Reports',
+    icon: FlaskConical,
     color: 'from-pink-500 to-pink-600',
     hoverColor: 'hover:from-pink-600 hover:to-pink-700',
-    description: 'View all notifications',
-    badge: 5 // Number of unread notifications
-  }
+    description: 'View lab reports',
+    path: '/lab-reports',
+    roles: ['patient', 'doctor', 'lab_technician', 'admin'],
+  },
 ]
 
-export function QuickActions({ onActionClick }) {
+export function QuickActions({ onActionClick, role }) {
+  const actions = role
+    ? allActions.filter((a) => a.roles.includes(role))
+    : allActions;
+
   return (
     <div className="w-full">
-      {/* ✨ SECTION HEADER */}
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-slate-900 font-heading">
           Quick Actions
@@ -76,15 +79,14 @@ export function QuickActions({ onActionClick }) {
         </p>
       </div>
 
-      {/* ✨ ACTIONS GRID */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {quickActions.map((action) => {
+      <div className={`grid grid-cols-2 md:grid-cols-3 ${actions.length > 4 ? 'lg:grid-cols-6' : `lg:grid-cols-${actions.length}`} gap-4`}>
+        {actions.map((action) => {
           const Icon = action.icon
 
           return (
             <button
               key={action.id}
-              onClick={() => onActionClick && onActionClick(action.id)}
+              onClick={() => onActionClick && onActionClick(action.id, action.path)}
               className="
                 group relative
                 flex flex-col items-center justify-center
@@ -98,7 +100,6 @@ export function QuickActions({ onActionClick }) {
               "
               aria-label={action.description}
             >
-              {/* ✨ ICON with gradient background */}
               <div className={`
                 relative
                 w-12 h-12 rounded-full
@@ -110,23 +111,8 @@ export function QuickActions({ onActionClick }) {
                 ${action.hoverColor}
               `}>
                 <Icon className="w-6 h-6 text-white" />
-
-                {/* ✨ NOTIFICATION BADGE (if present) */}
-                {action.badge && (
-                  <div className="
-                    absolute -top-1 -right-1
-                    w-5 h-5 rounded-full
-                    bg-red-500 text-white
-                    flex items-center justify-center
-                    text-xs font-bold
-                    animate-pulse
-                  ">
-                    {action.badge}
-                  </div>
-                )}
               </div>
 
-              {/* ✨ LABEL */}
               <span className="
                 text-sm font-medium text-slate-700
                 group-hover:text-slate-900
@@ -136,7 +122,6 @@ export function QuickActions({ onActionClick }) {
                 {action.label}
               </span>
 
-              {/* ✨ HOVER EFFECT - Shine animation */}
               <div className="
                 absolute inset-0 rounded-xl
                 bg-gradient-to-r from-transparent via-white/40 to-transparent
@@ -149,25 +134,6 @@ export function QuickActions({ onActionClick }) {
           )
         })}
       </div>
-
     </div>
   )
 }
-
-/**
- * 💡 USAGE EXAMPLE:
- *
- * <QuickActions
- *   onActionClick={(actionId) => {
- *     switch(actionId) {
- *       case 'new-appointment':
- *         // Open appointment modal
- *         break
- *       case 'add-patient':
- *         // Open patient form
- *         break
- *       // ... handle other actions
- *     }
- *   }}
- * />
- */

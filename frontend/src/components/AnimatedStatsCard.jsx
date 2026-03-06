@@ -110,7 +110,7 @@ export function AnimatedStatsCard({ stat, index = 0 }) {
             ) : (
               <TrendingDown className="w-3 h-3" aria-label="Trending down" />
             )}
-            <span>{Math.abs(stat.change)}%</span>
+            <span>{Math.abs(stat.change).toFixed(1)}%</span>
           </div>
           <span className="text-xs text-slate-500">vs last month</span>
         </div>

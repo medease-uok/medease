@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Users, Calendar, FileText, Activity, CheckCircle2, XCircle, Shield, ClipboardList, UserCheck, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Users, Calendar, FileText, Activity, Stethoscope, Pill, FlaskConical,
+  CheckCircle2, XCircle, Shield, ClipboardList, UserCheck, AlertTriangle,
+} from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
 import { AnimatedStatsCard } from '../components/AnimatedStatsCard';
@@ -9,27 +13,68 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 
-// Icon mapping for stats
+// Icon mapping for every possible stat label the backend returns per role
 const iconMap = {
+  // admin
   'Total Patients': Users,
-  'Appointments': Calendar,
+  'Total Doctors': Stethoscope,
+  'Appointments Today': Calendar,
+  'Active Prescriptions': Pill,
+  // doctor
+  'Total Patients': Users,
+  'Lab Reports': FlaskConical,
+  // nurse
   'Medical Records': FileText,
+  'Completed Appointments': CheckCircle2,
+  // lab_technician
+  'Total Reports': FlaskConical,
+  'Patients Tested': Users,
+  'Tests This Month': FlaskConical,
+  'Pending Reviews': FileText,
+  // pharmacist
+  'Dispensed': Pill,
+  'Expired': Pill,
+  'Total Medications': Pill,
+  // patient
+  'My Appointments': Calendar,
+  'My Prescriptions': Pill,
+  'My Lab Reports': FlaskConical,
+  'My Records': FileText,
+  // fallbacks
+  'Appointments': Calendar,
   'Active Cases': Activity,
 };
 
-// Format date helper
+const roleGreetings = {
+  admin: 'System overview at a glance.',
+  doctor: "Here's your clinical overview for today.",
+  nurse: "Here's your patient care overview.",
+  patient: "Here's your health summary.",
+  lab_technician: "Here's your laboratory overview.",
+  pharmacist: "Here's your pharmacy overview.",
+};
+
 const formatDate = (iso) => {
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-// Status Badge Component
-function StatusBadge({ status }) {
+function AppointmentStatusBadge({ status }) {
   const variants = {
     scheduled: 'default',
     completed: 'success',
     cancelled: 'destructive',
     pending: 'warning',
+  };
+  return (
+    <Badge variant={variants[status] || 'default'}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </Badge>
+  );
+}
+
+function RoleBadge({ status }) {
+  const variants = {
     patient: 'default',
     doctor: 'success',
     nurse: 'warning',
@@ -37,7 +82,6 @@ function StatusBadge({ status }) {
     pharmacist: 'default',
     admin: 'destructive',
   };
-
   return (
     <Badge variant={variants[status] || 'default'}>
       {status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
@@ -75,11 +119,36 @@ const adminTabs = [
   { id: 'logs', label: 'Audit Logs', icon: ClipboardList },
 ];
 
+// Appointment table column config per role
+const appointmentTableConfig = {
+  patient: {
+    title: 'My Appointments',
+    subtitle: 'Your upcoming and recent appointments',
+    columns: ['Doctor', 'Date', 'Status'],
+    render: (apt) => [apt.doctorName, formatDate(apt.scheduledAt), <AppointmentStatusBadge key="s" status={apt.status} />],
+  },
+  doctor: {
+    title: 'My Patient Appointments',
+    subtitle: 'Recent appointments with your patients',
+    columns: ['Patient', 'Date', 'Status'],
+    render: (apt) => [apt.patientName, formatDate(apt.scheduledAt), <AppointmentStatusBadge key="s" status={apt.status} />],
+  },
+  default: {
+    title: 'Recent Appointments',
+    subtitle: 'Latest scheduled appointments in the system',
+    columns: ['Patient', 'Doctor', 'Date', 'Status'],
+    render: (apt) => [apt.patientName, apt.doctorName, formatDate(apt.scheduledAt), <AppointmentStatusBadge key="s" status={apt.status} />],
+  },
+};
+
 export default function DashboardEnhanced() {
   const { currentUser } = useAuth();
-  const isAdmin = currentUser?.role === 'admin';
+  const navigate = useNavigate();
+  const role = currentUser?.role || 'patient';
+  const isAdmin = role === 'admin';
 
   const [dashData, setDashData] = useState(null);
+  const [activityData, setActivityData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Admin state
@@ -91,22 +160,31 @@ export default function DashboardEnhanced() {
   const [adminSearch, setAdminSearch] = useState('');
 
   useEffect(() => {
-    api.get('/dashboard/stats')
-      .then((res) => {
-        const transformedStats = res.data.stats.map((stat) => ({
+    const fetchStats = api.get('/dashboard/stats').then((statsRes) => {
+      const transformedStats = statsRes.data.stats.map((stat) => {
+        const change = stat.change ?? +(Math.random() * 20 - 5).toFixed(1);
+        return {
           ...stat,
           icon: iconMap[stat.label] || Activity,
-          change: stat.change || Math.random() * 20 - 5,
-          trend: (stat.change || Math.random() * 20 - 5) > 0 ? 'up' : 'down'
-        }));
-        setDashData({ ...res.data, stats: transformedStats });
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+          change,
+          trend: change > 0 ? 'up' : 'down',
+        };
+      });
+      setDashData({ ...statsRes.data, stats: transformedStats });
+    }).catch(console.error);
+
+    const fetchActivity = api.get('/dashboard/activity').then((activityRes) => {
+      setActivityData(activityRes.data || []);
+    }).catch(console.error);
+
+    Promise.allSettled([fetchStats, fetchActivity]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin) {
+      setAdminLoading(false);
+      return;
+    }
     Promise.all([
       api.get('/admin/users/pending'),
       api.get('/admin/users'),
@@ -139,9 +217,8 @@ export default function DashboardEnhanced() {
     }
   };
 
-  const handleQuickAction = (actionId) => {
-    console.log('Quick action:', actionId);
-    alert(`Action "${actionId}" clicked!\nIn production, this would navigate to the appropriate form.`);
+  const handleQuickAction = (_actionId, path) => {
+    if (path) navigate(path);
   };
 
   if (loading) {
@@ -168,7 +245,9 @@ export default function DashboardEnhanced() {
 
   const { stats, recentAppointments } = dashData;
 
-  // Filter admin data by search
+  const tableConfig = appointmentTableConfig[role] || appointmentTableConfig.default;
+
+  // Admin search filters
   const filteredUsers = activeUsers.filter((u) =>
     `${u.firstName} ${u.lastName} ${u.email} ${u.role}`.toLowerCase().includes(adminSearch.toLowerCase())
   );
@@ -181,10 +260,10 @@ export default function DashboardEnhanced() {
       {/* PAGE HEADER */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-          Dashboard
+          Welcome, {currentUser?.firstName || 'User'}
         </h1>
         <p className="text-slate-500 mt-1">
-          Welcome back! Here's an overview of your hospital management system.
+          {roleGreetings[role] || 'Welcome to your dashboard.'}
         </p>
       </div>
 
@@ -195,43 +274,45 @@ export default function DashboardEnhanced() {
         ))}
       </div>
 
-      {/* QUICK ACTIONS */}
-      <QuickActions onActionClick={handleQuickAction} />
+      {/* QUICK ACTIONS (role-filtered) */}
+      <QuickActions onActionClick={handleQuickAction} role={role} />
 
       {/* MAIN CONTENT GRID */}
       <div className="grid gap-6 lg:grid-cols-3">
+        {/* Recent Appointments (role-specific columns) */}
         <div className="lg:col-span-2">
           <Card className="hover:shadow-lg transition-shadow duration-300">
             <CardHeader>
-              <CardTitle>Recent Appointments</CardTitle>
-              <CardDescription>Latest scheduled appointments in the system</CardDescription>
+              <CardTitle>{tableConfig.title}</CardTitle>
+              <CardDescription>{tableConfig.subtitle}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border border-slate-200">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Patient</TableHead>
-                      <TableHead>Doctor</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Status</TableHead>
+                      {tableConfig.columns.map((col) => (
+                        <TableHead key={col}>{col}</TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {recentAppointments && recentAppointments.length > 0 ? (
-                      recentAppointments.map((appointment, idx) => (
-                        <TableRow key={appointment.id || idx} className="cursor-pointer">
-                          <TableCell className="font-medium">{appointment.patientName}</TableCell>
-                          <TableCell>{appointment.doctorName}</TableCell>
-                          <TableCell>{formatDate(appointment.scheduledAt)}</TableCell>
-                          <TableCell>
-                            <StatusBadge status={appointment.status} />
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      recentAppointments.map((apt, idx) => {
+                        const cells = tableConfig.render(apt);
+                        return (
+                          <TableRow key={apt.id || idx}>
+                            {cells.map((cell, i) => (
+                              <TableCell key={i} className={i === 0 ? 'font-medium' : ''}>
+                                {cell}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        );
+                      })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center text-slate-500">
+                        <TableCell colSpan={tableConfig.columns.length} className="h-24 text-center text-slate-500">
                           No appointments found
                         </TableCell>
                       </TableRow>
@@ -242,8 +323,10 @@ export default function DashboardEnhanced() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Activity Feed (real role-filtered data from API) */}
         <div>
-          <ActivityFeed maxItems={5} />
+          <ActivityFeed activities={activityData} maxItems={8} />
         </div>
       </div>
 
@@ -323,7 +406,7 @@ export default function DashboardEnhanced() {
                             <TableRow key={user.id || idx}>
                               <TableCell className="font-medium">{user.firstName} {user.lastName}</TableCell>
                               <TableCell>{user.email}</TableCell>
-                              <TableCell><StatusBadge status={user.role} /></TableCell>
+                              <TableCell><RoleBadge status={user.role} /></TableCell>
                               <TableCell>{user.phone || '-'}</TableCell>
                             </TableRow>
                           ))
@@ -356,7 +439,7 @@ export default function DashboardEnhanced() {
                               <p className="font-semibold text-slate-900">{user.firstName} {user.lastName}</p>
                               <p className="text-sm text-slate-500 mt-0.5">{user.email} &middot; {user.phone || 'No phone'}</p>
                             </div>
-                            <StatusBadge status={user.role} />
+                            <RoleBadge status={user.role} />
                           </div>
                           <div className="p-5">
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Registration Details</p>
