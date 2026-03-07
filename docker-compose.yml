@@ -64,15 +64,15 @@ services:
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       LOG_LEVEL: debug
-      SMTP_HOST: smtp.gmail.com
-      SMTP_PORT: 587
-      SMTP_SECURE: "false"
-      SMTP_USER: medeaseuok@gmail.com
-      SMTP_PASS: pobjgziicimnqdpy
-      SMTP_FROM: "MedEase <medeaseuok@gmail.com>"
-      FRONTEND_URL: http://localhost:3000
-      OTP_TTL_SECONDS: 600
-      OTP_MAX_ATTEMPTS: 3
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-600}
+      OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-3}
     volumes:
       - ./backend/src:/app/src
     depends_on:
