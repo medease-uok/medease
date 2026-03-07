@@ -133,3 +133,52 @@
   background: var(--color-bg);
   color: var(--color-text-primary);
 }
+
+/* ── Email-not-verified notice ── */
+.verify-email-notice {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #5d4037;
+  line-height: 1.5;
+}
+
+.verify-email-notice p {
+  margin: 0 0 8px 0;
+}
+
+.verify-email-notice p:last-child {
+  margin-bottom: 0;
+}
+
+.resend-btn {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.resend-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.resend-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.resend-success {
+  color: #2e7d32;
+  font-weight: 600;
+  margin-top: 8px;
+}

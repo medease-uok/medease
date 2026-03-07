@@ -118,4 +118,55 @@ const verifyOtpValidation = [
     .matches(/^\d{6}$/).withMessage('Verification code must be a 6-digit number.'),
 ];
 
-module.exports = { registerValidation, loginValidation, verifyOtpValidation };
+const forgotPasswordValidation = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required.')
+    .isEmail().withMessage('Please enter a valid email address.')
+    .normalizeEmail(),
+];
+
+const verifyResetOtpValidation = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required.')
+    .isEmail().withMessage('Please enter a valid email address.')
+    .normalizeEmail(),
+  body('otp')
+    .trim()
+    .notEmpty().withMessage('Reset code is required.')
+    .matches(/^\d{6}$/).withMessage('Reset code must be a 6-digit number.'),
+];
+
+const resetPasswordValidation = [
+  body('userId')
+    .notEmpty().withMessage('User ID is required.'),
+  body('resetToken')
+    .notEmpty().withMessage('Reset token is required.'),
+  body('newPassword')
+    .notEmpty().withMessage('New password is required.')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters.')
+    .isStrongPassword({
+      minLowercase: 1,
+      minUppercase: 1,
+      minNumbers: 1,
+      minSymbols: 1,
+    }).withMessage('Password must include uppercase, lowercase, number, and special character.'),
+  body('confirmPassword')
+    .notEmpty().withMessage('Please confirm your password.')
+    .custom((value, { req }) => {
+      if (value !== req.body.newPassword) {
+        throw new Error('Passwords do not match.');
+      }
+      return true;
+    }),
+];
+
+module.exports = {
+  registerValidation,
+  loginValidation,
+  verifyOtpValidation,
+  forgotPasswordValidation,
+  verifyResetOtpValidation,
+  resetPasswordValidation,
+};

@@ -37,7 +37,7 @@ services:
     container_name: medease-adminer
     restart: unless-stopped
     ports:
-      - "5050:8080"
+      - "5051:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,6 +60,15 @@ services:
       CORS_ORIGIN: http://localhost:3000
       CLOUDFLARE_SECRET_KEY: ${CLOUDFLARE_SECRET_KEY:-1x0000000000000000000000000000000AA}
       LOG_LEVEL: debug
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_SECURE: "false"
+      SMTP_USER: medeaseuok@gmail.com
+      SMTP_PASS: pobjgziicimnqdpy
+      SMTP_FROM: "MedEase <medeaseuok@gmail.com>"
+      FRONTEND_URL: http://localhost:3000
+      OTP_TTL_SECONDS: 600
+      OTP_MAX_ATTEMPTS: 3
     volumes:
       - ./backend/src:/app/src
     depends_on:

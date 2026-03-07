@@ -31,6 +31,8 @@ export default function Login() {
       setError('');
     } else if (result.success) {
       navigate('/dashboard');
+    } else if (result.reason === 'unverified') {
+      setError('Please verify your email address before logging in. Check your inbox.');
     } else if (result.reason === 'pending') {
       setError('Your account is pending admin approval.');
     } else {

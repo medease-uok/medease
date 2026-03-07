@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { useAuth } from '../data/AuthContext';
 import { roles as allRoles } from '../constants';
@@ -87,10 +87,10 @@ export default function Register() {
   });
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
-  const { register } = useAuth();
+  const navigate = useNavigate();
+  const { register, resendVerification } = useAuth();
 
   /* Helpers for per-field accessibility & error display */
   const fieldProps = (name, baseClass = 'login-input') => ({
@@ -219,7 +219,7 @@ export default function Register() {
     const result = await register({ ...form, captchaToken });
     setLoading(false);
     if (result.success) {
-      setSuccess(true);
+      navigate('/verify-email', { state: { email: form.email } });
     } else {
       /* If email already exists, show inline error and go back to step 1 */
       if (result.error && result.error.toLowerCase().includes('email already exists')) {
@@ -239,15 +239,7 @@ export default function Register() {
           <h1 className="login-title">MedEase</h1>
           <p className="login-subtitle">Create an Account</p>
         </div>
-        {success ? (
-          <div className="register-success">
-            <p>Your account has been created successfully.</p>
-            <p>Please wait for admin approval before signing in.</p>
-            <Link to="/login" className="login-button" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '20px' }}>
-              Back to Sign In
-            </Link>
-          </div>
-        ) : (<>
+        
         {/* Step indicator */}
         <div className="register-steps">
           {stepLabels.map((label, i) => {
@@ -518,7 +510,6 @@ export default function Register() {
         <div className="register-footer">
           Already have an account? <Link to="/login">Sign In</Link>
         </div>
-        </>)}
       </div>
     </div>
   );

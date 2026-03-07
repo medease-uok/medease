@@ -6,7 +6,7 @@ const redis = require('../config/redis');
 const config = require('../config');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/auditLog');
-const { sendLoginOtpEmail } = require('../utils/emailService');
+const { sendLoginOtpEmail, sendRegistrationVerificationEmail, sendPasswordResetOtpEmail } = require('../utils/emailService');
 
 /** Masks most of an email address for safe display, e.g. jo***@example.com */
 function maskEmail(email) {
@@ -114,6 +114,14 @@ const register = async (req, res, next) => {
     // Commit transaction
     await client.query('COMMIT');
 
+    // Generate email verification token and save it
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    await db.query(
+      'UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE id = $3',
+      [verificationToken, verificationExpires, user.id]
+    );
+
     // Audit log: successful registration
     await auditLog({
       userId: user.id,
@@ -125,7 +133,7 @@ const register = async (req, res, next) => {
 
     res.status(201).json({
       status: 'success',
-      message: 'Registration successful. Your account is pending admin approval.',
+      message: 'Registration successful. Please verify your email before logging in.',
       data: {
         user: {
           id: user.id,
@@ -177,7 +185,7 @@ const login = async (req, res, next) => {
   try {
     // Find user by email
     const result = await db.query(
-      'SELECT id, email, password_hash, first_name, last_name, role, is_active FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, first_name, last_name, role, is_active, email_verified FROM users WHERE email = $1',
       [email]
     );
 
@@ -192,6 +200,11 @@ const login = async (req, res, next) => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       throw new AppError('Invalid email or password.', 401);
+    }
+
+    // Check if email address has been verified
+    if (!user.email_verified) {
+      throw new AppError('Please verify your email address before logging in. Check your inbox for the verification link.', 403);
     }
 
     // Check if account is active
@@ -352,4 +365,256 @@ const verifyOtp = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, verifyOtp };
+/**
+ * GET /auth/verify-email?token=...
+ * Marks the user's email as verified.
+ */
+const verifyEmail = async (req, res, next) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      throw new AppError('Verification token is required.', 400);
+    }
+
+    const result = await db.query(
+      `SELECT id, first_name FROM users
+       WHERE verification_token = $1
+         AND verification_token_expires > NOW()`,
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('This verification link is invalid or has expired.', 400);
+    }
+
+    const user = result.rows[0];
+
+    await db.query(
+      `UPDATE users
+       SET email_verified = TRUE,
+           verification_token = NULL,
+           verification_token_expires = NULL
+       WHERE id = $1`,
+      [user.id]
+    );
+
+    await auditLog({
+      userId: user.id,
+      action: 'EMAIL_VERIFIED',
+      resourceType: 'user',
+      resourceId: user.id,
+      ip: req.ip,
+    });
+
+    res.json({
+      status: 'success',
+      message: 'Email verified successfully. You can now log in.',
+    });
+  } catch (err) {
+    if (err.isOperational) return next(err);
+    return next(err);
+  }
+};
+
+/**
+ * POST /auth/resend-verification
+ * Re-sends the verification email for an unverified account.
+ */
+const resendVerification = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw new AppError('Email is required.', 400);
+    }
+
+    const result = await db.query(
+      'SELECT id, first_name, email_verified FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      // Don't leak whether the email exists
+      return res.json({ status: 'success', message: 'If that email is registered, a new verification link has been sent.' });
+    }
+
+    const user = result.rows[0];
+
+    if (user.email_verified) {
+      throw new AppError('This email address is already verified.', 400);
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    await db.query(
+      'UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE id = $3',
+      [verificationToken, verificationExpires, user.id]
+    );
+
+    await sendRegistrationVerificationEmail(email, user.first_name, verificationToken);
+
+    res.json({
+      status: 'success',
+      message: 'If that email is registered, a new verification link has been sent.',
+    });
+  } catch (err) {
+    if (err.isOperational) return next(err);
+    return next(err);
+  }
+};
+
+/**
+ * POST /auth/forgot-password
+ * Sends a 6-digit OTP to the user's email to begin the password-reset flow.
+ */
+const forgotPassword = async (req, res, next) => {
+  const { email } = req.body;
+  try {
+    const result = await db.query(
+      'SELECT id, first_name, email_verified FROM users WHERE email = $1',
+      [email]
+    );
+
+    // Always respond the same way to prevent email enumeration
+    if (result.rows.length === 0 || !result.rows[0].email_verified) {
+      return res.json({
+        status: 'success',
+        message: 'If that email is registered and verified, a reset code has been sent.',
+      });
+    }
+
+    const user = result.rows[0];
+    const otp = crypto.randomInt(100000, 999999).toString();
+
+    await redis.set(
+      `pwd_reset_otp:${user.id}`,
+      JSON.stringify({ otp, attempts: 0 }),
+      'EX',
+      config.otp.ttlSeconds
+    );
+
+    await sendPasswordResetOtpEmail(email, user.first_name, otp);
+
+    await auditLog({
+      userId: user.id,
+      action: 'PASSWORD_RESET_REQUESTED',
+      resourceType: 'user',
+      resourceId: user.id,
+      ip: req.ip,
+    });
+
+    return res.json({
+      status: 'success',
+      message: 'If that email is registered and verified, a reset code has been sent.',
+    });
+  } catch (err) {
+    if (err.isOperational) return next(err);
+    return next(err);
+  }
+};
+
+/**
+ * POST /auth/verify-reset-otp
+ * Validates the OTP and returns a short-lived reset token.
+ */
+const verifyResetOtp = async (req, res, next) => {
+  const { email, otp } = req.body;
+  try {
+    const result = await db.query(
+      'SELECT id FROM users WHERE email = $1 AND email_verified = TRUE',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Invalid or expired reset code.', 401);
+    }
+
+    const user = result.rows[0];
+    const raw = await redis.get(`pwd_reset_otp:${user.id}`);
+
+    if (!raw) {
+      throw new AppError('Reset code has expired. Please request a new one.', 401);
+    }
+
+    const record = JSON.parse(raw);
+
+    if (record.attempts >= config.otp.maxAttempts) {
+      await redis.del(`pwd_reset_otp:${user.id}`);
+      throw new AppError('Too many incorrect attempts. Please request a new reset code.', 429);
+    }
+
+    if (record.otp !== otp.trim()) {
+      const ttl = await redis.ttl(`pwd_reset_otp:${user.id}`);
+      await redis.set(
+        `pwd_reset_otp:${user.id}`,
+        JSON.stringify({ otp: record.otp, attempts: record.attempts + 1 }),
+        'EX',
+        ttl > 0 ? ttl : config.otp.ttlSeconds
+      );
+      const remaining = config.otp.maxAttempts - record.attempts - 1;
+      throw new AppError(
+        `Invalid reset code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
+        401
+      );
+    }
+
+    // OTP valid — delete it and issue a one-time reset token (5 minutes)
+    await redis.del(`pwd_reset_otp:${user.id}`);
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    await redis.set(`pwd_reset_token:${user.id}`, resetToken, 'EX', 300);
+
+    return res.json({
+      status: 'success',
+      message: 'Code verified. You may now reset your password.',
+      data: { resetToken, userId: user.id },
+    });
+  } catch (err) {
+    if (err.isOperational) return next(err);
+    return next(err);
+  }
+};
+
+/**
+ * POST /auth/reset-password
+ * Sets a new password using the reset token issued by verifyResetOtp.
+ */
+const resetPassword = async (req, res, next) => {
+  const { userId, resetToken, newPassword } = req.body;
+  try {
+    const storedToken = await redis.get(`pwd_reset_token:${userId}`);
+
+    if (!storedToken || storedToken !== resetToken) {
+      throw new AppError('Invalid or expired reset token. Please start over.', 401);
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    await db.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [passwordHash, userId]
+    );
+
+    // Invalidate reset token immediately
+    await redis.del(`pwd_reset_token:${userId}`);
+
+    await auditLog({
+      userId,
+      action: 'PASSWORD_RESET',
+      resourceType: 'user',
+      resourceId: userId,
+      ip: req.ip,
+    });
+
+    return res.json({
+      status: 'success',
+      message: 'Password reset successfully. You can now log in with your new password.',
+    });
+  } catch (err) {
+    if (err.isOperational) return next(err);
+    return next(err);
+  }
+};
+
+module.exports = { register, login, verifyOtp, verifyEmail, resendVerification, forgotPassword, verifyResetOtp, resetPassword };

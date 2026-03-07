@@ -24,9 +24,21 @@ export function AuthProvider({ children }) {
       return { success: true };
     } catch (err) {
       if (err.status === 403) {
+        if (err.message && err.message.toLowerCase().includes('verify your email')) {
+          return { success: false, reason: 'unverified', email };
+        }
         return { success: false, reason: 'pending' };
       }
       return { success: false, reason: 'invalid' };
+    }
+  };
+
+  const resendVerification = async (email) => {
+    try {
+      await api.post('/auth/resend-verification', { email });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message || 'Failed to resend verification email.' };
     }
   };
 
@@ -62,7 +74,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, verifyOtp, logout, register }}>
+    <AuthContext.Provider value={{ currentUser, login, verifyOtp, logout, register, resendVerification }}>
       {children}
     </AuthContext.Provider>
   );
