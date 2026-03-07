@@ -24,6 +24,8 @@ const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
+    // req.resource is set by checkResourceAccess('patient') middleware
+    // which already verified ABAC access — just fetch full details
     const patientResult = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
               p.date_of_birth, p.gender, p.blood_type, p.address,
@@ -84,7 +86,6 @@ const getById = async (req, res, next) => {
       },
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -107,7 +108,6 @@ const getMe = async (req, res, next) => {
 
     res.json({ status: 'success', data: mapPatient(result.rows[0]) });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };

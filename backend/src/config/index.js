@@ -5,7 +5,10 @@ module.exports = {
   databaseUrl: process.env.DATABASE_URL,
   redisUrl: process.env.REDIS_URL,
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
+  refreshTokenSecret: process.env.REFRESH_TOKEN_SECRET || process.env.JWT_SECRET,
+  refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
+  refreshTokenTTL: parseInt(process.env.REFRESH_TOKEN_TTL, 10) || 7 * 24 * 60 * 60,
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3001',
   logLevel: process.env.LOG_LEVEL || 'debug',
 };

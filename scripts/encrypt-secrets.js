@@ -19,6 +19,7 @@ async function main() {
   const cfSecret = await ask('  CLOUDFLARE_SECRET_KEY: ');
   const cfSite = await ask('  VITE_CLOUDFLARE_SITE_KEY: ');
   const jwt = await ask('  JWT_SECRET: ');
+  const refreshSecret = await ask('  REFRESH_TOKEN_SECRET: ');
 
   console.log();
 
@@ -38,6 +39,7 @@ async function main() {
     'CLOUDFLARE_SECRET_KEY=' + cfSecret,
     'VITE_CLOUDFLARE_SITE_KEY=' + cfSite,
     'JWT_SECRET=' + jwt,
+    'REFRESH_TOKEN_SECRET=' + refreshSecret,
   ].join('\n') + '\n';
 
   const encrypted = encrypt(plaintext, password);

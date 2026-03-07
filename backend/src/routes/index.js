@@ -8,6 +8,8 @@ const medicalRecordRoutes = require('./medicalRecords.routes');
 const prescriptionRoutes = require('./prescriptions.routes');
 const labReportRoutes = require('./labReports.routes');
 const adminRoutes = require('./admin.routes');
+const rolesRoutes = require('./roles.routes');
+const abacRoutes = require('./abac.routes');
 const dashboardRoutes = require('./dashboard.routes');
 
 router.get('/', (req, res) => {
@@ -26,6 +28,8 @@ router.use('/medical-records', medicalRecordRoutes);
 router.use('/prescriptions', prescriptionRoutes);
 router.use('/lab-reports', labReportRoutes);
 router.use('/admin', adminRoutes);
+router.use('/roles', rolesRoutes);
+router.use('/abac-policies', abacRoutes);
 router.use('/dashboard', dashboardRoutes);
 
 module.exports = router;

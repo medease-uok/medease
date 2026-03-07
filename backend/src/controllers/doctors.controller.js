@@ -90,7 +90,6 @@ const getById = async (req, res, next) => {
       },
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };

@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../config/database');
+const redis = require('../config/redis');
 const config = require('../config');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/auditLog');
@@ -18,7 +20,6 @@ const register = async (req, res, next) => {
   const client = await db.getClient();
 
   try {
-    // Check for duplicate email
     const existing = await client.query(
       'SELECT id FROM users WHERE email = $1',
       [email]
@@ -27,7 +28,6 @@ const register = async (req, res, next) => {
       throw new AppError('An account with this email already exists.', 409);
     }
 
-    // Check for duplicate license number if applicable
     if (licenseNumber && ['doctor', 'nurse', 'pharmacist'].includes(role)) {
       const tableMap = { doctor: 'doctors', nurse: 'nurses', pharmacist: 'pharmacists' };
       const table = tableMap[role];
@@ -40,13 +40,10 @@ const register = async (req, res, next) => {
       }
     }
 
-    // Hash password
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // Begin transaction
     await client.query('BEGIN');
 
-    // Insert user
     const userResult = await client.query(
       `INSERT INTO users (email, password_hash, first_name, last_name, role, phone, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, false)
@@ -55,7 +52,6 @@ const register = async (req, res, next) => {
     );
     const user = userResult.rows[0];
 
-    // Insert role-specific profile
     switch (role) {
       case 'patient':
         await client.query(
@@ -92,16 +88,17 @@ const register = async (req, res, next) => {
         break;
 
       case 'lab_technician':
-        // No dedicated table for lab technicians in the current schema.
-        // Department is accepted but not persisted beyond the user record.
-        // TODO: Add lab_technicians table or department column to users table.
         break;
     }
 
-    // Commit transaction
+    await client.query(
+      `INSERT INTO user_roles (user_id, role_id)
+       SELECT $1, id FROM roles WHERE name = $2`,
+      [user.id, role]
+    );
+
     await client.query('COMMIT');
 
-    // Audit log: successful registration
     await auditLog({
       userId: user.id,
       action: 'REGISTER',
@@ -128,7 +125,6 @@ const register = async (req, res, next) => {
   } catch (err) {
     await client.query('ROLLBACK');
 
-    // Audit log: failed registration attempt
     await auditLog({
       userId: null,
       action: 'REGISTER',
@@ -158,11 +154,25 @@ const register = async (req, res, next) => {
   }
 };
 
+function signAccessToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiresIn }
+  );
+}
+
+async function createRefreshToken(userId) {
+  const token = crypto.randomBytes(40).toString('hex');
+  const key = `refresh:${token}`;
+  await redis.set(key, String(userId), 'EX', config.refreshTokenTTL);
+  return token;
+}
+
 const login = async (req, res, next) => {
   const { email, password } = req.body;
 
   try {
-    // Find user by email
     const result = await db.query(
       'SELECT id, email, password_hash, first_name, last_name, role, is_active FROM users WHERE email = $1',
       [email]
@@ -174,18 +184,15 @@ const login = async (req, res, next) => {
       throw new AppError('Invalid email or password.', 401);
     }
 
-    // Compare password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       throw new AppError('Invalid email or password.', 401);
     }
 
-    // Check if account is active
     if (!user.is_active) {
       throw new AppError('Your account is pending admin approval.', 403);
     }
 
-    // Audit log: successful login
     await auditLog({
       userId: user.id,
       action: 'LOGIN',
@@ -193,17 +200,14 @@ const login = async (req, res, next) => {
       ip: req.ip,
     });
 
-    // Sign JWT
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      config.jwtSecret,
-      { expiresIn: config.jwtExpiresIn }
-    );
+    const token = signAccessToken(user);
+    const refreshToken = await createRefreshToken(user.id);
 
     res.json({
       status: 'success',
       data: {
         token,
+        refreshToken,
         user: {
           id: user.id,
           email: user.email,
@@ -215,7 +219,6 @@ const login = async (req, res, next) => {
       },
     });
   } catch (err) {
-    // Audit log: failed login attempt
     await auditLog({
       userId: null,
       action: 'LOGIN',
@@ -224,11 +227,94 @@ const login = async (req, res, next) => {
       success: false,
     });
 
-    if (err.isOperational) {
-      return next(err);
-    }
     return next(err);
   }
 };
 
-module.exports = { register, login };
+const refresh = async (req, res, next) => {
+  const { refreshToken } = req.body;
+
+  try {
+    if (!refreshToken) {
+      throw new AppError('Refresh token is required.', 400);
+    }
+
+    const key = `refresh:${refreshToken}`;
+    const userId = await redis.get(key);
+
+    if (!userId) {
+      throw new AppError('Invalid or expired refresh token.', 401);
+    }
+
+    const result = await db.query(
+      'SELECT id, email, first_name, last_name, role, is_active FROM users WHERE id = $1',
+      [userId]
+    );
+
+    const user = result.rows[0];
+
+    if (!user || !user.is_active) {
+      await redis.del(key);
+      throw new AppError('Account not found or inactive.', 401);
+    }
+
+    // Rotate: delete old refresh token, issue new pair
+    await redis.del(key);
+    const newAccessToken = signAccessToken(user);
+    const newRefreshToken = await createRefreshToken(user.id);
+
+    res.json({
+      status: 'success',
+      data: {
+        token: newAccessToken,
+        refreshToken: newRefreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role,
+          isActive: user.is_active,
+        },
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const logout = async (req, res, next) => {
+  const { refreshToken } = req.body;
+
+  try {
+    if (refreshToken) {
+      await redis.del(`refresh:${refreshToken}`);
+    }
+
+    if (req.user) {
+      await auditLog({
+        userId: req.user.id,
+        action: 'LOGOUT',
+        resourceType: 'session',
+        ip: req.ip,
+      });
+    }
+
+    res.json({ status: 'success', message: 'Logged out successfully.' });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const { getUserPermissions } = require('../utils/permissions');
+
+const getMyPermissions = async (req, res, next) => {
+  try {
+    const permissions = await getUserPermissions(req.user.id);
+    res.json({ status: 'success', data: permissions });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { register, login, refresh, logout, getMyPermissions };

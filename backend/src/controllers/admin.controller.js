@@ -26,7 +26,6 @@ const getPendingUsers = async (req, res, next) => {
        ORDER BY created_at DESC`
     );
 
-    // Enrich with role-specific profile data for display
     const users = await Promise.all(result.rows.map(async (user) => {
       const mapped = mapUser(user);
       mapped.profileData = await getProfileData(user.id, user.role);
@@ -64,7 +63,6 @@ const approveUser = async (req, res, next) => {
 
     res.json({ status: 'success', message: 'User approved successfully.' });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -92,7 +90,6 @@ const rejectUser = async (req, res, next) => {
 
     res.json({ status: 'success', message: 'User rejected and removed.' });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -157,7 +154,6 @@ async function getProfileData(userId, role) {
   const row = result.rows[0];
   const data = {};
 
-  // Map snake_case to camelCase display keys
   const keyMap = {
     date_of_birth: 'dateOfBirth',
     gender: 'gender',
