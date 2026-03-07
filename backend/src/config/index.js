@@ -1,3 +1,9 @@
+const S3_REQUIRED = ['S3_BUCKET', 'S3_REGION', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'];
+const missingS3 = S3_REQUIRED.filter((v) => !process.env[v]);
+if (missingS3.length > 0) {
+  console.warn(`Warning: Missing S3 environment variables: ${missingS3.join(', ')}. Profile image uploads will fail.`);
+}
+
 module.exports = {
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',

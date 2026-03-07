@@ -63,8 +63,8 @@ async function deleteFromS3(key) {
       Bucket: config.s3.bucket,
       Key: key,
     }));
-  } catch {
-    // best-effort
+  } catch (err) {
+    console.warn(`Failed to delete S3 object "${key}":`, err.message);
   }
 }
 
