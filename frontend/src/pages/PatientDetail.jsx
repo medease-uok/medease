@@ -5,9 +5,16 @@ import DetailCard from '../components/DetailCard';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 
+const SEVERITY_COLORS = {
+  severe: 'bg-red-100 text-red-700',
+  moderate: 'bg-amber-100 text-amber-700',
+  mild: 'bg-green-100 text-green-700',
+};
+
 export default function PatientDetail() {
   const { id } = useParams();
   const [patient, setPatient] = useState(null);
+  const [allergies, setAllergies] = useState([]);
   const [records, setRecords] = useState([]);
   const [rxs, setRxs] = useState([]);
   const [labs, setLabs] = useState([]);
@@ -17,6 +24,7 @@ export default function PatientDetail() {
     api.get(`/patients/${id}`)
       .then((res) => {
         setPatient(res.data.patient);
+        setAllergies(res.data.allergies || []);
         setRecords(res.data.medicalRecords);
         setRxs(res.data.prescriptions);
         setLabs(res.data.labReports);
@@ -54,6 +62,24 @@ export default function PatientDetail() {
           { label: 'Insurance Expiry', value: patient.insuranceExpiryDate ? new Date(patient.insuranceExpiryDate).toLocaleDateString() : null },
         ]}
       />
+
+      {allergies.length > 0 && (
+        <>
+          <h3 style={{ marginBottom: 12, marginTop: 24 }}>Allergies ({allergies.length})</h3>
+          <div style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {allergies.map((a) => (
+              <span
+                key={a.id}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${SEVERITY_COLORS[a.severity] || SEVERITY_COLORS.mild}`}
+                title={a.reaction ? `Reaction: ${a.reaction}` : undefined}
+              >
+                {a.allergen}
+                <span className="text-xs opacity-70">({a.severity})</span>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
 
       <h3 style={{ marginBottom: 12 }}>Medical Records ({records.length})</h3>
       <div style={{ marginBottom: 24 }}>

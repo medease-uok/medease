@@ -42,7 +42,7 @@ const getById = async (req, res, next) => {
 
     const patient = await mapPatient(patientResult.rows[0]);
 
-    const [recordsResult, rxResult, labsResult] = await Promise.all([
+    const [recordsResult, rxResult, labsResult, allergiesResult] = await Promise.all([
       db.query(
         `SELECT mr.id, mr.patient_id, mr.doctor_id, mr.diagnosis, mr.treatment, mr.notes, mr.created_at,
                 'Dr. ' || u.first_name || ' ' || u.last_name AS doctor_name
@@ -74,12 +74,20 @@ const getById = async (req, res, next) => {
          ORDER BY lr.report_date DESC`,
         [id]
       ),
+      db.query(
+        `SELECT id, patient_id, allergen, severity, reaction, noted_at, created_at
+         FROM patient_allergies
+         WHERE patient_id = $1
+         ORDER BY severity DESC, allergen`,
+        [id]
+      ),
     ]);
 
     res.json({
       status: 'success',
       data: {
         patient,
+        allergies: allergiesResult.rows.map(mapAllergy),
         medicalRecords: recordsResult.rows.map(mapRecord),
         prescriptions: rxResult.rows.map(mapPrescription),
         labReports: labsResult.rows.map(mapLabReport),
@@ -194,7 +202,19 @@ const getMe = async (req, res, next) => {
       throw new AppError('Patient profile not found.', 404);
     }
 
-    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+    const patient = await mapPatient(result.rows[0]);
+
+    const allergiesResult = await db.query(
+      `SELECT id, patient_id, allergen, severity, reaction, noted_at, created_at
+       FROM patient_allergies
+       WHERE patient_id = $1
+       ORDER BY severity DESC, allergen`,
+      [patient.id]
+    );
+
+    patient.allergies = allergiesResult.rows.map(mapAllergy);
+
+    res.json({ status: 'success', data: patient });
   } catch (err) {
     return next(err);
   }
@@ -220,6 +240,18 @@ async function mapPatient(row) {
     insurancePolicyNumber: row.insurance_policy_number,
     insurancePlanType: row.insurance_plan_type,
     insuranceExpiryDate: row.insurance_expiry_date,
+  };
+}
+
+function mapAllergy(row) {
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    allergen: row.allergen,
+    severity: row.severity,
+    reaction: row.reaction,
+    notedAt: row.noted_at,
+    createdAt: row.created_at,
   };
 }
 

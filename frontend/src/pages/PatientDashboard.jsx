@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Calendar, FileText, Pill, FlaskConical, Stethoscope,
   Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Loader2, Trash2, Shield,
+  Plus, X, AlertTriangle,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -289,6 +290,169 @@ function ProfileCard({ profile, onEdit, onImageUpdate }) {
   );
 }
 
+const SEVERITY_STYLES = {
+  severe: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
+  moderate: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200' },
+  mild: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
+};
+
+function AllergySection({ patientId, allergies: initial }) {
+  const [allergies, setAllergies] = useState(initial || []);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ allergen: '', severity: 'mild', reaction: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const resetForm = () => {
+    setForm({ allergen: '', severity: 'mild', reaction: '' });
+    setEditing(null);
+    setShowForm(false);
+    setError('');
+  };
+
+  const startEdit = (allergy) => {
+    setForm({ allergen: allergy.allergen, severity: allergy.severity, reaction: allergy.reaction || '' });
+    setEditing(allergy.id);
+    setShowForm(true);
+    setError('');
+  };
+
+  const handleSave = async () => {
+    if (!form.allergen.trim()) { setError('Allergen name is required.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      if (editing) {
+        const res = await api.patch(`/patients/${patientId}/allergies/${editing}`, form);
+        setAllergies((prev) => prev.map((a) => a.id === editing ? res.data : a));
+      } else {
+        const res = await api.post(`/patients/${patientId}/allergies`, form);
+        setAllergies((prev) => [...prev, res.data]);
+      }
+      resetForm();
+    } catch (err) {
+      setError(err.message || 'Failed to save allergy.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/patients/${patientId}/allergies/${id}`);
+      setAllergies((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      setError(err.message || 'Failed to remove allergy.');
+    }
+  };
+
+  return (
+    <Card className="hover:shadow-lg transition-shadow duration-300">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            Allergies
+          </CardTitle>
+          <CardDescription>Known allergies and reactions</CardDescription>
+        </div>
+        {!showForm && (
+          <button
+            onClick={() => { resetForm(); setShowForm(true); }}
+            className="flex items-center gap-1 text-sm text-primary font-medium hover:underline"
+          >
+            <Plus className="w-4 h-4" /> Add
+          </button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {error && (
+          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+        )}
+
+        {showForm && (
+          <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                placeholder="Allergen (e.g. Penicillin)"
+                value={form.allergen}
+                onChange={(e) => setForm({ ...form, allergen: e.target.value })}
+                maxLength={200}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+              <select
+                value={form.severity}
+                onChange={(e) => setForm({ ...form, severity: e.target.value })}
+                className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="mild">Mild</option>
+                <option value="moderate">Moderate</option>
+                <option value="severe">Severe</option>
+              </select>
+            </div>
+            <input
+              type="text"
+              placeholder="Reaction (e.g. Rash, Anaphylaxis)"
+              value={form.reaction}
+              onChange={(e) => setForm({ ...form, reaction: e.target.value })}
+              maxLength={500}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={resetForm} className="px-3 py-1.5 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : editing ? 'Update' : 'Add'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {allergies.length > 0 ? (
+          <div className="space-y-2">
+            {allergies.map((a) => {
+              const style = SEVERITY_STYLES[a.severity] || SEVERITY_STYLES.mild;
+              return (
+                <div key={a.id} className={`flex items-center justify-between p-3 rounded-lg border ${style.border} ${style.bg}/30`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${style.bg} ${style.text}`}>
+                      {a.severity}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm text-slate-900 truncate">{a.allergen}</p>
+                      {a.reaction && <p className="text-xs text-slate-500 truncate">{a.reaction}</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => startEdit(a)} className="p-1 text-slate-400 hover:text-primary transition-colors" aria-label="Edit allergy">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => handleDelete(a.id)} className="p-1 text-slate-400 hover:text-red-500 transition-colors" aria-label="Delete allergy">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <AlertTriangle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">No allergies recorded</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function QuickNavCard({ icon: Icon, label, count, color, onClick }) {
   return (
     <button
@@ -431,6 +595,10 @@ export default function PatientDashboard() {
             updateUser({ profileImageUrl: updated.profileImageUrl });
           }}
         />
+      )}
+
+      {profile && (
+        <AllergySection patientId={profile.id} allergies={profile.allergies || []} />
       )}
 
       {editOpen && profile && (

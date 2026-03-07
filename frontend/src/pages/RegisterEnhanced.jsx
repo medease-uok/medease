@@ -40,7 +40,12 @@ const departments = [
   'ICU', 'Surgery', 'Radiology', 'Pathology', 'Pharmacy', 'General',
 ];
 
-const stepLabels = ['Account', 'Details', 'Password'];
+function getStepLabels(role, hasInsurance) {
+  if (role === 'patient' && hasInsurance) {
+    return ['Account', 'Details', 'Insurance', 'Password'];
+  }
+  return ['Account', 'Details', 'Password'];
+}
 
 const PATTERNS = {
   name: /^[A-Za-z\s]+$/,
@@ -132,6 +137,7 @@ export default function RegisterEnhanced() {
     insurancePlanType: '', insuranceExpiryDate: '',
     specialization: '', licenseNumber: '', department: '',
   });
+  const [hasInsurance, setHasInsurance] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -140,6 +146,11 @@ export default function RegisterEnhanced() {
   const [termsOpen, setTermsOpen] = useState(false);
   const navigate = useNavigate();
   const { register } = useAuth();
+
+  const stepLabels = getStepLabels(form.role, hasInsurance);
+  const totalSteps = stepLabels.length;
+  const passwordStep = totalSteps;
+  const insuranceStep = hasInsurance && form.role === 'patient' ? 3 : null;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -216,7 +227,16 @@ export default function RegisterEnhanced() {
     return errs;
   };
 
-  const validateStep3 = () => {
+  const validateInsurance = () => {
+    const errs = {};
+    if (hasInsurance) {
+      if (!form.insuranceProvider.trim()) errs.insuranceProvider = MSG.required('Insurance provider');
+      if (!form.insurancePolicyNumber.trim()) errs.insurancePolicyNumber = MSG.required('Policy number');
+    }
+    return errs;
+  };
+
+  const validatePassword = () => {
     const errs = {};
     if (!form.password) errs.password = MSG.required('Password');
     else if (form.password.length < MIN_PASSWORD_LENGTH) errs.password = MSG.passwordMin;
@@ -229,7 +249,14 @@ export default function RegisterEnhanced() {
 
   const handleNext = () => {
     setError('');
-    const errs = step === 1 ? validateStep1() : validateStep2();
+    let errs = {};
+    if (step === 1) {
+      errs = validateStep1();
+    } else if (step === 2) {
+      errs = validateStep2();
+    } else if (step === insuranceStep) {
+      errs = validateInsurance();
+    }
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
     setStep(step + 1);
@@ -244,7 +271,7 @@ export default function RegisterEnhanced() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const errs = validateStep3();
+    const errs = validatePassword();
     if (!termsAccepted) errs.terms = 'You must accept the Terms & Conditions';
     if (!captchaToken) errs.captcha = 'Please complete the verification';
     setFieldErrors(errs);
@@ -469,33 +496,30 @@ export default function RegisterEnhanced() {
                           </div>
                         </div>
 
-                        {/* Insurance Details */}
+                        {/* Insurance Question */}
                         <div className="border-t border-slate-200 pt-4 mt-2">
                           <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                             <Shield className="w-4 h-4 text-slate-500" />
-                            Insurance Details
+                            Insurance
                           </h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <InputField label="Insurance Provider" name="insuranceProvider" icon={CreditCard} value={form.insuranceProvider} onChange={handleChange} disabled={loading} placeholder="Provider name" maxLength={100} />
-                            <InputField label="Policy Number" name="insurancePolicyNumber" icon={FileText} value={form.insurancePolicyNumber} onChange={handleChange} disabled={loading} placeholder="Policy number" maxLength={50} />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 mt-4">
-                            <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-2">Plan Type</label>
-                              <select
-                                name="insurancePlanType"
-                                value={form.insurancePlanType}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary"
-                              >
-                                <option value="">Select Plan</option>
-                                <option value="Inpatient">Inpatient</option>
-                                <option value="Outpatient">Outpatient</option>
-                                <option value="Comprehensive">Comprehensive</option>
-                              </select>
-                            </div>
-                            <InputField label="Expiry Date" name="insuranceExpiryDate" type="date" icon={Calendar} value={form.insuranceExpiryDate} onChange={handleChange} disabled={loading} />
-                          </div>
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={hasInsurance}
+                              onChange={(e) => {
+                                setHasInsurance(e.target.checked);
+                                if (!e.target.checked) {
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    insuranceProvider: '', insurancePolicyNumber: '',
+                                    insurancePlanType: '', insuranceExpiryDate: '',
+                                  }));
+                                }
+                              }}
+                              className="w-5 h-5 text-primary rounded focus:ring-2 focus:ring-primary"
+                            />
+                            <span className="text-sm text-slate-700">I have health insurance</span>
+                          </label>
                         </div>
                       </>
                     )}
@@ -582,8 +606,44 @@ export default function RegisterEnhanced() {
                   </>
                 )}
 
-                {/* STEP 3: Password */}
-                {step === 3 && (
+                {/* STEP 3: Insurance (patients with insurance only) */}
+                {step === insuranceStep && (
+                  <>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Insurance Details</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <InputField label="Insurance Provider *" name="insuranceProvider" icon={CreditCard} error={fieldErrors.insuranceProvider} value={form.insuranceProvider} onChange={handleChange} disabled={loading} placeholder="Provider name" maxLength={100} />
+                      <InputField label="Policy Number *" name="insurancePolicyNumber" icon={FileText} error={fieldErrors.insurancePolicyNumber} value={form.insurancePolicyNumber} onChange={handleChange} disabled={loading} placeholder="Policy number" maxLength={50} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Plan Type</label>
+                        <select
+                          name="insurancePlanType"
+                          value={form.insurancePlanType}
+                          onChange={handleChange}
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="">Select Plan</option>
+                          <option value="Inpatient">Inpatient</option>
+                          <option value="Outpatient">Outpatient</option>
+                          <option value="Comprehensive">Comprehensive</option>
+                        </select>
+                      </div>
+                      <InputField label="Expiry Date" name="insuranceExpiryDate" type="date" icon={Calendar} value={form.insuranceExpiryDate} onChange={handleChange} disabled={loading} />
+                    </div>
+                    <div className="flex justify-between">
+                      <button type="button" onClick={handleBack} className="flex items-center gap-2 px-6 py-3 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-all">
+                        <ChevronLeft className="w-5 h-5" /> Back
+                      </button>
+                      <button type="button" onClick={handleNext} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-cta text-white font-semibold rounded-lg hover:shadow-lg transition-all">
+                        Next <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* Password Step (final step) */}
+                {step === passwordStep && (
                   <>
                     <h3 className="text-lg font-semibold text-slate-900 mb-4">Set Your Password</h3>
                     <InputField label="Password *" name="password" type="password" icon={Lock} error={fieldErrors.password} maxLength={72} value={form.password} onChange={handleChange} disabled={loading} />
