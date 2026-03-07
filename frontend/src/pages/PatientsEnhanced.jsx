@@ -21,7 +21,7 @@ export default function PatientsEnhanced() {
           status: 'active',
           lastVisit: patient.lastVisit || new Date().toISOString(),
           conditions: patient.conditions || [],
-          avatarUrl: null,
+          avatarUrl: patient.profileImageUrl || null,
         }));
         setPatients(enhancedPatients);
       })

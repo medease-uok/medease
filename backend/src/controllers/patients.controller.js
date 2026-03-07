@@ -1,11 +1,12 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
+const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
 
 const getAll = async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address,
+              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
               p.emergency_contact, p.emergency_relationship, p.emergency_phone
        FROM patients p
        JOIN users u ON p.user_id = u.id
@@ -13,7 +14,7 @@ const getAll = async (req, res, next) => {
        ORDER BY u.last_name, u.first_name`
     );
 
-    const patients = result.rows.map(mapPatient);
+    const patients = await Promise.all(result.rows.map(mapPatient));
     res.json({ status: 'success', data: patients });
   } catch (err) {
     return next(err);
@@ -28,7 +29,7 @@ const getById = async (req, res, next) => {
     // which already verified ABAC access — just fetch full details
     const patientResult = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address,
+              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
               p.emergency_contact, p.emergency_relationship, p.emergency_phone
        FROM patients p
        JOIN users u ON p.user_id = u.id
@@ -40,7 +41,7 @@ const getById = async (req, res, next) => {
       throw new AppError('Patient not found.', 404);
     }
 
-    const patient = mapPatient(patientResult.rows[0]);
+    const patient = await mapPatient(patientResult.rows[0]);
 
     const [recordsResult, rxResult, labsResult] = await Promise.all([
       db.query(
@@ -164,7 +165,7 @@ const updateById = async (req, res, next) => {
 
     const result = await client.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address,
+              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
               p.emergency_contact, p.emergency_relationship, p.emergency_phone
        FROM patients p
        JOIN users u ON p.user_id = u.id
@@ -174,7 +175,7 @@ const updateById = async (req, res, next) => {
 
     await client.query('COMMIT');
 
-    res.json({ status: 'success', data: mapPatient(result.rows[0]) });
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
   } catch (err) {
     await client.query('ROLLBACK');
     return next(err);
@@ -187,7 +188,7 @@ const getMe = async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address,
+              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
               p.emergency_contact, p.emergency_relationship, p.emergency_phone
        FROM patients p
        JOIN users u ON p.user_id = u.id
@@ -199,13 +200,13 @@ const getMe = async (req, res, next) => {
       throw new AppError('Patient profile not found.', 404);
     }
 
-    res.json({ status: 'success', data: mapPatient(result.rows[0]) });
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
   } catch (err) {
     return next(err);
   }
 };
 
-function mapPatient(row) {
+async function mapPatient(row) {
   return {
     id: row.id,
     userId: row.user_id,
@@ -217,6 +218,7 @@ function mapPatient(row) {
     gender: row.gender,
     bloodType: row.blood_type,
     address: row.address,
+    profileImageUrl: await getPresignedImageUrl(row.profile_image_url),
     emergencyContact: row.emergency_contact,
     emergencyRelationship: row.emergency_relationship,
     emergencyPhone: row.emergency_phone,
@@ -265,4 +267,89 @@ function mapLabReport(row) {
   };
 }
 
-module.exports = { getAll, getById, getMe, updateById };
+const uploadProfileImage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      return next(new AppError('No image file provided.', 400));
+    }
+
+    // Get current image URL for cleanup
+    const current = await db.query(
+      'SELECT profile_image_url FROM patients WHERE id = $1',
+      [id]
+    );
+    if (current.rows.length === 0) {
+      return next(new AppError('Patient not found.', 404));
+    }
+
+    const oldKey = current.rows[0].profile_image_url;
+    const newKey = await uploadToS3(req.file, id);
+
+    await db.query(
+      'UPDATE patients SET profile_image_url = $1, updated_at = NOW() WHERE id = $2',
+      [newKey, id]
+    );
+
+    // Clean up old image (best-effort)
+    deleteFromS3(oldKey);
+
+    // Return the full updated profile
+    const result = await db.query(
+      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
+              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
+              p.emergency_contact, p.emergency_relationship, p.emergency_phone
+       FROM patients p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = $1`,
+      [id]
+    );
+
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const deleteProfileImage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const current = await db.query(
+      'SELECT profile_image_url FROM patients WHERE id = $1',
+      [id]
+    );
+    if (current.rows.length === 0) {
+      return next(new AppError('Patient not found.', 404));
+    }
+
+    const oldKey = current.rows[0].profile_image_url;
+    if (!oldKey) {
+      return next(new AppError('No profile image to delete.', 400));
+    }
+
+    await db.query(
+      'UPDATE patients SET profile_image_url = NULL, updated_at = NOW() WHERE id = $1',
+      [id]
+    );
+
+    deleteFromS3(oldKey);
+
+    const result = await db.query(
+      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
+              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
+              p.emergency_contact, p.emergency_relationship, p.emergency_phone
+       FROM patients p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = $1`,
+      [id]
+    );
+
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, getMe, updateById, uploadProfileImage, deleteProfileImage };

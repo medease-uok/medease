@@ -55,9 +55,17 @@ export default function Header({ title }) {
           </button>
 
           <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-cta flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
-            </div>
+            {currentUser?.profileImageUrl ? (
+              <img
+                src={currentUser.profileImageUrl}
+                alt={`${currentUser.firstName} ${currentUser.lastName}`}
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-cta flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
+              </div>
+            )}
 
             <div className="hidden lg:block text-right">
               <p className="text-sm font-medium text-slate-900">

@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, FileText, Pill, FlaskConical, Stethoscope,
-  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil,
+  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Loader2, Trash2,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
 import EditProfileModal from '../components/EditProfileModal';
+import ImageCropModal from '../components/ImageCropModal';
+import ProfileImageLightbox from '../components/ProfileImageLightbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -40,88 +42,214 @@ function StatusBadge({ status }) {
   );
 }
 
-function ProfileCard({ profile, onEdit }) {
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+function ProfileCard({ profile, onEdit, onImageUpdate }) {
   const age = calculateAge(profile.dateOfBirth);
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState(null);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setImageError('Only JPEG, PNG, and WebP images are allowed.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setImageError('Image must be under 5 MB.');
+      return;
+    }
+
+    setImageError('');
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropConfirm = async (croppedFile) => {
+    setUploading(true);
+    setCropSrc(null);
+    try {
+      const formData = new FormData();
+      formData.append('profileImage', croppedFile);
+      const res = await api.upload(`/patients/${profile.id}/profile-image`, formData);
+      onImageUpdate(res.data);
+    } catch (err) {
+      setImageError(err.message || 'Failed to upload image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImageDelete = async () => {
+    setImageError('');
+    setUploading(true);
+    try {
+      const res = await api.delete(`/patients/${profile.id}/profile-image`);
+      onImageUpdate(res.data);
+    } catch (err) {
+      setImageError(err.message || 'Failed to remove image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const fullName = `${profile.firstName} ${profile.lastName}`;
 
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-300">
-      <CardContent className="pt-6">
-        <div className="flex items-start gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-cta flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-            {(profile.firstName?.[0] || '')}{(profile.lastName?.[0] || '')}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 font-heading">
-                  {profile.firstName} {profile.lastName}
-                </h2>
-                <p className="text-sm text-slate-500 mt-0.5">{profile.email}</p>
-              </div>
+    <>
+      <Card className="hover:shadow-lg transition-shadow duration-300">
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center text-center">
+            <div className="relative group mb-3">
+              {profile.profileImageUrl ? (
+                <img
+                  src={profile.profileImageUrl}
+                  alt={fullName}
+                  onClick={() => setLightboxOpen(true)}
+                  className="w-20 h-20 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-cta flex items-center justify-center text-white text-2xl font-bold">
+                  {(profile.firstName?.[0] || '')}{(profile.lastName?.[0] || '')}
+                </div>
+              )}
+              {uploading && (
+                <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                </div>
+              )}
               <button
-                onClick={onEdit}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+                type="button"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute -bottom-0.5 -right-0.5 w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors border-2 border-white"
+                aria-label="Change profile photo"
               >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit
+                <Pencil className="w-3 h-3" />
               </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-              {age !== null && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <User className="w-4 h-4 text-slate-400" />
-                  <span>{age} yrs, {profile.gender}</span>
-                </div>
+              {profile.profileImageUrl && !uploading && (
+                <button
+                  type="button"
+                  onClick={handleImageDelete}
+                  className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 border-2 border-white"
+                  aria-label="Remove profile image"
+                >
+                  <Trash2 className="w-2.5 h-2.5" />
+                </button>
               )}
-              {profile.bloodType && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 font-heading">{fullName}</h2>
+            <p className="text-sm text-slate-500 mt-0.5">{profile.email}</p>
+            <button
+              onClick={onEdit}
+              className="mt-3 flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit Profile
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-slate-100">
+            {age !== null && (
+              <div className="flex flex-col items-center text-center gap-1">
+                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
+                  <User className="w-4 h-4 text-slate-500" />
+                </div>
+                <p className="text-xs text-slate-400">Age / Gender</p>
+                <p className="text-sm font-medium text-slate-700">{age} yrs, {profile.gender}</p>
+              </div>
+            )}
+            {profile.bloodType && (
+              <div className="flex flex-col items-center text-center gap-1">
+                <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center">
                   <Droplets className="w-4 h-4 text-red-400" />
-                  <span>{profile.bloodType}</span>
                 </div>
-              )}
-              {profile.phone && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  <span>{profile.phone}</span>
+                <p className="text-xs text-slate-400">Blood Type</p>
+                <p className="text-sm font-medium text-slate-700">{profile.bloodType}</p>
+              </div>
+            )}
+            {profile.phone && (
+              <div className="flex flex-col items-center text-center gap-1">
+                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
+                  <Phone className="w-4 h-4 text-slate-500" />
                 </div>
-              )}
-              {profile.address && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <MapPin className="w-4 h-4 text-slate-400" />
-                  <span className="truncate">{profile.address}</span>
+                <p className="text-xs text-slate-400">Phone</p>
+                <p className="text-sm font-medium text-slate-700">{profile.phone}</p>
+              </div>
+            )}
+            {profile.address && (
+              <div className="flex flex-col items-center text-center gap-1">
+                <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
+                  <MapPin className="w-4 h-4 text-slate-500" />
                 </div>
-              )}
-            </div>
-
-            {profile.emergencyContact && (
-              <div className="mt-5 p-4 bg-red-50/70 border border-red-100 rounded-xl">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
-                    <AlertCircle className="w-3.5 h-3.5 text-red-500" />
-                  </div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-red-600">Emergency Contact</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <p className="text-xs text-slate-400 mb-0.5">Name</p>
-                    <p className="text-sm font-medium text-slate-800">{profile.emergencyContact}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400 mb-0.5">Relationship</p>
-                    <p className="text-sm font-medium text-slate-800">{profile.emergencyRelationship}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400 mb-0.5">Phone</p>
-                    <p className="text-sm font-medium text-slate-800">{profile.emergencyPhone}</p>
-                  </div>
-                </div>
+                <p className="text-xs text-slate-400">Address</p>
+                <p className="text-sm font-medium text-slate-700 line-clamp-2">{profile.address}</p>
               </div>
             )}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+
+          {profile.emergencyContact && (
+            <div className="mt-5 p-4 bg-red-50/70 border border-red-100 rounded-xl">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-red-600">Emergency Contact</p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Name</p>
+                  <p className="text-sm font-medium text-slate-800">{profile.emergencyContact}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Relationship</p>
+                  <p className="text-sm font-medium text-slate-800">{profile.emergencyRelationship}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Phone</p>
+                  <p className="text-sm font-medium text-slate-800">{profile.emergencyPhone}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {imageError && (
+            <p className="mt-3 text-sm text-center text-red-600">{imageError}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {lightboxOpen && profile.profileImageUrl && (
+        <ProfileImageLightbox
+          src={profile.profileImageUrl}
+          alt={fullName}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
+
+      {cropSrc && (
+        <ImageCropModal
+          imageSrc={cropSrc}
+          onCancel={() => setCropSrc(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
+    </>
   );
 }
 
@@ -176,7 +304,12 @@ export default function PatientDashboard() {
         return;
       }
 
-      if (profileRes.status === 'fulfilled') setProfile(profileRes.value.data);
+      if (profileRes.status === 'fulfilled') {
+        setProfile(profileRes.value.data);
+        if (profileRes.value.data.profileImageUrl) {
+          updateUser({ profileImageUrl: profileRes.value.data.profileImageUrl });
+        }
+      }
       if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
       if (appointmentsRes.status === 'fulfilled') setAppointments(appointmentsRes.value.data || []);
       if (prescriptionsRes.status === 'fulfilled') setPrescriptions(prescriptionsRes.value.data || []);
@@ -253,7 +386,16 @@ export default function PatientDashboard() {
         </div>
       )}
 
-      {profile && <ProfileCard profile={profile} onEdit={() => setEditOpen(true)} />}
+      {profile && (
+        <ProfileCard
+          profile={profile}
+          onEdit={() => setEditOpen(true)}
+          onImageUpdate={(updated) => {
+            setProfile(updated);
+            updateUser({ profileImageUrl: updated.profileImageUrl });
+          }}
+        />
+      )}
 
       {editOpen && profile && (
         <EditProfileModal
@@ -263,6 +405,10 @@ export default function PatientDashboard() {
             setProfile(updated);
             updateUser({ firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone });
             setEditOpen(false);
+          }}
+          onImageUpdate={(updated) => {
+            setProfile(updated);
+            updateUser({ profileImageUrl: updated.profileImageUrl });
           }}
         />
       )}

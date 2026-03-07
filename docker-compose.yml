@@ -59,6 +59,10 @@ services:
       JWT_EXPIRES_IN: 24h
       CORS_ORIGIN: http://localhost:3000
       CLOUDFLARE_SECRET_KEY: ${CLOUDFLARE_SECRET_KEY:-1x0000000000000000000000000000000AA}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-eu-north-1}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       LOG_LEVEL: debug
     volumes:
       - ./backend/src:/app/src

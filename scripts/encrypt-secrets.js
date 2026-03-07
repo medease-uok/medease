@@ -22,6 +22,12 @@ async function main() {
   const refreshSecret = await ask('  REFRESH_TOKEN_SECRET: ');
 
   console.log();
+  console.log('AWS S3 (Profile Image Uploads):');
+  const s3Bucket = await ask('  S3_BUCKET: ');
+  const s3AccessKey = await ask('  S3_ACCESS_KEY_ID: ');
+  const s3SecretKey = await ask('  S3_SECRET_ACCESS_KEY: ');
+
+  console.log();
 
   let password;
   while (true) {
@@ -40,6 +46,9 @@ async function main() {
     'VITE_CLOUDFLARE_SITE_KEY=' + cfSite,
     'JWT_SECRET=' + jwt,
     'REFRESH_TOKEN_SECRET=' + refreshSecret,
+    'S3_BUCKET=' + s3Bucket,
+    'S3_ACCESS_KEY_ID=' + s3AccessKey,
+    'S3_SECRET_ACCESS_KEY=' + s3SecretKey,
   ].join('\n') + '\n';
 
   const encrypted = encrypt(plaintext, password);

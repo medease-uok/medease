@@ -11,6 +11,7 @@ const adminRoutes = require('./admin.routes');
 const rolesRoutes = require('./roles.routes');
 const abacRoutes = require('./abac.routes');
 const dashboardRoutes = require('./dashboard.routes');
+const profileRoutes = require('./profile.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -31,5 +32,6 @@ router.use('/admin', adminRoutes);
 router.use('/roles', rolesRoutes);
 router.use('/abac-policies', abacRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/profile', profileRoutes);
 
 module.exports = router;

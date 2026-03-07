@@ -121,11 +121,38 @@ async function request(endpoint, options = {}) {
   return data;
 }
 
+async function uploadRequest(endpoint, formData) {
+  const token = localStorage.getItem('medease_token');
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/api${endpoint}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    if (res.status === 401 && localStorage.getItem('medease_token')) {
+      clearSession();
+    }
+    const error = new Error(data.message || 'Upload failed');
+    error.status = res.status;
+    error.data = data;
+    throw error;
+  }
+
+  return data;
+}
+
 const api = {
   get: (endpoint) => request(endpoint, { method: 'GET' }),
   post: (endpoint, body) => request(endpoint, { method: 'POST', body }),
   patch: (endpoint, body) => request(endpoint, { method: 'PATCH', body }),
   delete: (endpoint) => request(endpoint, { method: 'DELETE' }),
+  upload: (endpoint, formData) => uploadRequest(endpoint, formData),
 };
 
 export default api;
