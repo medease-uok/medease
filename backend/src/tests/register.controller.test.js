@@ -24,9 +24,16 @@ jest.mock('../config', () => ({
   jwtSecret: 'test-secret',
   jwtExpiresIn: '1h',
   refreshTokenTTL: 604800,
+  otp: { ttlSeconds: 600, maxAttempts: 3 },
 }));
 
 jest.mock('../utils/auditLog', () => jest.fn().mockResolvedValue(undefined));
+
+jest.mock('../utils/emailService', () => ({
+  sendLoginOtpEmail: jest.fn().mockResolvedValue(undefined),
+  sendRegistrationVerificationEmail: jest.fn().mockResolvedValue(undefined),
+  sendPasswordResetOtpEmail: jest.fn().mockResolvedValue(undefined),
+}));
 
 const { register } = require('../controllers/auth.controller');
 const auditLog = require('../utils/auditLog');
