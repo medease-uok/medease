@@ -25,6 +25,9 @@ MedEase is a web-based hospital management system that streamlines patient care,
 - **Prescription Management** - Electronic prescriptions with pharmacy dispensing
 - **Role-Based Access Control (RBAC)** - Granular permissions system with 26 permissions across 6 categories
 - **Attribute-Based Access Control (ABAC)** - Fine-grained, policy-driven access filtering on resources (appointments, records, prescriptions, lab reports)
+- **Email Verification** - OTP-based email verification on registration with resend and cooldown
+- **Profile Image Uploads** - S3-backed profile images with presigned URLs
+- **Patient Dashboard** - Dedicated health dashboard for patients with profile, appointments, prescriptions, and lab reports
 - **Audit Logging** - Track all user actions for security and compliance
 - **Session Management** - JWT access tokens with refresh token rotation and inactivity timeout
 - **CAPTCHA Protection** - Cloudflare Turnstile on registration to prevent bot signups
@@ -47,9 +50,11 @@ Permissions are stored in the database and can be modified at runtime by admins 
 
 - **Frontend**: React 19 (Vite)
 - **Backend**: Node.js & Express 5 (RESTful API)
-- **Database**: PostgreSQL 17 with RBAC schema
-- **Cache**: Redis 8 (refresh tokens, permission caching)
-- **Auth**: JWT access tokens (15m) + Redis-backed refresh tokens (7d rotation)
+- **Database**: PostgreSQL 17 with RBAC + ABAC schema
+- **Cache**: Redis 8 (refresh tokens, permission caching, ABAC policy caching)
+- **Auth**: JWT access tokens (15m) + Redis-backed refresh tokens (7d rotation) + email OTP verification
+- **Email**: Nodemailer (registration verification, login OTP, password reset)
+- **Storage**: AWS S3 (profile images with presigned URLs)
 - **CAPTCHA**: Cloudflare Turnstile
 - **Containerization**: Docker & Docker Compose
 - **Cloud**: AWS (Fargate, S3, CloudFront, API Gateway)
@@ -89,6 +94,7 @@ medease/
 │       │   ├── admin.controller.js       # User management, audit logs
 │       │   ├── roles.controller.js       # RBAC management
 │       │   ├── abac.controller.js        # ABAC policy CRUD
+│       │   ├── profile.controller.js     # Profile management with S3 image uploads
 │       │   ├── patients.controller.js
 │       │   ├── doctors.controller.js
 │       │   ├── appointments.controller.js
@@ -101,12 +107,14 @@ medease/
 │       │   ├── authorize.js      # Role-based + permission-based authorization
 │       │   ├── abac.js           # ABAC resource-level access checks
 │       │   ├── resolveSubject.js # Resolves user profile IDs for ABAC
+│       │   ├── upload.js         # Multer + S3 file upload (presigned URLs)
 │       │   ├── verifyCaptcha.js  # Cloudflare Turnstile verification
 │       │   ├── validate.js       # Request validation
 │       │   └── errorHandler.js   # Global error handling
 │       ├── routes/               # API route definitions
 │       ├── utils/
 │       │   ├── abac.js           # ABAC policy engine (evaluate, build SQL filters)
+│       │   ├── emailService.js   # Nodemailer (verification, OTP, password reset)
 │       │   ├── permissions.js    # Permission checks with Redis caching
 │       │   ├── auditLog.js       # Audit logging utility
 │       │   └── AppError.js       # Custom error class
@@ -134,18 +142,19 @@ medease/
 │       ├── pages/              # Page components
 │       │   ├── Login.jsx       # Login with credentials
 │       │   ├── RegisterEnhanced.jsx  # Registration with CAPTCHA & T&C
-│       │   ├── DashboardEnhanced.jsx # Role-based dashboard with admin panel
+│       │   ├── VerifyEmail.jsx # Email verification with token/resend
+│       │   ├── DashboardEnhanced.jsx # Role-based dashboard for staff
+│       │   ├── PatientDashboard.jsx  # Patient health dashboard with profile image
 │       │   ├── PatientsEnhanced.jsx / PatientDetail.jsx
 │       │   ├── Doctors.jsx / DoctorDetail.jsx
 │       │   ├── Appointments.jsx
 │       │   ├── MedicalRecords.jsx
 │       │   ├── Prescriptions.jsx
 │       │   ├── LabReports.jsx
-│       │   ├── PatientDashboard.jsx     # Patient-specific health dashboard
 │       │   └── PermissionManagement.jsx  # Role & permission management (admin)
 │       ├── data/
 │       │   ├── AuthContext.jsx # Auth state, login/logout/register
-│       │   └── roles.js       # Centralized role constants and role groups
+│       │   └── roles.js       # Role constants and role groups (STAFF, CLINICAL, etc.)
 │       ├── services/
 │       │   └── api.js          # API client with silent token refresh & inactivity tracking
 │       └── constants.js        # Shared enums and constants
@@ -221,7 +230,9 @@ Secrets (API keys, JWT secret, refresh token secret) are stored in `secrets.enc`
 **Admin setup (one-time):**
 ```bash
 npm run encrypt-secrets
-# Enter values for: CLOUDFLARE_SECRET_KEY, VITE_CLOUDFLARE_SITE_KEY, JWT_SECRET, REFRESH_TOKEN_SECRET
+# Enter values for: CLOUDFLARE_SECRET_KEY, VITE_CLOUDFLARE_SITE_KEY, JWT_SECRET, REFRESH_TOKEN_SECRET,
+#   S3_BUCKET, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,
+#   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 # Choose an encryption password → commit the generated secrets.enc
 ```
 
@@ -314,11 +325,13 @@ cd backend && npm run db:seed   # Seed database manually
 
 ### Token Flow
 
-1. **Login** returns a JWT access token (15-minute expiry) and an opaque refresh token (7-day TTL, stored in Redis)
-2. **Access token** is sent as `Authorization: Bearer <token>` on every API request
-3. **On 401**, the frontend silently calls `/auth/refresh` to rotate the refresh token and get a new access token
-4. **On inactivity** (15 minutes with no clicks, keystrokes, or scrolling), the refresh is skipped and the user is logged out
-5. **Logout** invalidates the refresh token server-side via Redis
+1. **Register** creates the account and sends a verification email with a link/token
+2. **Verify Email** — user clicks the link or enters the token on `/verify-email` to activate their account
+3. **Login** returns a JWT access token (15-minute expiry) and an opaque refresh token (7-day TTL, stored in Redis)
+4. **Access token** is sent as `Authorization: Bearer <token>` on every API request
+5. **On 401**, the frontend silently calls `/auth/refresh` to rotate the refresh token and get a new access token
+6. **On inactivity** (15 minutes with no clicks, keystrokes, or scrolling), the refresh is skipped and the user is logged out
+7. **Logout** invalidates the refresh token server-side via Redis
 
 ### Authorization Layers
 

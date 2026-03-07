@@ -24,9 +24,16 @@ jest.mock('../config', () => ({
   jwtSecret: 'test-secret',
   jwtExpiresIn: '1h',
   refreshTokenTTL: 604800,
+  otp: { ttlSeconds: 600, maxAttempts: 3 },
 }));
 
 jest.mock('../utils/auditLog', () => jest.fn().mockResolvedValue(undefined));
+
+jest.mock('../utils/emailService', () => ({
+  sendLoginOtpEmail: jest.fn().mockResolvedValue(undefined),
+  sendRegistrationVerificationEmail: jest.fn().mockResolvedValue(undefined),
+  sendPasswordResetOtpEmail: jest.fn().mockResolvedValue(undefined),
+}));
 
 const { register } = require('../controllers/auth.controller');
 const auditLog = require('../utils/auditLog');
@@ -75,7 +82,7 @@ describe('register controller', () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'success',
-          message: expect.stringContaining('pending admin approval'),
+          message: expect.stringContaining('verify your email'),
           data: {
             user: expect.objectContaining({
               id: 'uuid-1',

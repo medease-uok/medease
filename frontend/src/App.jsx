@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import RoleGuard from './components/RoleGuard';
 import Login from './pages/Login';
 import RegisterEnhanced from './pages/RegisterEnhanced';
+import VerifyEmail from './pages/VerifyEmail';
 import DashboardEnhanced from './pages/DashboardEnhanced';
 import PatientsEnhanced from './pages/PatientsEnhanced';
 import PatientDetail from './pages/PatientDetail';
@@ -34,6 +35,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<RegisterEnhanced />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<DashboardRedirect />} />
             <Route path="dashboard" element={<R roles={ROLE_GROUPS.STAFF}><DashboardEnhanced /></R>} />

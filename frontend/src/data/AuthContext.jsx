@@ -34,6 +34,11 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     try {
       const data = await api.post('/auth/login', { email, password });
+      // Backend now returns otp_required before issuing a token
+      if (data.status === 'otp_required') {
+        return { success: false, reason: 'otp_required', maskedEmail: data.data.email, pendingLoginToken: data.data.pendingLoginToken };
+      }
+      // Fallback: if backend ever returns token directly (e.g. future bypass flag)
       const { token, refreshToken, user } = data.data;
       setCurrentUser(user);
       localStorage.setItem('medease_user', JSON.stringify(user));
@@ -53,9 +58,46 @@ export function AuthProvider({ children }) {
       return { success: true };
     } catch (err) {
       if (err.status === 403) {
+        if (err.message && err.message.toLowerCase().includes('verify your email')) {
+          return { success: false, reason: 'unverified', email };
+        }
         return { success: false, reason: 'pending' };
       }
       return { success: false, reason: 'invalid' };
+    }
+  };
+
+  const resendVerification = async (email) => {
+    try {
+      await api.post('/auth/resend-verification', { email });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message || 'Failed to resend verification email.' };
+    }
+  };
+
+  const verifyOtp = async (email, otp, pendingLoginToken) => {
+    try {
+      const data = await api.post('/auth/verify-otp', { email, otp, pendingLoginToken });
+      const { token, refreshToken, user } = data.data;
+      setCurrentUser(user);
+      localStorage.setItem('medease_user', JSON.stringify(user));
+      localStorage.setItem('medease_token', token);
+      localStorage.setItem('medease_refresh_token', refreshToken);
+      localStorage.setItem('medease_last_activity', String(Date.now()));
+
+      // Fetch permissions immediately after OTP verification
+      try {
+        const permRes = await api.get('/auth/me/permissions');
+        setPermissions(permRes.data);
+        localStorage.setItem('medease_permissions', JSON.stringify(permRes.data));
+      } catch {
+        setPermissions([]);
+      }
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message || 'Invalid verification code.' };
     }
   };
 
@@ -96,7 +138,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, permissions, login, logout, register, updateUser }}>
+    <AuthContext.Provider value={{ currentUser, permissions, login, verifyOtp, logout, register, resendVerification, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
