@@ -90,6 +90,21 @@ const getById = async (req, res, next) => {
   }
 };
 
+function buildSetClauses(fieldMap) {
+  const setClauses = [];
+  const params = [];
+  let idx = 1;
+
+  for (const [column, value] of Object.entries(fieldMap)) {
+    if (value !== undefined) {
+      setClauses.push(`${column} = $${idx++}`);
+      params.push(value ?? null);
+    }
+  }
+
+  return { setClauses, params, nextIdx: idx };
+}
+
 const updateById = async (req, res, next) => {
   const client = await db.getClient();
   try {
@@ -100,58 +115,54 @@ const updateById = async (req, res, next) => {
       emergencyContact, emergencyRelationship, emergencyPhone,
     } = req.body;
 
+    const userUpdate = buildSetClauses({
+      first_name: firstName,
+      last_name: lastName,
+      phone: phone !== undefined ? (phone || null) : undefined,
+    });
+
+    const profileUpdate = buildSetClauses({
+      date_of_birth: dateOfBirth,
+      gender: gender,
+      blood_type: bloodType !== undefined ? (bloodType || null) : undefined,
+      address: address !== undefined ? (address || null) : undefined,
+      emergency_contact: emergencyContact !== undefined ? (emergencyContact || null) : undefined,
+      emergency_relationship: emergencyRelationship !== undefined ? (emergencyRelationship || null) : undefined,
+      emergency_phone: emergencyPhone !== undefined ? (emergencyPhone || null) : undefined,
+    });
+
+    if (userUpdate.setClauses.length === 0 && profileUpdate.setClauses.length === 0) {
+      return next(new AppError('No valid fields provided for update.', 400));
+    }
+
     await client.query('BEGIN');
 
     const patientResult = await client.query(
-      'SELECT user_id FROM patients WHERE id = $1',
+      'SELECT user_id FROM patients WHERE id = $1 FOR UPDATE',
       [id]
     );
     if (patientResult.rows.length === 0) {
-      throw new AppError('Patient not found.', 404);
+      throw new AppError('Resource not found.', 404);
     }
     const userId = patientResult.rows[0].user_id;
 
-    if (firstName !== undefined || lastName !== undefined || phone !== undefined) {
-      const userFields = [];
-      const userParams = [];
-      let idx = 1;
-
-      if (firstName !== undefined) { userFields.push(`first_name = $${idx++}`); userParams.push(firstName); }
-      if (lastName !== undefined) { userFields.push(`last_name = $${idx++}`); userParams.push(lastName); }
-      if (phone !== undefined) { userFields.push(`phone = $${idx++}`); userParams.push(phone || null); }
-
-      if (userFields.length > 0) {
-        userParams.push(userId);
-        await client.query(
-          `UPDATE users SET ${userFields.join(', ')}, updated_at = NOW() WHERE id = $${idx}`,
-          userParams
-        );
-      }
-    }
-
-    const profileFields = [];
-    const profileParams = [];
-    let pIdx = 1;
-
-    if (dateOfBirth !== undefined) { profileFields.push(`date_of_birth = $${pIdx++}`); profileParams.push(dateOfBirth); }
-    if (gender !== undefined) { profileFields.push(`gender = $${pIdx++}`); profileParams.push(gender); }
-    if (bloodType !== undefined) { profileFields.push(`blood_type = $${pIdx++}`); profileParams.push(bloodType || null); }
-    if (address !== undefined) { profileFields.push(`address = $${pIdx++}`); profileParams.push(address || null); }
-    if (emergencyContact !== undefined) { profileFields.push(`emergency_contact = $${pIdx++}`); profileParams.push(emergencyContact || null); }
-    if (emergencyRelationship !== undefined) { profileFields.push(`emergency_relationship = $${pIdx++}`); profileParams.push(emergencyRelationship || null); }
-    if (emergencyPhone !== undefined) { profileFields.push(`emergency_phone = $${pIdx++}`); profileParams.push(emergencyPhone || null); }
-
-    if (profileFields.length > 0) {
-      profileParams.push(id);
+    if (userUpdate.setClauses.length > 0) {
+      userUpdate.params.push(userId);
       await client.query(
-        `UPDATE patients SET ${profileFields.join(', ')}, updated_at = NOW() WHERE id = $${pIdx}`,
-        profileParams
+        `UPDATE users SET ${userUpdate.setClauses.join(', ')}, updated_at = NOW() WHERE id = $${userUpdate.nextIdx}`,
+        userUpdate.params
       );
     }
 
-    await client.query('COMMIT');
+    if (profileUpdate.setClauses.length > 0) {
+      profileUpdate.params.push(id);
+      await client.query(
+        `UPDATE patients SET ${profileUpdate.setClauses.join(', ')}, updated_at = NOW() WHERE id = $${profileUpdate.nextIdx}`,
+        profileUpdate.params
+      );
+    }
 
-    const result = await db.query(
+    const result = await client.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
               p.date_of_birth, p.gender, p.blood_type, p.address,
               p.emergency_contact, p.emergency_relationship, p.emergency_phone
@@ -160,6 +171,8 @@ const updateById = async (req, res, next) => {
        WHERE p.id = $1`,
       [id]
     );
+
+    await client.query('COMMIT');
 
     res.json({ status: 'success', data: mapPatient(result.rows[0]) });
   } catch (err) {

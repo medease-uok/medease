@@ -15,6 +15,6 @@ router.use(resolveSubject);
 router.get('/me', authorize('patient'), getMe);
 router.get('/', authorize('doctor', 'nurse', 'admin'), getAll);
 router.get('/:id', authorize('doctor', 'nurse', 'admin'), checkResourceAccess('patient'), getById);
-router.put('/:id', requirePermission('edit_patient', 'edit_own_profile'), checkResourceAccess('patient'), validate(updatePatientValidation), updateById);
+router.patch('/:id', requirePermission('edit_patient', 'edit_own_profile'), checkResourceAccess('patient'), validate(updatePatientValidation), updateById);
 
 module.exports = router;
