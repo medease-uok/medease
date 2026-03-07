@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Calendar, FileText, Pill, FlaskConical, Stethoscope,
   Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Loader2, Trash2, Shield,
-  Plus, X, AlertTriangle,
+  Plus, X, AlertTriangle, Heart,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -184,6 +184,13 @@ function ProfileCard({ profile, onEdit, onImageUpdate }) {
                 <p className="text-sm font-medium text-slate-700">{profile.bloodType}</p>
               </div>
             )}
+            <div className="flex flex-col items-center text-center gap-1">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center ${profile.organDonor ? 'bg-emerald-50' : 'bg-slate-100'}`}>
+                <Heart className={`w-4 h-4 ${profile.organDonor ? 'text-emerald-500' : 'text-slate-400'}`} />
+              </div>
+              <p className="text-xs text-slate-400">Organ Donor</p>
+              <p className={`text-sm font-medium ${profile.organDonor ? 'text-emerald-600' : 'text-slate-500'}`}>{profile.organDonor ? 'Yes' : 'No'}</p>
+            </div>
             {profile.phone && (
               <div className="flex flex-col items-center text-center gap-1">
                 <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
@@ -225,6 +232,35 @@ function ProfileCard({ profile, onEdit, onImageUpdate }) {
                   <p className="text-xs text-slate-400 mb-0.5">Phone</p>
                   <p className="text-sm font-medium text-slate-800">{profile.emergencyPhone}</p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {profile.organDonor && (
+            <div className="mt-5 p-4 bg-emerald-50/70 border border-emerald-100 rounded-xl">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Heart className="w-3.5 h-3.5 text-emerald-500" />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Organ Donor (NTP)</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-center">
+                {profile.organDonorCardNo && (
+                  <div>
+                    <p className="text-xs text-slate-400 mb-0.5">Card No.</p>
+                    <p className="text-sm font-medium text-slate-800">{profile.organDonorCardNo}</p>
+                  </div>
+                )}
+                {profile.organsToDonate?.length > 0 && (
+                  <div className={profile.organDonorCardNo ? '' : 'col-span-2'}>
+                    <p className="text-xs text-slate-400 mb-1.5">Organs</p>
+                    <div className="flex flex-wrap justify-center gap-1">
+                      {profile.organsToDonate.map((organ) => (
+                        <span key={organ} className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium">{organ}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
