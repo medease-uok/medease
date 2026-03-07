@@ -10,6 +10,7 @@ export default function Login() {
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState('credentials'); // 'credentials' | 'otp'
   const [maskedEmail, setMaskedEmail] = useState('');
+  const [pendingLoginToken, setPendingLoginToken] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login, verifyOtp } = useAuth();
@@ -28,6 +29,7 @@ export default function Login() {
 
     if (result.reason === 'otp_required') {
       setMaskedEmail(result.maskedEmail);
+      setPendingLoginToken(result.pendingLoginToken);
       setStep('otp');
       setError('');
     } else if (result.success) {
@@ -49,7 +51,7 @@ export default function Login() {
       return;
     }
     setLoading(true);
-    const result = await verifyOtp(email, otp);
+    const result = await verifyOtp(email, otp, pendingLoginToken);
     setLoading(false);
 
     if (result.success) {

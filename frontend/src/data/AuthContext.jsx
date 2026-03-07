@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
       const data = await api.post('/auth/login', { email, password });
       // Backend now returns otp_required before issuing a token
       if (data.status === 'otp_required') {
-        return { success: false, reason: 'otp_required', maskedEmail: data.data.email };
+        return { success: false, reason: 'otp_required', maskedEmail: data.data.email, pendingLoginToken: data.data.pendingLoginToken };
       }
       // Fallback: if backend ever returns token directly (e.g. future bypass flag)
       const { token, refreshToken, user } = data.data;
@@ -76,9 +76,9 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const verifyOtp = async (email, otp) => {
+  const verifyOtp = async (email, otp, pendingLoginToken) => {
     try {
-      const data = await api.post('/auth/verify-otp', { email, otp });
+      const data = await api.post('/auth/verify-otp', { email, otp, pendingLoginToken });
       const { token, refreshToken, user } = data.data;
       setCurrentUser(user);
       localStorage.setItem('medease_user', JSON.stringify(user));

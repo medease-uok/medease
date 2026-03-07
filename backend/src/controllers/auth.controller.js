@@ -11,15 +11,21 @@ const { getUserPermissions } = require('../utils/permissions');
 
 /** Masks most of an email address for safe display, e.g. jo***@example.com */
 function maskEmail(email) {
-  const [local, domain] = email.split('@');
+  const atIndex = email.lastIndexOf('@');
+  if (atIndex < 1) return '***@***';
+  const local = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1);
   const visible = local.slice(0, Math.min(2, local.length));
   return `${visible}***@${domain}`;
 }
 
-/** Redis key for a user's pending login OTP */
+/** Redis key helpers */
 const otpKey = (userId) => `login_otp:${userId}`;
+const pwdResetOtpKey = (userId) => `pwd_reset_otp:${userId}`;
+const pwdResetTokenKey = (userId) => `pwd_reset_token:${userId}`;
 
 const SALT_ROUNDS = 12;
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 const DEFAULT_AVATARS = {
   Male: [
@@ -151,11 +157,19 @@ const register = async (req, res, next) => {
 
     // Generate email verification token and save it
     const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const verificationExpires = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
     await db.query(
       'UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE id = $3',
       [verificationToken, verificationExpires, user.id]
     );
+
+    // Send verification email (fire-and-forget; registration still succeeds if SMTP is down)
+    try {
+      await sendRegistrationVerificationEmail(email, firstName, verificationToken);
+    } catch (emailErr) {
+      // Log but don't fail registration — user can request a resend later
+      console.error('Failed to send verification email:', emailErr.message);
+    }
 
     await auditLog({
       userId: user.id,
@@ -246,10 +260,13 @@ const login = async (req, res, next) => {
     // Generate a cryptographically-random 6-digit OTP
     const otp = crypto.randomInt(100000, 999999).toString();
 
-    // Store in Redis: { otp, attempts } - expires after OTP_TTL_SECONDS
+    // Session-binding token to prevent OTP from being used from a different client
+    const pendingLoginToken = crypto.randomBytes(32).toString('hex');
+
+    // Store in Redis: { otp, attempts, pendingLoginToken } - expires after OTP_TTL_SECONDS
     await redis.set(
       otpKey(user.id),
-      JSON.stringify({ otp, attempts: 0 }),
+      JSON.stringify({ otp, attempts: 0, pendingLoginToken }),
       'EX',
       config.otp.ttlSeconds
     );
@@ -269,6 +286,7 @@ const login = async (req, res, next) => {
       message: `A verification code has been sent to ${maskEmail(user.email)}. It expires in ${config.otp.ttlSeconds / 60} minutes.`,
       data: {
         email: maskEmail(user.email),
+        pendingLoginToken,
       },
     });
   } catch (err) {
@@ -289,25 +307,33 @@ const login = async (req, res, next) => {
  * Validates the emailed OTP and, on success, returns the JWT access + refresh tokens.
  */
 const verifyOtp = async (req, res, next) => {
-  const { email, otp } = req.body;
+  const { email, otp, pendingLoginToken } = req.body;
 
   try {
     const result = await db.query(
-      'SELECT id, email, first_name, last_name, role, is_active FROM users WHERE email = $1',
+      'SELECT id, email, first_name, last_name, role, is_active, email_verified FROM users WHERE email = $1',
       [email]
     );
     const user = result.rows[0];
 
-    if (!user || !user.is_active) {
-      throw new AppError('Invalid or expired verification code.', 401);
+    // Single generic error for all invalid states to prevent user enumeration
+    const genericError = new AppError('Invalid or expired verification code.', 401);
+
+    if (!user || !user.is_active || !user.email_verified) {
+      throw genericError;
     }
 
     const raw = await redis.get(otpKey(user.id));
     if (!raw) {
-      throw new AppError('Verification code has expired. Please log in again.', 401);
+      throw genericError;
     }
 
     const record = JSON.parse(raw);
+
+    // Verify session binding — the pendingLoginToken must match the one issued at login
+    if (record.pendingLoginToken && record.pendingLoginToken !== pendingLoginToken) {
+      throw genericError;
+    }
 
     if (record.attempts >= config.otp.maxAttempts) {
       await redis.del(otpKey(user.id));
@@ -318,12 +344,10 @@ const verifyOtp = async (req, res, next) => {
     }
 
     if (record.otp !== otp.trim()) {
-      const ttl = await redis.ttl(otpKey(user.id));
       await redis.set(
         otpKey(user.id),
-        JSON.stringify({ otp: record.otp, attempts: record.attempts + 1 }),
-        'EX',
-        ttl > 0 ? ttl : config.otp.ttlSeconds
+        JSON.stringify({ ...record, attempts: record.attempts + 1 }),
+        'KEEPTTL'
       );
       const remaining = config.otp.maxAttempts - record.attempts - 1;
       throw new AppError(
@@ -422,7 +446,6 @@ const verifyEmail = async (req, res, next) => {
       message: 'Email verified successfully. You can now log in.',
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -444,18 +467,21 @@ const resendVerification = async (req, res, next) => {
       [email]
     );
 
+    const genericMessage = 'If that email is registered, a new verification link has been sent.';
+
     if (result.rows.length === 0) {
-      return res.json({ status: 'success', message: 'If that email is registered, a new verification link has been sent.' });
+      return res.json({ status: 'success', message: genericMessage });
     }
 
     const user = result.rows[0];
 
+    // Already verified — return same generic message to prevent enumeration
     if (user.email_verified) {
-      throw new AppError('This email address is already verified.', 400);
+      return res.json({ status: 'success', message: genericMessage });
     }
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verificationExpires = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
 
     await db.query(
       'UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE id = $3',
@@ -466,10 +492,9 @@ const resendVerification = async (req, res, next) => {
 
     res.json({
       status: 'success',
-      message: 'If that email is registered, a new verification link has been sent.',
+      message: genericMessage,
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -497,7 +522,7 @@ const forgotPassword = async (req, res, next) => {
     const otp = crypto.randomInt(100000, 999999).toString();
 
     await redis.set(
-      `pwd_reset_otp:${user.id}`,
+      pwdResetOtpKey(user.id),
       JSON.stringify({ otp, attempts: 0 }),
       'EX',
       config.otp.ttlSeconds
@@ -518,7 +543,6 @@ const forgotPassword = async (req, res, next) => {
       message: 'If that email is registered and verified, a reset code has been sent.',
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -540,7 +564,7 @@ const verifyResetOtp = async (req, res, next) => {
     }
 
     const user = result.rows[0];
-    const raw = await redis.get(`pwd_reset_otp:${user.id}`);
+    const raw = await redis.get(pwdResetOtpKey(user.id));
 
     if (!raw) {
       throw new AppError('Reset code has expired. Please request a new one.', 401);
@@ -549,17 +573,15 @@ const verifyResetOtp = async (req, res, next) => {
     const record = JSON.parse(raw);
 
     if (record.attempts >= config.otp.maxAttempts) {
-      await redis.del(`pwd_reset_otp:${user.id}`);
+      await redis.del(pwdResetOtpKey(user.id));
       throw new AppError('Too many incorrect attempts. Please request a new reset code.', 429);
     }
 
     if (record.otp !== otp.trim()) {
-      const ttl = await redis.ttl(`pwd_reset_otp:${user.id}`);
       await redis.set(
-        `pwd_reset_otp:${user.id}`,
+        pwdResetOtpKey(user.id),
         JSON.stringify({ otp: record.otp, attempts: record.attempts + 1 }),
-        'EX',
-        ttl > 0 ? ttl : config.otp.ttlSeconds
+        'KEEPTTL'
       );
       const remaining = config.otp.maxAttempts - record.attempts - 1;
       throw new AppError(
@@ -569,9 +591,9 @@ const verifyResetOtp = async (req, res, next) => {
     }
 
     // OTP valid - delete it and issue a one-time reset token (5 minutes)
-    await redis.del(`pwd_reset_otp:${user.id}`);
+    await redis.del(pwdResetOtpKey(user.id));
     const resetToken = crypto.randomBytes(32).toString('hex');
-    await redis.set(`pwd_reset_token:${user.id}`, resetToken, 'EX', 300);
+    await redis.set(pwdResetTokenKey(user.id), resetToken, 'EX', 300);
 
     return res.json({
       status: 'success',
@@ -579,7 +601,6 @@ const verifyResetOtp = async (req, res, next) => {
       data: { resetToken, userId: user.id },
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
@@ -591,7 +612,7 @@ const verifyResetOtp = async (req, res, next) => {
 const resetPassword = async (req, res, next) => {
   const { userId, resetToken, newPassword } = req.body;
   try {
-    const storedToken = await redis.get(`pwd_reset_token:${userId}`);
+    const storedToken = await redis.get(pwdResetTokenKey(userId));
 
     if (!storedToken || storedToken !== resetToken) {
       throw new AppError('Invalid or expired reset token. Please start over.', 401);
@@ -604,7 +625,7 @@ const resetPassword = async (req, res, next) => {
       [passwordHash, userId]
     );
 
-    await redis.del(`pwd_reset_token:${userId}`);
+    await redis.del(pwdResetTokenKey(userId));
 
     await auditLog({
       userId,
@@ -619,7 +640,6 @@ const resetPassword = async (req, res, next) => {
       message: 'Password reset successfully. You can now log in with your new password.',
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };

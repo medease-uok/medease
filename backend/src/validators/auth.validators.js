@@ -116,6 +116,9 @@ const verifyOtpValidation = [
     .trim()
     .notEmpty().withMessage('Verification code is required.')
     .matches(/^\d{6}$/).withMessage('Verification code must be a 6-digit number.'),
+  body('pendingLoginToken')
+    .trim()
+    .notEmpty().withMessage('Session token is required.'),
 ];
 
 const forgotPasswordValidation = [

@@ -2,19 +2,26 @@ const nodemailer = require('nodemailer');
 const config = require('../config');
 
 /**
- * Creates and returns a configured SMTP transporter.
- * Lazily created so the app starts even if SMTP is not yet configured.
+ * Lazily-created singleton SMTP transporter with connection pooling.
+ * The app starts even if SMTP is not yet configured.
  */
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    secure: config.smtp.secure,   // true for port 465, false for 587 / 25
-    auth: {
-      user: config.smtp.user,
-      pass: config.smtp.pass,
-    },
-  });
+let _transporter = null;
+
+function getTransporter() {
+  if (!_transporter) {
+    _transporter = nodemailer.createTransport({
+      host: config.smtp.host,
+      port: config.smtp.port,
+      secure: config.smtp.secure,   // true for port 465, false for 587 / 25
+      auth: {
+        user: config.smtp.user,
+        pass: config.smtp.pass,
+      },
+      pool: true,
+      maxConnections: 5,
+    });
+  }
+  return _transporter;
 }
 
 /**
@@ -25,7 +32,7 @@ function createTransporter() {
  * @param {string} otp       - 6-digit OTP code
  */
 async function sendLoginOtpEmail(to, firstName, otp) {
-  const transporter = createTransporter();
+  const transporter = getTransporter();
 
   const html = `
     <!DOCTYPE html>
@@ -117,7 +124,7 @@ async function sendLoginOtpEmail(to, firstName, otp) {
  * @param {string} token     - 64-char hex verification token
  */
 async function sendRegistrationVerificationEmail(to, firstName, token) {
-  const transporter = createTransporter();
+  const transporter = getTransporter();
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
   const from = config.smtp.from || `"MedEase" <${config.smtp.user}>`;
@@ -199,7 +206,7 @@ async function sendRegistrationVerificationEmail(to, firstName, token) {
  * @param {string} otp       - 6-digit OTP code
  */
 async function sendPasswordResetOtpEmail(to, firstName, otp) {
-  const transporter = createTransporter();
+  const transporter = getTransporter();
   const from = config.smtp.from || `"MedEase" <${config.smtp.user}>`;
 
   const html = `
