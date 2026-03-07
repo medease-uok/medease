@@ -167,7 +167,15 @@ git clone https://github.com/medease-uok/medease.git
 cd medease
 ```
 
-### 2. Start Everything (Recommended)
+### 2. Enable Git Hooks
+
+```bash
+git config core.hooksPath hooks
+```
+
+This sets up the shared pre-commit hook that runs backend tests before every commit.
+
+### 3. Start Everything (Recommended)
 
 ```bash
 npm start
