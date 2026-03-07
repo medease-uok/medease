@@ -401,6 +401,10 @@ export default function PatientDashboard() {
             updateUser({ firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone });
             setEditOpen(false);
           }}
+          onImageUpdate={(updated) => {
+            setProfile(updated);
+            updateUser({ profileImageUrl: updated.profileImageUrl });
+          }}
         />
       )}
 

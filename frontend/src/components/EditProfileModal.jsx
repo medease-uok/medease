@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { X, Save, Loader2, Phone } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, Save, Loader2, Phone, Camera, Trash2 } from 'lucide-react';
 import api from '../services/api';
+import ImageCropModal from './ImageCropModal';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENDERS = ['Male', 'Female', 'Other'];
@@ -20,7 +21,63 @@ const baseInputClass = (hasError) =>
 const inputClass = (hasError) => `w-full ${baseInputClass(hasError)}`;
 const phoneInputClass = (hasError) => `flex-1 pl-11 pr-4 py-3 border ${hasError ? 'border-red-500' : 'border-slate-300'} rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all`;
 
-export default function EditProfileModal({ profile, onClose, onSaved }) {
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+export default function EditProfileModal({ profile, onClose, onSaved, onImageUpdate }) {
+  const fileInputRef = useRef(null);
+  const [cropSrc, setCropSrc] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState('');
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setImageError('Only JPEG, PNG, and WebP images are allowed.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setImageError('Image must be under 5 MB.');
+      return;
+    }
+
+    setImageError('');
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropConfirm = async (croppedFile) => {
+    setUploading(true);
+    setCropSrc(null);
+    try {
+      const formData = new FormData();
+      formData.append('profileImage', croppedFile);
+      const res = await api.upload(`/patients/${profile.id}/profile-image`, formData);
+      onImageUpdate(res.data);
+    } catch (err) {
+      setImageError(err.message || 'Failed to upload image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImageDelete = async () => {
+    setImageError('');
+    setUploading(true);
+    try {
+      const res = await api.delete(`/patients/${profile.id}/profile-image`);
+      onImageUpdate(res.data);
+    } catch (err) {
+      setImageError(err.message || 'Failed to remove image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const [form, setForm] = useState({
     firstName: profile.firstName || '',
     lastName: profile.lastName || '',
@@ -138,6 +195,7 @@ export default function EditProfileModal({ profile, onClose, onSaved }) {
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={saving ? undefined : onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -154,6 +212,60 @@ export default function EditProfileModal({ profile, onClose, onSaved }) {
               {apiError}
             </div>
           )}
+
+          <div>
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Profile Photo</h3>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                {profile.profileImageUrl ? (
+                  <img
+                    src={profile.profileImageUrl}
+                    alt={`${profile.firstName} ${profile.lastName}`}
+                    className="w-20 h-20 rounded-full object-cover ring-2 ring-slate-200"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-cta flex items-center justify-center text-white text-2xl font-bold">
+                    {(profile.firstName?.[0] || '')}{(profile.lastName?.[0] || '')}
+                  </div>
+                )}
+                {uploading && (
+                  <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors disabled:opacity-50"
+                >
+                  <Camera className="w-4 h-4" />
+                  {profile.profileImageUrl ? 'Change Photo' : 'Upload Photo'}
+                </button>
+                {profile.profileImageUrl && (
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={handleImageDelete}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Remove Photo
+                  </button>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </div>
+            {imageError && <p className="mt-2 text-sm text-red-600">{imageError}</p>}
+          </div>
 
           <div>
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Personal Information</h3>
@@ -270,5 +382,14 @@ export default function EditProfileModal({ profile, onClose, onSaved }) {
         </form>
       </div>
     </div>
+
+    {cropSrc && (
+      <ImageCropModal
+        imageSrc={cropSrc}
+        onCancel={() => setCropSrc(null)}
+        onConfirm={handleCropConfirm}
+      />
+    )}
+    </>
   );
 }
