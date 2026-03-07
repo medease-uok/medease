@@ -211,7 +211,9 @@ async function main() {
       const value = trimmed.slice(eq + 1);
       process.env[key] = value;
       injectEnvVar(backendEnv, key, value);
-      injectEnvVar(frontendEnv, key, value);
+      if (key.startsWith('VITE_')) {
+        injectEnvVar(frontendEnv, key, value);
+      }
     }
 
     console.log('Secrets loaded from vault.');

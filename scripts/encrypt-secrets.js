@@ -24,6 +24,7 @@ async function main() {
   console.log();
   console.log('AWS S3 (Profile Image Uploads):');
   const s3Bucket = await ask('  S3_BUCKET: ');
+  const s3Region = await ask('  S3_REGION (e.g. eu-north-1): ');
   const s3AccessKey = await ask('  S3_ACCESS_KEY_ID: ');
   const s3SecretKey = await ask('  S3_SECRET_ACCESS_KEY: ');
 
@@ -53,6 +54,7 @@ async function main() {
     'JWT_SECRET=' + jwt,
     'REFRESH_TOKEN_SECRET=' + refreshSecret,
     'S3_BUCKET=' + s3Bucket,
+    'S3_REGION=' + s3Region,
     'S3_ACCESS_KEY_ID=' + s3AccessKey,
     'S3_SECRET_ACCESS_KEY=' + s3SecretKey,
     'SMTP_USER=' + smtpUser,
