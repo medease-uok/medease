@@ -28,6 +28,12 @@ async function main() {
   const s3SecretKey = await ask('  S3_SECRET_ACCESS_KEY: ');
 
   console.log();
+  console.log('SMTP (Email Verification & OTP):');
+  const smtpUser = await ask('  SMTP_USER (e.g. you@gmail.com): ');
+  const smtpPass = await ask('  SMTP_PASS (App Password): ');
+  const smtpFrom = await ask('  SMTP_FROM (e.g. MedEase <you@gmail.com>): ');
+
+  console.log();
 
   let password;
   while (true) {
@@ -49,6 +55,9 @@ async function main() {
     'S3_BUCKET=' + s3Bucket,
     'S3_ACCESS_KEY_ID=' + s3AccessKey,
     'S3_SECRET_ACCESS_KEY=' + s3SecretKey,
+    'SMTP_USER=' + smtpUser,
+    'SMTP_PASS=' + smtpPass,
+    'SMTP_FROM=' + smtpFrom,
   ].join('\n') + '\n';
 
   const encrypted = encrypt(plaintext, password);
