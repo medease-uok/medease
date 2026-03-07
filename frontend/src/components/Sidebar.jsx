@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
+import { ROLES, ROLE_GROUPS } from '../data/roles';
 import {
   LayoutDashboard,
   Users,
@@ -14,28 +15,29 @@ import {
 
 
 const navConfig = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['patient', 'doctor', 'nurse', 'lab_technician', 'pharmacist', 'admin'] },
-  { path: '/patients', label: 'Patients', icon: Users, roles: ['doctor', 'nurse', 'admin'] },
-  { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: ['patient', 'admin'] },
-  { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ['patient', 'doctor', 'nurse', 'admin'] },
-  { path: '/medical-records', label: 'Medical Records', icon: FileText, roles: ['patient', 'doctor', 'nurse', 'admin'] },
-  { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: ['patient', 'doctor', 'pharmacist', 'admin'] },
-  { path: '/lab-reports', label: 'Lab Reports', icon: FlaskConical, roles: ['patient', 'doctor', 'lab_technician', 'admin'] },
-  { path: '/permissions', label: 'Permissions', icon: Shield, roles: ['admin'] },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ROLE_GROUPS.STAFF },
+  { path: '/my-health', label: 'My Health', icon: Activity, roles: ROLE_GROUPS.PATIENT_ONLY },
+  { path: '/patients', label: 'Patients', icon: Users, roles: ROLE_GROUPS.CLINICAL },
+  { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: [ROLES.PATIENT, ROLES.ADMIN] },
+  { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.PATIENT_CARE },
+  { path: '/medical-records', label: 'Medical Records', icon: FileText, roles: ROLE_GROUPS.PATIENT_CARE },
+  { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN] },
+  { path: '/lab-reports', label: 'Lab Reports', icon: FlaskConical, roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN] },
+  { path: '/permissions', label: 'Permissions', icon: Shield, roles: [ROLES.ADMIN] },
 ];
 
 const roleColors = {
-  patient: 'bg-blue-100 text-blue-700',
-  doctor: 'bg-green-100 text-green-700',
-  nurse: 'bg-purple-100 text-purple-700',
-  lab_technician: 'bg-orange-100 text-orange-700',
-  pharmacist: 'bg-pink-100 text-pink-700',
-  admin: 'bg-red-100 text-red-700',
+  [ROLES.PATIENT]: 'bg-blue-100 text-blue-700',
+  [ROLES.DOCTOR]: 'bg-green-100 text-green-700',
+  [ROLES.NURSE]: 'bg-purple-100 text-purple-700',
+  [ROLES.LAB_TECHNICIAN]: 'bg-orange-100 text-orange-700',
+  [ROLES.PHARMACIST]: 'bg-pink-100 text-pink-700',
+  [ROLES.ADMIN]: 'bg-red-100 text-red-700',
 };
 
 export default function Sidebar() {
   const { currentUser } = useAuth();
-  const role = currentUser?.role || 'patient';
+  const role = currentUser?.role || ROLES.PATIENT;
   const links = navConfig.filter((item) => item.roles.includes(role));
 
   const initials = currentUser
