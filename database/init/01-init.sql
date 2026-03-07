@@ -33,6 +33,8 @@ CREATE TABLE users (
   last_name VARCHAR(100) NOT NULL,
   role user_role NOT NULL,
   phone VARCHAR(20),
+  date_of_birth DATE,
+  profile_image_url TEXT,
   is_active BOOLEAN DEFAULT false,
   mfa_enabled BOOLEAN DEFAULT false,
   created_at TIMESTAMP DEFAULT NOW(),
@@ -47,9 +49,14 @@ CREATE TABLE patients (
   gender VARCHAR(20),
   blood_type VARCHAR(5),
   address TEXT,
+  profile_image_url TEXT,
   emergency_contact VARCHAR(100),
   emergency_relationship VARCHAR(50),
   emergency_phone VARCHAR(20),
+  insurance_provider VARCHAR(100),
+  insurance_policy_number VARCHAR(50),
+  insurance_plan_type VARCHAR(50) CHECK (insurance_plan_type IS NULL OR insurance_plan_type IN ('Inpatient', 'Outpatient', 'Comprehensive')),
+  insurance_expiry_date DATE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

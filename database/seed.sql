@@ -16,29 +16,29 @@ INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone,
   ('a0000000-0000-0000-0000-000000000002', 'nimali.admin@medease.com', crypt('Password@123', gen_salt('bf')), 'Nimali', 'Jayawardena', 'admin', '+94771000002', true);
 
 -- Doctors
-INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('d0000000-0000-0000-0000-000000000001', 'kamal.perera@medease.com', crypt('Password@123', gen_salt('bf')), 'Kamal', 'Perera', 'doctor', '+94772000001', true),
-  ('d0000000-0000-0000-0000-000000000002', 'sithara.silva@medease.com', crypt('Password@123', gen_salt('bf')), 'Sithara', 'Silva', 'doctor', '+94772000002', true),
-  ('d0000000-0000-0000-0000-000000000003', 'ruwan.fernando@medease.com', crypt('Password@123', gen_salt('bf')), 'Ruwan', 'Fernando', 'doctor', '+94772000003', true),
-  ('d0000000-0000-0000-0000-000000000004', 'anjali.dissanayake@medease.com', crypt('Password@123', gen_salt('bf')), 'Anjali', 'Dissanayake', 'doctor', '+94772000004', true);
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, date_of_birth, is_active, profile_image_url) VALUES
+  ('d0000000-0000-0000-0000-000000000001', 'kamal.perera@medease.com', crypt('Password@123', gen_salt('bf')), 'Kamal', 'Perera', 'doctor', '+94772000001', '1980-05-14', true, 'default-images/58509043_9439678.jpg'),
+  ('d0000000-0000-0000-0000-000000000002', 'sithara.silva@medease.com', crypt('Password@123', gen_salt('bf')), 'Sithara', 'Silva', 'doctor', '+94772000002', '1983-09-22', true, 'default-images/58509051_9439729.jpg'),
+  ('d0000000-0000-0000-0000-000000000003', 'ruwan.fernando@medease.com', crypt('Password@123', gen_salt('bf')), 'Ruwan', 'Fernando', 'doctor', '+94772000003', '1986-01-10', true, 'default-images/58509054_9441186.jpg'),
+  ('d0000000-0000-0000-0000-000000000004', 'anjali.dissanayake@medease.com', crypt('Password@123', gen_salt('bf')), 'Anjali', 'Dissanayake', 'doctor', '+94772000004', '1988-11-03', true, 'default-images/58509055_9439726.jpg');
 
 -- Nurses
-INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('e0000000-0000-0000-0000-000000000001', 'malini.bandara@medease.com', crypt('Password@123', gen_salt('bf')), 'Malini', 'Bandara', 'nurse', '+94773000001', true),
-  ('e0000000-0000-0000-0000-000000000002', 'chamari.rathnayake@medease.com', crypt('Password@123', gen_salt('bf')), 'Chamari', 'Rathnayake', 'nurse', '+94773000002', true),
-  ('e0000000-0000-0000-0000-000000000003', 'priyanka.kumari@medease.com', crypt('Password@123', gen_salt('bf')), 'Priyanka', 'Kumari', 'nurse', '+94773000003', true);
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, date_of_birth, is_active, profile_image_url) VALUES
+  ('e0000000-0000-0000-0000-000000000001', 'malini.bandara@medease.com', crypt('Password@123', gen_salt('bf')), 'Malini', 'Bandara', 'nurse', '+94773000001', '1990-03-18', true, 'default-images/58509058_9442242.jpg'),
+  ('e0000000-0000-0000-0000-000000000002', 'chamari.rathnayake@medease.com', crypt('Password@123', gen_salt('bf')), 'Chamari', 'Rathnayake', 'nurse', '+94773000002', '1992-07-25', true, 'default-images/58509051_9439729.jpg'),
+  ('e0000000-0000-0000-0000-000000000003', 'priyanka.kumari@medease.com', crypt('Password@123', gen_salt('bf')), 'Priyanka', 'Kumari', 'nurse', '+94773000003', '1994-12-05', true, 'default-images/58509055_9439726.jpg');
 
 -- Lab Technicians
-INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('10000000-0000-0000-0000-000000000001', 'nimal.wijesinghe@medease.com', crypt('Password@123', gen_salt('bf')), 'Nimal', 'Wijesinghe', 'lab_technician', '+94774000001', true),
-  ('10000000-0000-0000-0000-000000000002', 'sanduni.herath@medease.com', crypt('Password@123', gen_salt('bf')), 'Sanduni', 'Herath', 'lab_technician', '+94774000002', true);
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, date_of_birth, is_active, profile_image_url) VALUES
+  ('10000000-0000-0000-0000-000000000001', 'nimal.wijesinghe@medease.com', crypt('Password@123', gen_salt('bf')), 'Nimal', 'Wijesinghe', 'lab_technician', '+94774000001', '1987-06-20', true, 'default-images/58509057_9440461.jpg'),
+  ('10000000-0000-0000-0000-000000000002', 'sanduni.herath@medease.com', crypt('Password@123', gen_salt('bf')), 'Sanduni', 'Herath', 'lab_technician', '+94774000002', '1993-04-11', true, 'default-images/58509058_9442242.jpg');
 
 -- Pharmacists
-INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
-  ('b0000000-0000-0000-0000-000000000001', 'tharindu.gamage@medease.com', crypt('Password@123', gen_salt('bf')), 'Tharindu', 'Gamage', 'pharmacist', '+94775000001', true),
-  ('b0000000-0000-0000-0000-000000000002', 'dilani.mendis@medease.com', crypt('Password@123', gen_salt('bf')), 'Dilani', 'Mendis', 'pharmacist', '+94775000002', true);
+INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, date_of_birth, is_active, profile_image_url) VALUES
+  ('b0000000-0000-0000-0000-000000000001', 'tharindu.gamage@medease.com', crypt('Password@123', gen_salt('bf')), 'Tharindu', 'Gamage', 'pharmacist', '+94775000001', '1989-08-30', true, 'default-images/58509043_9439678.jpg'),
+  ('b0000000-0000-0000-0000-000000000002', 'dilani.mendis@medease.com', crypt('Password@123', gen_salt('bf')), 'Dilani', 'Mendis', 'pharmacist', '+94775000002', '1991-02-14', true, 'default-images/58509055_9439726.jpg');
 
--- Patients
+-- Patients (DOB is on the patients table for this role)
 INSERT INTO users (id, email, password_hash, first_name, last_name, role, phone, is_active) VALUES
   ('c0000000-0000-0000-0000-000000000001', 'sarah.fernando@medease.com', crypt('Password@123', gen_salt('bf')), 'Sarah', 'Fernando', 'patient', '+94776000001', true),
   ('c0000000-0000-0000-0000-000000000002', 'dinesh.rajapaksa@medease.com', crypt('Password@123', gen_salt('bf')), 'Dinesh', 'Rajapaksa', 'patient', '+94776000002', true),
@@ -61,13 +61,13 @@ INSERT INTO doctors (id, user_id, specialization, license_number, department, av
 -- PATIENTS (profiles)
 -- ============================================
 
-INSERT INTO patients (id, user_id, date_of_birth, gender, blood_type, address, emergency_contact, emergency_relationship, emergency_phone) VALUES
-  ('ce000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', '1990-03-15', 'Female', 'O+', '45 Galle Road, Colombo 03', 'Amal Fernando', 'Spouse', '+94771234567'),
-  ('ce000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', '1985-07-22', 'Male', 'A+', '12 Kandy Road, Peradeniya', 'Kamala Rajapaksa', 'Parent', '+94772345678'),
-  ('ce000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', '1995-11-08', 'Female', 'B+', '78 Temple Road, Nugegoda', 'Sunil Weerasinghe', 'Parent', '+94773456789'),
-  ('ce000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000004', '1978-01-30', 'Male', 'AB-', '23 Lake Drive, Kurunegala', 'Priya Jayasuriya', 'Spouse', '+94774567890'),
-  ('ce000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000005', '2000-06-12', 'Female', 'O-', '56 Beach Road, Matara', 'Kumari Abeywickrama', 'Parent', '+94775678901'),
-  ('ce000000-0000-0000-0000-000000000006', 'c0000000-0000-0000-0000-000000000006', '1992-09-25', 'Male', 'A-', '34 Hill Street, Galle', 'Nirmala Gunasekara', 'Sibling', '+94776789012');
+INSERT INTO patients (id, user_id, date_of_birth, gender, blood_type, address, emergency_contact, emergency_relationship, emergency_phone, profile_image_url, insurance_provider, insurance_policy_number, insurance_plan_type, insurance_expiry_date) VALUES
+  ('ce000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', '1990-03-15', 'Female', 'O+', '45 Galle Road, Colombo 03', 'Amal Fernando', 'Spouse', '+94771234567', 'default-images/58509051_9439729.jpg', 'Sri Lanka Insurance Corporation', 'SLIC-HI-2024-08932', 'Comprehensive', '2029-03-31'),
+  ('ce000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', '1985-07-22', 'Male', 'A+', '12 Kandy Road, Peradeniya', 'Kamala Rajapaksa', 'Parent', '+94772345678', 'default-images/58509043_9439678.jpg', 'Ceylinco Insurance', 'CEY-MED-2024-45210', 'Inpatient', '2028-12-31'),
+  ('ce000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', '1995-11-08', 'Female', 'B+', '78 Temple Road, Nugegoda', 'Sunil Weerasinghe', 'Parent', '+94773456789', 'default-images/58509055_9439726.jpg', 'AIA Insurance Lanka', 'AIA-HP-2025-71034', 'Comprehensive', '2029-06-30'),
+  ('ce000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000004', '1978-01-30', 'Male', 'AB-', '23 Lake Drive, Kurunegala', 'Priya Jayasuriya', 'Spouse', '+94774567890', 'default-images/58509054_9441186.jpg', NULL, NULL, NULL, NULL),
+  ('ce000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000005', '2000-06-12', 'Female', 'O-', '56 Beach Road, Matara', 'Kumari Abeywickrama', 'Parent', '+94775678901', 'default-images/58509058_9442242.jpg', 'Allianz Insurance Lanka', 'ALZ-SL-2025-33891', 'Outpatient', '2028-09-30'),
+  ('ce000000-0000-0000-0000-000000000006', 'c0000000-0000-0000-0000-000000000006', '1992-09-25', 'Male', 'A-', '34 Hill Street, Galle', 'Nirmala Gunasekara', 'Sibling', '+94776789012', 'default-images/58509057_9440461.jpg', 'Union Assurance', 'UA-HEALTH-2024-12567', 'Inpatient', '2028-04-15');
 
 -- ============================================
 -- NURSES (profiles)

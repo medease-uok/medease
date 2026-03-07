@@ -1,0 +1,12 @@
+#!/bin/sh
+
+echo "Running backend tests..."
+cd "$(git rev-parse --show-toplevel)/backend" || exit 1
+npm test
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Tests failed. Commit aborted."
+  echo "Fix the failing tests or use --no-verify to skip (not recommended)."
+  exit 1
+fi

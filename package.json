@@ -1,0 +1,11 @@
+{
+  "name": "medease",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MedEase Hospital Management System",
+  "scripts": {
+    "start": "node start.js",
+    "encrypt-secrets": "node scripts/encrypt-secrets.js",
+    "create-admin": "node scripts/create-admin.js"
+  }
+}

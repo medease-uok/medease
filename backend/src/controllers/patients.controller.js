@@ -1,19 +1,24 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
+const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
+
+const PATIENT_SELECT = `
+  SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
+         p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
+         p.emergency_contact, p.emergency_relationship, p.emergency_phone,
+         p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
+  FROM patients p
+  JOIN users u ON p.user_id = u.id`;
 
 const getAll = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone
-       FROM patients p
-       JOIN users u ON p.user_id = u.id
+      `${PATIENT_SELECT}
        WHERE u.is_active = true
        ORDER BY u.last_name, u.first_name`
     );
 
-    const patients = result.rows.map(mapPatient);
+    const patients = await Promise.all(result.rows.map(mapPatient));
     res.json({ status: 'success', data: patients });
   } catch (err) {
     return next(err);
@@ -24,13 +29,10 @@ const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
+    // req.resource is set by checkResourceAccess('patient') middleware
+    // which already verified ABAC access — just fetch full details
     const patientResult = await db.query(
-      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone
-       FROM patients p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
+      `${PATIENT_SELECT} WHERE p.id = $1`,
       [id]
     );
 
@@ -38,7 +40,7 @@ const getById = async (req, res, next) => {
       throw new AppError('Patient not found.', 404);
     }
 
-    const patient = mapPatient(patientResult.rows[0]);
+    const patient = await mapPatient(patientResult.rows[0]);
 
     const [recordsResult, rxResult, labsResult] = await Promise.all([
       db.query(
@@ -84,20 +86,107 @@ const getById = async (req, res, next) => {
       },
     });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
+  }
+};
+
+function buildSetClauses(fieldMap) {
+  const setClauses = [];
+  const params = [];
+  let idx = 1;
+
+  for (const [column, value] of Object.entries(fieldMap)) {
+    if (value !== undefined) {
+      setClauses.push(`${column} = $${idx++}`);
+      params.push(value ?? null);
+    }
+  }
+
+  return { setClauses, params, nextIdx: idx };
+}
+
+const updateById = async (req, res, next) => {
+  const client = await db.getClient();
+  try {
+    const { id } = req.params;
+    const {
+      firstName, lastName, phone,
+      dateOfBirth, gender, bloodType, address,
+      emergencyContact, emergencyRelationship, emergencyPhone,
+      insuranceProvider, insurancePolicyNumber, insurancePlanType, insuranceExpiryDate,
+    } = req.body;
+
+    const userUpdate = buildSetClauses({
+      first_name: firstName,
+      last_name: lastName,
+      phone: phone !== undefined ? (phone || null) : undefined,
+    });
+
+    const profileUpdate = buildSetClauses({
+      date_of_birth: dateOfBirth,
+      gender: gender,
+      blood_type: bloodType !== undefined ? (bloodType || null) : undefined,
+      address: address !== undefined ? (address || null) : undefined,
+      emergency_contact: emergencyContact !== undefined ? (emergencyContact || null) : undefined,
+      emergency_relationship: emergencyRelationship !== undefined ? (emergencyRelationship || null) : undefined,
+      emergency_phone: emergencyPhone !== undefined ? (emergencyPhone || null) : undefined,
+      insurance_provider: insuranceProvider !== undefined ? (insuranceProvider || null) : undefined,
+      insurance_policy_number: insurancePolicyNumber !== undefined ? (insurancePolicyNumber || null) : undefined,
+      insurance_plan_type: insurancePlanType !== undefined ? (insurancePlanType || null) : undefined,
+      insurance_expiry_date: insuranceExpiryDate !== undefined ? (insuranceExpiryDate || null) : undefined,
+    });
+
+    if (userUpdate.setClauses.length === 0 && profileUpdate.setClauses.length === 0) {
+      return next(new AppError('No valid fields provided for update.', 400));
+    }
+
+    await client.query('BEGIN');
+
+    const patientResult = await client.query(
+      'SELECT user_id FROM patients WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+    if (patientResult.rows.length === 0) {
+      throw new AppError('Resource not found.', 404);
+    }
+    const userId = patientResult.rows[0].user_id;
+
+    if (userUpdate.setClauses.length > 0) {
+      userUpdate.params.push(userId);
+      await client.query(
+        `UPDATE users SET ${userUpdate.setClauses.join(', ')}, updated_at = NOW() WHERE id = $${userUpdate.nextIdx}`,
+        userUpdate.params
+      );
+    }
+
+    if (profileUpdate.setClauses.length > 0) {
+      profileUpdate.params.push(id);
+      await client.query(
+        `UPDATE patients SET ${profileUpdate.setClauses.join(', ')}, updated_at = NOW() WHERE id = $${profileUpdate.nextIdx}`,
+        profileUpdate.params
+      );
+    }
+
+    const result = await client.query(
+      `${PATIENT_SELECT} WHERE p.id = $1`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    return next(err);
+  } finally {
+    client.release();
   }
 };
 
 const getMe = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone
-       FROM patients p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.user_id = $1`,
+      `${PATIENT_SELECT} WHERE p.user_id = $1`,
       [req.user.id]
     );
 
@@ -105,14 +194,13 @@ const getMe = async (req, res, next) => {
       throw new AppError('Patient profile not found.', 404);
     }
 
-    res.json({ status: 'success', data: mapPatient(result.rows[0]) });
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
   } catch (err) {
-    if (err.isOperational) return next(err);
     return next(err);
   }
 };
 
-function mapPatient(row) {
+async function mapPatient(row) {
   return {
     id: row.id,
     userId: row.user_id,
@@ -124,9 +212,14 @@ function mapPatient(row) {
     gender: row.gender,
     bloodType: row.blood_type,
     address: row.address,
+    profileImageUrl: await getPresignedImageUrl(row.profile_image_url),
     emergencyContact: row.emergency_contact,
     emergencyRelationship: row.emergency_relationship,
     emergencyPhone: row.emergency_phone,
+    insuranceProvider: row.insurance_provider,
+    insurancePolicyNumber: row.insurance_policy_number,
+    insurancePlanType: row.insurance_plan_type,
+    insuranceExpiryDate: row.insurance_expiry_date,
   };
 }
 
@@ -172,4 +265,78 @@ function mapLabReport(row) {
   };
 }
 
-module.exports = { getAll, getById, getMe };
+const uploadProfileImage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      return next(new AppError('No image file provided.', 400));
+    }
+
+    // Get current image URL for cleanup
+    const current = await db.query(
+      'SELECT profile_image_url FROM patients WHERE id = $1',
+      [id]
+    );
+    if (current.rows.length === 0) {
+      return next(new AppError('Patient not found.', 404));
+    }
+
+    const oldKey = current.rows[0].profile_image_url;
+    const newKey = await uploadToS3(req.file, id);
+
+    await db.query(
+      'UPDATE patients SET profile_image_url = $1, updated_at = NOW() WHERE id = $2',
+      [newKey, id]
+    );
+
+    // Clean up old image (best-effort)
+    deleteFromS3(oldKey);
+
+    const result = await db.query(
+      `${PATIENT_SELECT} WHERE p.id = $1`,
+      [id]
+    );
+
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const deleteProfileImage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const current = await db.query(
+      'SELECT profile_image_url FROM patients WHERE id = $1',
+      [id]
+    );
+    if (current.rows.length === 0) {
+      return next(new AppError('Patient not found.', 404));
+    }
+
+    const oldKey = current.rows[0].profile_image_url;
+    if (!oldKey) {
+      return next(new AppError('No profile image to delete.', 400));
+    }
+
+    await db.query(
+      'UPDATE patients SET profile_image_url = NULL, updated_at = NOW() WHERE id = $1',
+      [id]
+    );
+
+    deleteFromS3(oldKey);
+
+    const result = await db.query(
+      `${PATIENT_SELECT} WHERE p.id = $1`,
+      [id]
+    );
+
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, getMe, updateById, uploadProfileImage, deleteProfileImage };

@@ -7,6 +7,7 @@ const config = require('../config');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/auditLog');
 const { sendLoginOtpEmail, sendRegistrationVerificationEmail, sendPasswordResetOtpEmail } = require('../utils/emailService');
+const { getUserPermissions } = require('../utils/permissions');
 
 /** Masks most of an email address for safe display, e.g. jo***@example.com */
 function maskEmail(email) {
@@ -20,6 +21,41 @@ const otpKey = (userId) => `login_otp:${userId}`;
 
 const SALT_ROUNDS = 12;
 
+const DEFAULT_AVATARS = {
+  Male: [
+    'default-images/58509043_9439678.jpg',
+    'default-images/58509054_9441186.jpg',
+    'default-images/58509057_9440461.jpg',
+  ],
+  Female: [
+    'default-images/58509051_9439729.jpg',
+    'default-images/58509055_9439726.jpg',
+    'default-images/58509058_9442242.jpg',
+  ],
+};
+
+function pickDefaultAvatar(gender) {
+  const list = DEFAULT_AVATARS[gender];
+  if (list) return list[Math.floor(Math.random() * list.length)];
+  const all = [...DEFAULT_AVATARS.Male, ...DEFAULT_AVATARS.Female];
+  return all[Math.floor(Math.random() * all.length)];
+}
+
+function signAccessToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiresIn }
+  );
+}
+
+async function createRefreshToken(userId) {
+  const token = crypto.randomBytes(40).toString('hex');
+  const key = `refresh:${token}`;
+  await redis.set(key, String(userId), 'EX', config.refreshTokenTTL);
+  return token;
+}
+
 const register = async (req, res, next) => {
   const {
     firstName, lastName, email, phone, role, password,
@@ -31,7 +67,6 @@ const register = async (req, res, next) => {
   const client = await db.getClient();
 
   try {
-    // Check for duplicate email
     const existing = await client.query(
       'SELECT id FROM users WHERE email = $1',
       [email]
@@ -40,7 +75,6 @@ const register = async (req, res, next) => {
       throw new AppError('An account with this email already exists.', 409);
     }
 
-    // Check for duplicate license number if applicable
     if (licenseNumber && ['doctor', 'nurse', 'pharmacist'].includes(role)) {
       const tableMap = { doctor: 'doctors', nurse: 'nurses', pharmacist: 'pharmacists' };
       const table = tableMap[role];
@@ -53,30 +87,29 @@ const register = async (req, res, next) => {
       }
     }
 
-    // Hash password
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-    // Begin transaction
     await client.query('BEGIN');
 
-    // Insert user
+    const defaultAvatar = role !== 'patient' ? pickDefaultAvatar(gender) : null;
+
     const userResult = await client.query(
-      `INSERT INTO users (email, password_hash, first_name, last_name, role, phone, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, false)
+      `INSERT INTO users (email, password_hash, first_name, last_name, role, phone, date_of_birth, is_active, profile_image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8)
        RETURNING id, email, first_name, last_name, role, is_active, created_at`,
-      [email, passwordHash, firstName, lastName, role, phone || null]
+      [email, passwordHash, firstName, lastName, role, phone || null, dateOfBirth || null, defaultAvatar]
     );
     const user = userResult.rows[0];
 
-    // Insert role-specific profile
     switch (role) {
       case 'patient':
         await client.query(
           `INSERT INTO patients (user_id, date_of_birth, gender, blood_type, address,
-             emergency_contact, emergency_relationship, emergency_phone)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+             emergency_contact, emergency_relationship, emergency_phone, profile_image_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [user.id, dateOfBirth, gender, bloodType || null, address || null,
-           emergencyContact || null, emergencyRelationship || null, emergencyPhone || null]
+           emergencyContact || null, emergencyRelationship || null, emergencyPhone || null,
+           pickDefaultAvatar(gender)]
         );
         break;
 
@@ -105,13 +138,15 @@ const register = async (req, res, next) => {
         break;
 
       case 'lab_technician':
-        // No dedicated table for lab technicians in the current schema.
-        // Department is accepted but not persisted beyond the user record.
-        // TODO: Add lab_technicians table or department column to users table.
         break;
     }
 
-    // Commit transaction
+    await client.query(
+      `INSERT INTO user_roles (user_id, role_id)
+       SELECT $1, id FROM roles WHERE name = $2`,
+      [user.id, role]
+    );
+
     await client.query('COMMIT');
 
     // Generate email verification token and save it
@@ -122,7 +157,6 @@ const register = async (req, res, next) => {
       [verificationToken, verificationExpires, user.id]
     );
 
-    // Audit log: successful registration
     await auditLog({
       userId: user.id,
       action: 'REGISTER',
@@ -149,7 +183,6 @@ const register = async (req, res, next) => {
   } catch (err) {
     await client.query('ROLLBACK');
 
-    // Audit log: failed registration attempt
     await auditLog({
       userId: null,
       action: 'REGISTER',
@@ -183,7 +216,6 @@ const login = async (req, res, next) => {
   const { email, password } = req.body;
 
   try {
-    // Find user by email
     const result = await db.query(
       'SELECT id, email, password_hash, first_name, last_name, role, is_active, email_verified FROM users WHERE email = $1',
       [email]
@@ -196,7 +228,6 @@ const login = async (req, res, next) => {
       throw new AppError('Invalid email or password.', 401);
     }
 
-    // Compare password
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       throw new AppError('Invalid email or password.', 401);
@@ -212,13 +243,10 @@ const login = async (req, res, next) => {
       throw new AppError('Your account is pending admin approval.', 403);
     }
 
-    // -------------------------------------------------------------------
-    // Email OTP Verification
-    // -------------------------------------------------------------------
     // Generate a cryptographically-random 6-digit OTP
     const otp = crypto.randomInt(100000, 999999).toString();
 
-    // Store in Redis: { otp, attempts } – expires after OTP_TTL_SECONDS
+    // Store in Redis: { otp, attempts } - expires after OTP_TTL_SECONDS
     await redis.set(
       otpKey(user.id),
       JSON.stringify({ otp, attempts: 0 }),
@@ -226,10 +254,9 @@ const login = async (req, res, next) => {
       config.otp.ttlSeconds
     );
 
-    // Send OTP email (non-blocking audit is still recorded below on failure)
+    // Send OTP email
     await sendLoginOtpEmail(user.email, user.first_name, otp);
 
-    // Audit log: OTP sent (maps to 'LOGIN_OTP_SENT' action – logged as pending)
     await auditLog({
       userId: user.id,
       action: 'LOGIN_OTP_SENT',
@@ -245,7 +272,6 @@ const login = async (req, res, next) => {
       },
     });
   } catch (err) {
-    // Audit log: failed login attempt
     await auditLog({
       userId: null,
       action: 'LOGIN',
@@ -254,22 +280,18 @@ const login = async (req, res, next) => {
       success: false,
     });
 
-    if (err.isOperational) {
-      return next(err);
-    }
     return next(err);
   }
 };
 
 /**
  * POST /auth/verify-otp
- * Validates the emailed OTP and, on success, returns the JWT access token.
+ * Validates the emailed OTP and, on success, returns the JWT access + refresh tokens.
  */
 const verifyOtp = async (req, res, next) => {
   const { email, otp } = req.body;
 
   try {
-    // Fetch user
     const result = await db.query(
       'SELECT id, email, first_name, last_name, role, is_active FROM users WHERE email = $1',
       [email]
@@ -280,7 +302,6 @@ const verifyOtp = async (req, res, next) => {
       throw new AppError('Invalid or expired verification code.', 401);
     }
 
-    // Retrieve OTP record from Redis
     const raw = await redis.get(otpKey(user.id));
     if (!raw) {
       throw new AppError('Verification code has expired. Please log in again.', 401);
@@ -288,18 +309,15 @@ const verifyOtp = async (req, res, next) => {
 
     const record = JSON.parse(raw);
 
-    // Enforce max-attempt limit (prevent brute-force)
     if (record.attempts >= config.otp.maxAttempts) {
       await redis.del(otpKey(user.id));
       throw new AppError(
-        `Too many incorrect attempts. Please log in again to request a new code.`,
+        'Too many incorrect attempts. Please log in again to request a new code.',
         429
       );
     }
 
-    // Compare OTP
     if (record.otp !== otp.trim()) {
-      // Increment attempt counter but keep the same TTL
       const ttl = await redis.ttl(otpKey(user.id));
       await redis.set(
         otpKey(user.id),
@@ -314,10 +332,9 @@ const verifyOtp = async (req, res, next) => {
       );
     }
 
-    // OTP is valid — delete it from Redis immediately (single-use)
+    // OTP is valid - delete it from Redis immediately (single-use)
     await redis.del(otpKey(user.id));
 
-    // Audit log: successful login
     await auditLog({
       userId: user.id,
       action: 'LOGIN',
@@ -325,17 +342,14 @@ const verifyOtp = async (req, res, next) => {
       ip: req.ip,
     });
 
-    // Sign JWT
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      config.jwtSecret,
-      { expiresIn: config.jwtExpiresIn }
-    );
+    const token = signAccessToken(user);
+    const refreshToken = await createRefreshToken(user.id);
 
     return res.json({
       status: 'success',
       data: {
         token,
+        refreshToken,
         user: {
           id: user.id,
           email: user.email,
@@ -347,7 +361,6 @@ const verifyOtp = async (req, res, next) => {
       },
     });
   } catch (err) {
-    // Only log as failed LOGIN if it wasn't an OTP-stage error (to avoid duplicate entries)
     if (!err.isOperational) {
       await auditLog({
         userId: null,
@@ -358,9 +371,6 @@ const verifyOtp = async (req, res, next) => {
       });
     }
 
-    if (err.isOperational) {
-      return next(err);
-    }
     return next(err);
   }
 };
@@ -435,7 +445,6 @@ const resendVerification = async (req, res, next) => {
     );
 
     if (result.rows.length === 0) {
-      // Don't leak whether the email exists
       return res.json({ status: 'success', message: 'If that email is registered, a new verification link has been sent.' });
     }
 
@@ -477,7 +486,6 @@ const forgotPassword = async (req, res, next) => {
       [email]
     );
 
-    // Always respond the same way to prevent email enumeration
     if (result.rows.length === 0 || !result.rows[0].email_verified) {
       return res.json({
         status: 'success',
@@ -560,7 +568,7 @@ const verifyResetOtp = async (req, res, next) => {
       );
     }
 
-    // OTP valid — delete it and issue a one-time reset token (5 minutes)
+    // OTP valid - delete it and issue a one-time reset token (5 minutes)
     await redis.del(`pwd_reset_otp:${user.id}`);
     const resetToken = crypto.randomBytes(32).toString('hex');
     await redis.set(`pwd_reset_token:${user.id}`, resetToken, 'EX', 300);
@@ -596,7 +604,6 @@ const resetPassword = async (req, res, next) => {
       [passwordHash, userId]
     );
 
-    // Invalidate reset token immediately
     await redis.del(`pwd_reset_token:${userId}`);
 
     await auditLog({
@@ -617,4 +624,92 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, verifyOtp, verifyEmail, resendVerification, forgotPassword, verifyResetOtp, resetPassword };
+const refresh = async (req, res, next) => {
+  const { refreshToken } = req.body;
+
+  try {
+    if (!refreshToken) {
+      throw new AppError('Refresh token is required.', 400);
+    }
+
+    const key = `refresh:${refreshToken}`;
+    const userId = await redis.get(key);
+
+    if (!userId) {
+      throw new AppError('Invalid or expired refresh token.', 401);
+    }
+
+    const result = await db.query(
+      'SELECT id, email, first_name, last_name, role, is_active FROM users WHERE id = $1',
+      [userId]
+    );
+
+    const user = result.rows[0];
+
+    if (!user || !user.is_active) {
+      await redis.del(key);
+      throw new AppError('Account not found or inactive.', 401);
+    }
+
+    // Rotate: delete old refresh token, issue new pair
+    await redis.del(key);
+    const newAccessToken = signAccessToken(user);
+    const newRefreshToken = await createRefreshToken(user.id);
+
+    res.json({
+      status: 'success',
+      data: {
+        token: newAccessToken,
+        refreshToken: newRefreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          role: user.role,
+          isActive: user.is_active,
+        },
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const logout = async (req, res, next) => {
+  const { refreshToken } = req.body;
+
+  try {
+    if (refreshToken) {
+      await redis.del(`refresh:${refreshToken}`);
+    }
+
+    if (req.user) {
+      await auditLog({
+        userId: req.user.id,
+        action: 'LOGOUT',
+        resourceType: 'session',
+        ip: req.ip,
+      });
+    }
+
+    res.json({ status: 'success', message: 'Logged out successfully.' });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const getMyPermissions = async (req, res, next) => {
+  try {
+    const permissions = await getUserPermissions(req.user.id);
+    res.json({ status: 'success', data: permissions });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = {
+  register, login, verifyOtp, verifyEmail, resendVerification,
+  forgotPassword, verifyResetOtp, resetPassword,
+  refresh, logout, getMyPermissions,
+};

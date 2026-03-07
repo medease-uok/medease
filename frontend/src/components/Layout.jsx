@@ -2,7 +2,6 @@ import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import './Layout.css';
 
 const pageTitles = {
   '/dashboard': 'Dashboard',
@@ -27,11 +26,13 @@ export default function Layout() {
   const title = pageTitles[basePath] || 'MedEase';
 
   return (
-    <div className="layout">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <Sidebar />
       <Header title={title} />
-      <main className="layout-content">
-        <Outlet />
+      <main className="ml-64 pt-16 min-h-screen">
+        <div className="p-8">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

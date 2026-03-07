@@ -18,6 +18,7 @@ build/
 # IDE
 .idea/
 .vscode/
+.claude/
 
 # Logs
 *.log
@@ -45,8 +46,11 @@ override.tf.json
 .terraformrc
 terraform.rc
 
-# Vault password (saved locally by start.sh — never commit)
+# Vault password (saved locally by start script — never commit)
 .vault-password
+
+# Root package-lock (no root dependencies)
+/package-lock.json
 
 # Additional common ignores
 dist/

@@ -98,7 +98,7 @@ jobs:
             Keep your review concise and actionable.`;
 
             const body = JSON.stringify({
-              model: 'claude-sonnet-4-5-20250929',
+              model: 'claude-sonnet-4-6',
               max_tokens: 8192,
               messages: [{ role: 'user', content: prompt }]
             });
@@ -124,7 +124,7 @@ jobs:
             const result = JSON.parse(responseText);
             const review = result.content[0].text;
 
-            const commentBody = '## 🤖 Claude Code Review\n\n' + review + '\n\n---\n*Review powered by Claude Sonnet 4.5*';
+            const commentBody = '## 🤖 Claude Code Review\n\n' + review;
 
             try {
               await github.rest.issues.createComment({

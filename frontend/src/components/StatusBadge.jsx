@@ -1,14 +1,17 @@
-import './StatusBadge.css';
+import { Badge } from './ui/badge';
 
-const colors = {
-  scheduled: { bg: '#ebf4ff', text: '#2b6cb0' },
-  confirmed: { bg: '#e6ffed', text: '#22543d' },
-  in_progress: { bg: '#fefcbf', text: '#744210' },
-  completed: { bg: '#edf2f7', text: '#4a5568' },
-  cancelled: { bg: '#fed7d7', text: '#9b2c2c' },
-  active: { bg: '#e6ffed', text: '#22543d' },
-  dispensed: { bg: '#ebf4ff', text: '#2b6cb0' },
-  expired: { bg: '#edf2f7', text: '#4a5568' },
+
+const statusVariants = {
+  scheduled: 'default',
+  confirmed: 'success',
+  in_progress: 'warning',
+  completed: 'success',
+  cancelled: 'destructive',
+  active: 'success',
+  inactive: 'secondary',
+  dispensed: 'default',
+  expired: 'secondary',
+  pending: 'warning',
 };
 
 const labels = {
@@ -17,15 +20,12 @@ const labels = {
 };
 
 export default function StatusBadge({ status }) {
-  const color = colors[status] || { bg: '#edf2f7', text: '#4a5568' };
+  const variant = statusVariants[status] || 'secondary';
   const label = labels[status] || status.charAt(0).toUpperCase() + status.slice(1);
 
   return (
-    <span
-      className="status-badge"
-      style={{ backgroundColor: color.bg, color: color.text }}
-    >
+    <Badge variant={variant}>
       {label}
-    </span>
+    </Badge>
   );
 }
