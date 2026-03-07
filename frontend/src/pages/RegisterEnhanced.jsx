@@ -427,7 +427,24 @@ export default function RegisterEnhanced() {
                           </h4>
                           <div className="grid grid-cols-2 gap-4">
                             <InputField label="Contact Name" name="emergencyContact" icon={UserCheck} value={form.emergencyContact} onChange={handleChange} disabled={loading} placeholder="Full name" maxLength={100} />
-                            <InputField label="Relationship" name="emergencyRelationship" value={form.emergencyRelationship} onChange={handleChange} disabled={loading} placeholder="e.g. Parent, Spouse" maxLength={50} />
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">Relationship</label>
+                              <select
+                                name="emergencyRelationship"
+                                value={form.emergencyRelationship}
+                                onChange={handleChange}
+                                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                              >
+                                <option value="">Select Relationship</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Spouse">Spouse</option>
+                                <option value="Sibling">Sibling</option>
+                                <option value="Child">Child</option>
+                                <option value="Friend">Friend</option>
+                                <option value="Guardian">Guardian</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </div>
                           </div>
                           <div className="mt-4">
                             <label className="block text-sm font-medium text-slate-700 mb-2">Emergency Phone</label>
