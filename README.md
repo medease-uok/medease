@@ -24,6 +24,7 @@ MedEase is a web-based hospital management system that streamlines patient care,
 - **Lab Reports** - Upload, view, and manage laboratory test results
 - **Prescription Management** - Electronic prescriptions with pharmacy dispensing
 - **Role-Based Access Control (RBAC)** - Granular permissions system with 26 permissions across 6 categories
+- **Attribute-Based Access Control (ABAC)** - Fine-grained, policy-driven access filtering on resources (appointments, records, prescriptions, lab reports)
 - **Audit Logging** - Track all user actions for security and compliance
 - **Session Management** - JWT access tokens with refresh token rotation and inactivity timeout
 - **CAPTCHA Protection** - Cloudflare Turnstile on registration to prevent bot signups
@@ -70,7 +71,8 @@ medease/
 ├── database/
 │   ├── init/
 │   │   ├── 01-init.sql         # Core schema: users, patients, doctors, nurses, etc.
-│   │   └── 02-roles-permissions.sql  # RBAC: roles, permissions, role_permissions, user_roles
+│   │   ├── 02-roles-permissions.sql  # RBAC: roles, permissions, role_permissions, user_roles
+│   │   └── 03-abac-policies.sql     # ABAC: policy-based access control rules
 │   └── seed.sql                # Sample data for all tables
 ├── scripts/
 │   ├── lib/vault.js            # AES-256 crypto utility (OpenSSL-compatible)
@@ -83,9 +85,10 @@ medease/
 │       │   ├── database.js     # PostgreSQL connection pool
 │       │   └── redis.js        # Redis client
 │       ├── controllers/        # Route handlers
-│       │   ├── auth.controller.js        # Login, register, refresh, logout, permissions
+│       │   ├── auth.controller.js        # Login, register, refresh, logout
 │       │   ├── admin.controller.js       # User management, audit logs
 │       │   ├── roles.controller.js       # RBAC management
+│       │   ├── abac.controller.js        # ABAC policy CRUD
 │       │   ├── patients.controller.js
 │       │   ├── doctors.controller.js
 │       │   ├── appointments.controller.js
@@ -96,11 +99,14 @@ medease/
 │       ├── middleware/
 │       │   ├── authenticate.js   # JWT verification
 │       │   ├── authorize.js      # Role-based + permission-based authorization
+│       │   ├── abac.js           # ABAC resource-level access checks
+│       │   ├── resolveSubject.js # Resolves user profile IDs for ABAC
 │       │   ├── verifyCaptcha.js  # Cloudflare Turnstile verification
 │       │   ├── validate.js       # Request validation
 │       │   └── errorHandler.js   # Global error handling
 │       ├── routes/               # API route definitions
 │       ├── utils/
+│       │   ├── abac.js           # ABAC policy engine (evaluate, build SQL filters)
 │       │   ├── permissions.js    # Permission checks with Redis caching
 │       │   ├── auditLog.js       # Audit logging utility
 │       │   └── AppError.js       # Custom error class
@@ -314,19 +320,38 @@ cd backend && npm run db:seed   # Seed database manually
 
 ### Authorization Layers
 
-**Role-based** (existing, backward-compatible):
+MedEase uses three complementary authorization layers:
+
+**1. Role-based (RBAC):**
 ```js
 const authorize = require('../middleware/authorize');
 router.get('/users', authorize('admin'));
 ```
 
-**Permission-based** (new, granular):
+**2. Permission-based (granular RBAC):**
 ```js
 const { requirePermission } = require('../middleware/authorize');
 router.post('/prescriptions', requirePermission('create_prescription'));
 ```
 
 Permissions are resolved from `user_roles` -> `role_permissions` -> `permissions` tables, cached in Redis for 5 minutes. Roles support **single-parent hierarchy** — a child role inherits all permissions from its parent chain.
+
+**3. Attribute-based (ABAC):**
+```js
+const { checkResourceAccess } = require('../middleware/abac');
+router.get('/patients/:id', checkResourceAccess('patient'), controller);
+```
+
+ABAC policies are stored in the `abac_policies` table as JSON condition trees and evaluated at runtime. They control which users can access which specific resources based on attributes (e.g., "patients can only view their own appointments"). Policies are cached in Redis for 5 minutes.
+
+For list endpoints, `buildAccessFilter()` converts ABAC policies into SQL WHERE clauses so filtering happens at the database level:
+```js
+const { buildAccessFilter } = require('../utils/abac');
+const { clause, params } = await buildAccessFilter('appointment', subject, columnMap);
+const result = await db.query(`SELECT ... WHERE ${clause}`, params);
+```
+
+Admins can manage ABAC policies at runtime via the `/api/abac-policies` endpoints (CRUD).
 
 **Frontend route guards** (role-based):
 ```jsx
@@ -342,7 +367,7 @@ const { can, canAny } = usePermissions();
 <Can any={['view_prescriptions', 'view_own_prescriptions']}>...</Can>
 ```
 
-### Database Schema (RBAC)
+### Database Schema (RBAC + ABAC)
 
 ```
 permissions          roles                  user_roles
@@ -353,9 +378,21 @@ permissions          roles                  user_roles
 └── created_at       ├── parent_role_id →   ├── role_id → roles.id
                      │   roles.id (hierarchy)└── permission_id → permissions.id
                      └── created_at
+
+abac_policies
+├── id
+├── name                    # Unique policy name
+├── resource_type           # appointment, medical_record, prescription, lab_report, patient
+├── conditions (JSONB)      # JSON condition tree (any/all/equals/equals_ref/in/exists)
+├── effect                  # allow | deny
+├── priority                # Higher = evaluated first
+├── is_active
+└── created_at
 ```
 
 26 permissions across 6 categories: `patients`, `appointments`, `medical_records`, `prescriptions`, `lab_reports`, `admin`.
+
+15 default ABAC policies covering ownership-based access for all resource types.
 
 ## Support
 
