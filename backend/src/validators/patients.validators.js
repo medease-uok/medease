@@ -14,7 +14,7 @@ const updatePatientValidation = [
   body('phone')
     .optional({ values: 'falsy' })
     .trim()
-    .matches(/^(\+94)?[7-9]\d{8,9}$/).withMessage('Phone number should be 9-10 digits starting with 7, 8, or 9 (optionally prefixed with +94).'),
+    .matches(/^(\+94)?[7-9]\d{8}$/).withMessage('Phone number should be 9 digits starting with 7, 8, or 9 (optionally prefixed with +94).'),
   body('dateOfBirth')
     .optional()
     .isISO8601().withMessage('Date of birth must be a valid date.')
@@ -46,7 +46,7 @@ const updatePatientValidation = [
   body('emergencyPhone')
     .optional({ values: 'falsy' })
     .trim()
-    .matches(/^(\+94)?[7-9]\d{8,9}$/).withMessage('Emergency phone should be 9-10 digits starting with 7, 8, or 9 (optionally prefixed with +94).'),
+    .matches(/^(\+94)?[7-9]\d{8}$/).withMessage('Emergency phone should be 9 digits starting with 7, 8, or 9 (optionally prefixed with +94).'),
 ];
 
 module.exports = { updatePatientValidation };
