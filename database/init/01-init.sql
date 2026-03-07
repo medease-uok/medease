@@ -33,6 +33,8 @@ CREATE TABLE users (
   last_name VARCHAR(100) NOT NULL,
   role user_role NOT NULL,
   phone VARCHAR(20),
+  date_of_birth DATE,
+  profile_image_url TEXT,
   is_active BOOLEAN DEFAULT false,
   mfa_enabled BOOLEAN DEFAULT false,
   created_at TIMESTAMP DEFAULT NOW(),

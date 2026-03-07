@@ -9,6 +9,26 @@ const auditLog = require('../utils/auditLog');
 
 const SALT_ROUNDS = 12;
 
+const DEFAULT_AVATARS = {
+  Male: [
+    'default-images/58509043_9439678.jpg',
+    'default-images/58509054_9441186.jpg',
+    'default-images/58509057_9440461.jpg',
+  ],
+  Female: [
+    'default-images/58509051_9439729.jpg',
+    'default-images/58509055_9439726.jpg',
+    'default-images/58509058_9442242.jpg',
+  ],
+};
+
+function pickDefaultAvatar(gender) {
+  const list = DEFAULT_AVATARS[gender];
+  if (list) return list[Math.floor(Math.random() * list.length)];
+  const all = [...DEFAULT_AVATARS.Male, ...DEFAULT_AVATARS.Female];
+  return all[Math.floor(Math.random() * all.length)];
+}
+
 const register = async (req, res, next) => {
   const {
     firstName, lastName, email, phone, role, password,
@@ -44,11 +64,13 @@ const register = async (req, res, next) => {
 
     await client.query('BEGIN');
 
+    const defaultAvatar = role !== 'patient' ? pickDefaultAvatar(gender) : null;
+
     const userResult = await client.query(
-      `INSERT INTO users (email, password_hash, first_name, last_name, role, phone, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, false)
+      `INSERT INTO users (email, password_hash, first_name, last_name, role, phone, date_of_birth, is_active, profile_image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8)
        RETURNING id, email, first_name, last_name, role, is_active, created_at`,
-      [email, passwordHash, firstName, lastName, role, phone || null]
+      [email, passwordHash, firstName, lastName, role, phone || null, dateOfBirth || null, defaultAvatar]
     );
     const user = userResult.rows[0];
 
@@ -56,10 +78,11 @@ const register = async (req, res, next) => {
       case 'patient':
         await client.query(
           `INSERT INTO patients (user_id, date_of_birth, gender, blood_type, address,
-             emergency_contact, emergency_relationship, emergency_phone)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+             emergency_contact, emergency_relationship, emergency_phone, profile_image_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [user.id, dateOfBirth, gender, bloodType || null, address || null,
-           emergencyContact || null, emergencyRelationship || null, emergencyPhone || null]
+           emergencyContact || null, emergencyRelationship || null, emergencyPhone || null,
+           pickDefaultAvatar(gender)]
         );
         break;
 

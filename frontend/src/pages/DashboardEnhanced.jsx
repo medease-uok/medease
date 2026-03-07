@@ -9,6 +9,8 @@ import { useAuth } from '../data/AuthContext';
 import { AnimatedStatsCard } from '../components/AnimatedStatsCard';
 import { QuickActions } from '../components/QuickActions';
 import { ActivityFeed } from '../components/ActivityFeed';
+import UserProfileCard from '../components/UserProfileCard';
+import EditStaffProfileModal from '../components/EditStaffProfileModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
@@ -132,14 +134,17 @@ const appointmentTableConfig = {
 };
 
 export default function DashboardEnhanced() {
-  const { currentUser } = useAuth();
+  const { currentUser, updateUser } = useAuth();
   const navigate = useNavigate();
   const role = currentUser?.role || 'patient';
   const isAdmin = role === 'admin';
+  const showProfile = !isAdmin && role !== 'patient';
 
   const [dashData, setDashData] = useState(null);
   const [activityData, setActivityData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [profileData, setProfileData] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const [adminTab, setAdminTab] = useState('pending');
   const [pendingUsers, setPendingUsers] = useState([]);
@@ -166,7 +171,16 @@ export default function DashboardEnhanced() {
       setActivityData(activityRes.data || []);
     }).catch(console.error);
 
-    Promise.allSettled([fetchStats, fetchActivity]).finally(() => setLoading(false));
+    const fetchProfile = showProfile
+      ? api.get('/profile/me').then((profileRes) => {
+          setProfileData(profileRes.data);
+          if (profileRes.data.profileImageUrl) {
+            updateUser({ profileImageUrl: profileRes.data.profileImageUrl });
+          }
+        }).catch(console.error)
+      : Promise.resolve();
+
+    Promise.allSettled([fetchStats, fetchActivity, fetchProfile]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -253,6 +267,33 @@ export default function DashboardEnhanced() {
           {roleGreetings[role] || 'Welcome to your dashboard.'}
         </p>
       </div>
+
+      {showProfile && profileData && (
+        <UserProfileCard
+          profile={profileData}
+          onProfileUpdate={(updated) => {
+            setProfileData(updated);
+            updateUser({ profileImageUrl: updated.profileImageUrl, firstName: updated.firstName, lastName: updated.lastName });
+          }}
+          onEdit={() => setEditOpen(true)}
+        />
+      )}
+
+      {editOpen && profileData && (
+        <EditStaffProfileModal
+          profile={profileData}
+          onClose={() => setEditOpen(false)}
+          onSaved={(updated) => {
+            setProfileData(updated);
+            updateUser({ firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone });
+            setEditOpen(false);
+          }}
+          onImageUpdate={(updated) => {
+            setProfileData(updated);
+            updateUser({ profileImageUrl: updated.profileImageUrl });
+          }}
+        />
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, index) => (
