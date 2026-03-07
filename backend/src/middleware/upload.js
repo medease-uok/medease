@@ -7,8 +7,8 @@ const config = require('../config');
 const AppError = require('../utils/AppError');
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-const PRESIGNED_URL_EXPIRY = 3600; // 1 hour in seconds
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const PRESIGNED_URL_EXPIRY = 3600;
 
 const s3 = new S3Client({
   region: config.s3.region,
@@ -32,10 +32,6 @@ const upload = multer({
   },
 });
 
-/**
- * Upload a buffer to S3 and return the S3 key.
- * Key format: profile-images/<patientId>/<randomHash>.<ext>
- */
 async function uploadToS3(file, patientId) {
   const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
   const hash = crypto.randomBytes(16).toString('hex');
@@ -51,9 +47,6 @@ async function uploadToS3(file, patientId) {
   return key;
 }
 
-/**
- * Generate a presigned GET URL for a private S3 object.
- */
 async function getPresignedImageUrl(key) {
   if (!key) return null;
   const command = new GetObjectCommand({
@@ -63,9 +56,6 @@ async function getPresignedImageUrl(key) {
   return getSignedUrl(s3, command, { expiresIn: PRESIGNED_URL_EXPIRY });
 }
 
-/**
- * Delete an object from S3 by its key.
- */
 async function deleteFromS3(key) {
   if (!key) return;
   try {
@@ -74,7 +64,7 @@ async function deleteFromS3(key) {
       Key: key,
     }));
   } catch {
-    // Ignore delete errors — old image cleanup is best-effort
+    // best-effort
   }
 }
 

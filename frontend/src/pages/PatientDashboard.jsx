@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, FileText, Pill, FlaskConical, Stethoscope,
-  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Camera, Loader2, Trash2,
+  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Loader2, Trash2,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
 import EditProfileModal from '../components/EditProfileModal';
+import ImageCropModal from '../components/ImageCropModal';
+import ProfileImageLightbox from '../components/ProfileImageLightbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -41,15 +43,17 @@ function StatusBadge({ status }) {
 }
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 function ProfileCard({ profile, onEdit, onImageUpdate }) {
   const age = calculateAge(profile.dateOfBirth);
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [imageError, setImageError] = useState('');
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState(null);
 
-  const handleImageSelect = async (e) => {
+  const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
@@ -64,10 +68,17 @@ function ProfileCard({ profile, onEdit, onImageUpdate }) {
     }
 
     setImageError('');
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropConfirm = async (croppedFile) => {
     setUploading(true);
+    setCropSrc(null);
     try {
       const formData = new FormData();
-      formData.append('profileImage', file);
+      formData.append('profileImage', croppedFile);
       const res = await api.upload(`/patients/${profile.id}/profile-image`, formData);
       onImageUpdate(res.data);
     } catch (err) {
@@ -90,127 +101,150 @@ function ProfileCard({ profile, onEdit, onImageUpdate }) {
     }
   };
 
+  const fullName = `${profile.firstName} ${profile.lastName}`;
+
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-300">
-      <CardContent className="pt-6">
-        <div className="flex items-start gap-5">
-          <div className="relative group flex-shrink-0">
-            {profile.profileImageUrl ? (
-              <img
-                src={profile.profileImageUrl}
-                alt={`${profile.firstName} ${profile.lastName}`}
-                className="w-16 h-16 rounded-2xl object-cover"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-cta flex items-center justify-center text-white text-xl font-bold">
-                {(profile.firstName?.[0] || '')}{(profile.lastName?.[0] || '')}
-              </div>
-            )}
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => fileInputRef.current?.click()}
-              className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-            >
-              {uploading ? (
-                <Loader2 className="w-5 h-5 text-white animate-spin" />
+    <>
+      <Card className="hover:shadow-lg transition-shadow duration-300">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-5">
+            <div className="relative group flex-shrink-0">
+              {profile.profileImageUrl ? (
+                <img
+                  src={profile.profileImageUrl}
+                  alt={fullName}
+                  onClick={() => setLightboxOpen(true)}
+                  className="w-16 h-16 rounded-2xl object-cover cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all"
+                />
               ) : (
-                <Camera className="w-5 h-5 text-white" />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-cta flex items-center justify-center text-white text-xl font-bold">
+                  {(profile.firstName?.[0] || '')}{(profile.lastName?.[0] || '')}
+                </div>
               )}
-            </button>
-            {profile.profileImageUrl && !uploading && (
+              {uploading && (
+                <div className="absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                </div>
+              )}
               <button
                 type="button"
-                onClick={handleImageDelete}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                aria-label="Remove profile image"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors border-2 border-white"
+                aria-label="Change profile photo"
               >
-                <Trash2 className="w-3 h-3" />
+                <Pencil className="w-3 h-3" />
               </button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={handleImageSelect}
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 font-heading">
-                  {profile.firstName} {profile.lastName}
-                </h2>
-                <p className="text-sm text-slate-500 mt-0.5">{profile.email}</p>
-              </div>
-              <button
-                onClick={onEdit}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit
-              </button>
+              {profile.profileImageUrl && !uploading && (
+                <button
+                  type="button"
+                  onClick={handleImageDelete}
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 border-2 border-white"
+                  aria-label="Remove profile image"
+                >
+                  <Trash2 className="w-2.5 h-2.5" />
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
             </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 font-heading">
+                    {fullName}
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-0.5">{profile.email}</p>
+                </div>
+                <button
+                  onClick={onEdit}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit
+                </button>
+              </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-              {age !== null && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <User className="w-4 h-4 text-slate-400" />
-                  <span>{age} yrs, {profile.gender}</span>
-                </div>
-              )}
-              {profile.bloodType && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Droplets className="w-4 h-4 text-red-400" />
-                  <span>{profile.bloodType}</span>
-                </div>
-              )}
-              {profile.phone && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  <span>{profile.phone}</span>
-                </div>
-              )}
-              {profile.address && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <MapPin className="w-4 h-4 text-slate-400" />
-                  <span className="truncate">{profile.address}</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                {age !== null && (
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <User className="w-4 h-4 text-slate-400" />
+                    <span>{age} yrs, {profile.gender}</span>
+                  </div>
+                )}
+                {profile.bloodType && (
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <Droplets className="w-4 h-4 text-red-400" />
+                    <span>{profile.bloodType}</span>
+                  </div>
+                )}
+                {profile.phone && (
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <Phone className="w-4 h-4 text-slate-400" />
+                    <span>{profile.phone}</span>
+                  </div>
+                )}
+                {profile.address && (
+                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <MapPin className="w-4 h-4 text-slate-400" />
+                    <span className="truncate">{profile.address}</span>
+                  </div>
+                )}
+              </div>
+
+              {profile.emergencyContact && (
+                <div className="mt-5 p-4 bg-red-50/70 border border-red-100 rounded-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+                      <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-red-600">Emergency Contact</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-0.5">Name</p>
+                      <p className="text-sm font-medium text-slate-800">{profile.emergencyContact}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-0.5">Relationship</p>
+                      <p className="text-sm font-medium text-slate-800">{profile.emergencyRelationship}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-0.5">Phone</p>
+                      <p className="text-sm font-medium text-slate-800">{profile.emergencyPhone}</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-
-            {profile.emergencyContact && (
-              <div className="mt-5 p-4 bg-red-50/70 border border-red-100 rounded-xl">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
-                    <AlertCircle className="w-3.5 h-3.5 text-red-500" />
-                  </div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-red-600">Emergency Contact</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <p className="text-xs text-slate-400 mb-0.5">Name</p>
-                    <p className="text-sm font-medium text-slate-800">{profile.emergencyContact}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400 mb-0.5">Relationship</p>
-                    <p className="text-sm font-medium text-slate-800">{profile.emergencyRelationship}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400 mb-0.5">Phone</p>
-                    <p className="text-sm font-medium text-slate-800">{profile.emergencyPhone}</p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-        {imageError && (
-          <p className="mt-3 text-sm text-red-600">{imageError}</p>
-        )}
-      </CardContent>
-    </Card>
+          {imageError && (
+            <p className="mt-3 text-sm text-red-600">{imageError}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {lightboxOpen && profile.profileImageUrl && (
+        <ProfileImageLightbox
+          src={profile.profileImageUrl}
+          alt={fullName}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
+
+      {cropSrc && (
+        <ImageCropModal
+          imageSrc={cropSrc}
+          onCancel={() => setCropSrc(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
+    </>
   );
 }
 
@@ -265,7 +299,12 @@ export default function PatientDashboard() {
         return;
       }
 
-      if (profileRes.status === 'fulfilled') setProfile(profileRes.value.data);
+      if (profileRes.status === 'fulfilled') {
+        setProfile(profileRes.value.data);
+        if (profileRes.value.data.profileImageUrl) {
+          updateUser({ profileImageUrl: profileRes.value.data.profileImageUrl });
+        }
+      }
       if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
       if (appointmentsRes.status === 'fulfilled') setAppointments(appointmentsRes.value.data || []);
       if (prescriptionsRes.status === 'fulfilled') setPrescriptions(prescriptionsRes.value.data || []);
@@ -342,7 +381,16 @@ export default function PatientDashboard() {
         </div>
       )}
 
-      {profile && <ProfileCard profile={profile} onEdit={() => setEditOpen(true)} onImageUpdate={(updated) => setProfile(updated)} />}
+      {profile && (
+        <ProfileCard
+          profile={profile}
+          onEdit={() => setEditOpen(true)}
+          onImageUpdate={(updated) => {
+            setProfile(updated);
+            updateUser({ profileImageUrl: updated.profileImageUrl });
+          }}
+        />
+      )}
 
       {editOpen && profile && (
         <EditProfileModal
