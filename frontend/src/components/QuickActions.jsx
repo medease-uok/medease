@@ -1,4 +1,5 @@
 import { Calendar, FileText, Pill, FlaskConical, Stethoscope, Users } from 'lucide-react'
+import { ROLES, ROLE_GROUPS } from '../data/roles'
 
 const allActions = [
   {
@@ -9,7 +10,7 @@ const allActions = [
     hoverColor: 'hover:from-blue-600 hover:to-blue-700',
     description: 'View appointments',
     path: '/appointments',
-    roles: ['patient', 'doctor', 'nurse', 'admin'],
+    roles: ROLE_GROUPS.PATIENT_CARE,
   },
   {
     id: 'patients',
@@ -19,7 +20,7 @@ const allActions = [
     hoverColor: 'hover:from-green-600 hover:to-green-700',
     description: 'View patients',
     path: '/patients',
-    roles: ['doctor', 'nurse', 'admin'],
+    roles: ROLE_GROUPS.CLINICAL,
   },
   {
     id: 'doctors',
@@ -29,7 +30,7 @@ const allActions = [
     hoverColor: 'hover:from-teal-600 hover:to-teal-700',
     description: 'View doctors',
     path: '/doctors',
-    roles: ['patient', 'admin'],
+    roles: [ROLES.PATIENT, ROLES.ADMIN],
   },
   {
     id: 'medical-records',
@@ -39,7 +40,7 @@ const allActions = [
     hoverColor: 'hover:from-purple-600 hover:to-purple-700',
     description: 'Medical records',
     path: '/medical-records',
-    roles: ['patient', 'doctor', 'nurse', 'admin'],
+    roles: ROLE_GROUPS.PATIENT_CARE,
   },
   {
     id: 'prescriptions',
@@ -49,7 +50,7 @@ const allActions = [
     hoverColor: 'hover:from-orange-600 hover:to-orange-700',
     description: 'View prescriptions',
     path: '/prescriptions',
-    roles: ['patient', 'doctor', 'pharmacist', 'admin'],
+    roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN],
   },
   {
     id: 'lab-reports',
@@ -59,7 +60,7 @@ const allActions = [
     hoverColor: 'hover:from-pink-600 hover:to-pink-700',
     description: 'View lab reports',
     path: '/lab-reports',
-    roles: ['patient', 'doctor', 'lab_technician', 'admin'],
+    roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN],
   },
 ]
 

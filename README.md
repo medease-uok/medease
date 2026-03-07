@@ -141,9 +141,11 @@ medease/
 │       │   ├── MedicalRecords.jsx
 │       │   ├── Prescriptions.jsx
 │       │   ├── LabReports.jsx
+│       │   ├── PatientDashboard.jsx     # Patient-specific health dashboard
 │       │   └── PermissionManagement.jsx  # Role & permission management (admin)
 │       ├── data/
-│       │   └── AuthContext.jsx # Auth state, login/logout/register
+│       │   ├── AuthContext.jsx # Auth state, login/logout/register
+│       │   └── roles.js       # Centralized role constants and role groups
 │       ├── services/
 │       │   └── api.js          # API client with silent token refresh & inactivity tracking
 │       └── constants.js        # Shared enums and constants
@@ -355,7 +357,8 @@ Admins can manage ABAC policies at runtime via the `/api/abac-policies` endpoint
 
 **Frontend route guards** (role-based):
 ```jsx
-<Route path="patients" element={<RoleGuard roles={['doctor', 'nurse', 'admin']}><Patients /></RoleGuard>} />
+import { ROLE_GROUPS } from './data/roles';
+<Route path="patients" element={<RoleGuard roles={ROLE_GROUPS.CLINICAL}><Patients /></RoleGuard>} />
 ```
 
 **Frontend permission checks** (dynamic):

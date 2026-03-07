@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Calendar, FileText, Pill, FlaskConical, Stethoscope, Heart,
+  Calendar, FileText, Pill, FlaskConical, Stethoscope,
   Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight,
 } from 'lucide-react';
 import api from '../services/api';
@@ -9,6 +9,8 @@ import { useAuth } from '../data/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+
+const MAX_PREVIEW_ITEMS = 5;
 
 const formatDate = (iso) => {
   if (!iso) return '-';
@@ -99,6 +101,7 @@ function QuickNavCard({ icon: Icon, label, count, color, onClick }) {
   return (
     <button
       onClick={onClick}
+      aria-label={`View ${count} ${label}`}
       className="group relative flex flex-col items-center justify-center p-6 rounded-xl bg-white border-2 border-slate-100 transition-all duration-300 ease-out hover:border-transparent hover:shadow-xl hover:shadow-primary/20 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
     >
       <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${color} flex items-center justify-center mb-3 transition-transform duration-300 group-hover:scale-110`}>
@@ -119,31 +122,47 @@ export default function PatientDashboard() {
   const [prescriptions, setPrescriptions] = useState([]);
   const [labReports, setLabReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [profileRes, statsRes, appointmentsRes, prescriptionsRes, labRes] = await Promise.allSettled([
-          api.get('/patients/me'),
-          api.get('/dashboard/stats'),
-          api.get('/appointments'),
-          api.get('/prescriptions'),
-          api.get('/lab-reports'),
-        ]);
+    let mounted = true;
 
-        if (profileRes.status === 'fulfilled') setProfile(profileRes.value.data);
-        if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
-        if (appointmentsRes.status === 'fulfilled') setAppointments(appointmentsRes.value.data || []);
-        if (prescriptionsRes.status === 'fulfilled') setPrescriptions(prescriptionsRes.value.data || []);
-        if (labRes.status === 'fulfilled') setLabReports(labRes.value.data || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
+    const fetchAll = async () => {
+      const [profileRes, statsRes, appointmentsRes, prescriptionsRes, labRes] = await Promise.allSettled([
+        api.get('/patients/me'),
+        api.get('/dashboard/stats'),
+        api.get('/appointments'),
+        api.get('/prescriptions'),
+        api.get('/lab-reports'),
+      ]);
+
+      if (!mounted) return;
+
+      const failures = [profileRes, statsRes, appointmentsRes, prescriptionsRes, labRes]
+        .filter((r) => r.status === 'rejected');
+
+      if (failures.length === 5) {
+        setError('Unable to load your dashboard. Please try again later.');
         setLoading(false);
+        return;
       }
+
+      if (profileRes.status === 'fulfilled') setProfile(profileRes.value.data);
+      if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
+      if (appointmentsRes.status === 'fulfilled') setAppointments(appointmentsRes.value.data || []);
+      if (prescriptionsRes.status === 'fulfilled') setPrescriptions(prescriptionsRes.value.data || []);
+      if (labRes.status === 'fulfilled') setLabReports(labRes.value.data || []);
+
+      if (failures.length > 0) {
+        setError('Some sections could not be loaded. Showing available data.');
+      }
+
+      setLoading(false);
     };
 
     fetchAll();
+
+    return () => { mounted = false; };
   }, []);
 
   if (loading) {
@@ -157,15 +176,32 @@ export default function PatientDashboard() {
     );
   }
 
+  if (error && !profile && appointments.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+          <p className="text-slate-700 font-medium">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const upcomingAppointments = appointments
     .filter((a) => a.status === 'scheduled')
-    .slice(0, 5);
+    .slice(0, MAX_PREVIEW_ITEMS);
 
   const activePrescriptions = prescriptions
     .filter((p) => p.status === 'pending' || p.status === 'active')
-    .slice(0, 5);
+    .slice(0, MAX_PREVIEW_ITEMS);
 
-  const recentLabReports = labReports.slice(0, 5);
+  const recentLabReports = labReports.slice(0, MAX_PREVIEW_ITEMS);
 
   const appointmentCount = stats?.stats?.find((s) => s.label === 'My Appointments')?.value ?? appointments.length;
   const prescriptionCount = stats?.stats?.find((s) => s.label === 'My Prescriptions')?.value ?? prescriptions.length;
@@ -180,6 +216,13 @@ export default function PatientDashboard() {
         </h1>
         <p className="text-slate-500 mt-1">Here's your health summary.</p>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+          <p className="text-sm text-amber-700">{error}</p>
+        </div>
+      )}
 
       {profile && <ProfileCard profile={profile} />}
 

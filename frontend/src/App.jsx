@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './data/AuthContext';
+import { ROLES, ROLE_GROUPS } from './data/roles';
 import Layout from './components/Layout';
 import RoleGuard from './components/RoleGuard';
 import Login from './pages/Login';
@@ -21,7 +22,8 @@ const R = ({ roles, children }) => <RoleGuard roles={roles}>{children}</RoleGuar
 
 function DashboardRedirect() {
   const { currentUser } = useAuth();
-  if (currentUser?.role === 'patient') return <Navigate to="/my-health" replace />;
+  if (!currentUser) return <Navigate to="/login" replace />;
+  if (currentUser.role === ROLES.PATIENT) return <Navigate to="/my-health" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -34,17 +36,17 @@ function App() {
           <Route path="/register" element={<RegisterEnhanced />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<DashboardRedirect />} />
-            <Route path="dashboard" element={<R roles={['doctor', 'nurse', 'lab_technician', 'pharmacist', 'admin']}><DashboardEnhanced /></R>} />
-            <Route path="my-health" element={<R roles={['patient']}><PatientDashboard /></R>} />
-            <Route path="patients" element={<R roles={['doctor', 'nurse', 'admin']}><PatientsEnhanced /></R>} />
-            <Route path="patients/:id" element={<R roles={['doctor', 'nurse', 'admin']}><PatientDetail /></R>} />
-            <Route path="doctors" element={<R roles={['patient', 'admin']}><Doctors /></R>} />
-            <Route path="doctors/:id" element={<R roles={['patient', 'admin']}><DoctorDetail /></R>} />
-            <Route path="appointments" element={<R roles={['patient', 'doctor', 'nurse', 'admin']}><Appointments /></R>} />
-            <Route path="medical-records" element={<R roles={['patient', 'doctor', 'nurse', 'admin']}><MedicalRecords /></R>} />
-            <Route path="prescriptions" element={<R roles={['patient', 'doctor', 'pharmacist', 'admin']}><Prescriptions /></R>} />
-            <Route path="lab-reports" element={<R roles={['patient', 'doctor', 'lab_technician', 'admin']}><LabReports /></R>} />
-            <Route path="permissions" element={<R roles={['admin']}><PermissionManagement /></R>} />
+            <Route path="dashboard" element={<R roles={ROLE_GROUPS.STAFF}><DashboardEnhanced /></R>} />
+            <Route path="my-health" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><PatientDashboard /></R>} />
+            <Route path="patients" element={<R roles={ROLE_GROUPS.CLINICAL}><PatientsEnhanced /></R>} />
+            <Route path="patients/:id" element={<R roles={ROLE_GROUPS.CLINICAL}><PatientDetail /></R>} />
+            <Route path="doctors" element={<R roles={[ROLES.PATIENT, ROLES.ADMIN]}><Doctors /></R>} />
+            <Route path="doctors/:id" element={<R roles={[ROLES.PATIENT, ROLES.ADMIN]}><DoctorDetail /></R>} />
+            <Route path="appointments" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><Appointments /></R>} />
+            <Route path="medical-records" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><MedicalRecords /></R>} />
+            <Route path="prescriptions" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN]}><Prescriptions /></R>} />
+            <Route path="lab-reports" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN]}><LabReports /></R>} />
+            <Route path="permissions" element={<R roles={[ROLES.ADMIN]}><PermissionManagement /></R>} />
             <Route path="admin" element={<DashboardRedirect />} />
           </Route>
           <Route path="*" element={<DashboardRedirect />} />
