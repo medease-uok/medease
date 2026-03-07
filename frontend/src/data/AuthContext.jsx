@@ -71,6 +71,14 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateUser = (fields) => {
+    setCurrentUser((prev) => {
+      const updated = { ...prev, ...fields };
+      localStorage.setItem('medease_user', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const logout = async () => {
     const refreshToken = localStorage.getItem('medease_refresh_token');
     try {
@@ -88,7 +96,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, permissions, login, logout, register }}>
+    <AuthContext.Provider value={{ currentUser, permissions, login, logout, register, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
