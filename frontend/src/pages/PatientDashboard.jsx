@@ -236,6 +236,35 @@ function ProfileCard({ profile, onEdit, onImageUpdate }) {
             </div>
           )}
 
+          {profile.organDonor && (
+            <div className="mt-5 p-4 bg-emerald-50/70 border border-emerald-100 rounded-xl">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Heart className="w-3.5 h-3.5 text-emerald-500" />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Organ Donor (NTP)</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-center">
+                {profile.organDonorCardNo && (
+                  <div>
+                    <p className="text-xs text-slate-400 mb-0.5">Card No.</p>
+                    <p className="text-sm font-medium text-slate-800">{profile.organDonorCardNo}</p>
+                  </div>
+                )}
+                {profile.organsToDonate?.length > 0 && (
+                  <div className={profile.organDonorCardNo ? '' : 'col-span-2'}>
+                    <p className="text-xs text-slate-400 mb-1.5">Organs</p>
+                    <div className="flex flex-wrap justify-center gap-1">
+                      {profile.organsToDonate.map((organ) => (
+                        <span key={organ} className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-medium">{organ}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {profile.insuranceProvider && (
             <div className="mt-5 p-4 bg-blue-50/70 border border-blue-100 rounded-xl">
               <div className="flex items-center justify-center gap-2 mb-3">

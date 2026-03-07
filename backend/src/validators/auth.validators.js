@@ -64,9 +64,6 @@ const registerValidation = [
     .optional({ values: 'falsy' })
     .trim()
     .isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']).withMessage('Invalid blood type.'),
-  body('organDonor')
-    .optional()
-    .isBoolean().withMessage('Organ donor must be true or false.'),
   body('address')
     .optional({ values: 'falsy' })
     .trim(),

@@ -53,6 +53,8 @@ export default function PatientDetail() {
           { label: 'Gender', value: patient.gender },
           { label: 'Blood Type', value: patient.bloodType },
           { label: 'Organ Donor', value: patient.organDonor ? 'Yes' : 'No' },
+          { label: 'Donor Card No.', value: patient.organDonorCardNo },
+          { label: 'Organs to Donate', value: patient.organsToDonate?.join(', ') },
           { label: 'Address', value: patient.address },
           { label: 'Emergency Contact', value: patient.emergencyContact },
           { label: 'Relationship', value: patient.emergencyRelationship },
