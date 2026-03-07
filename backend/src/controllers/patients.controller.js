@@ -7,7 +7,8 @@ const getAll = async (req, res, next) => {
     const result = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
               p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone
+              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
+              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
        FROM patients p
        JOIN users u ON p.user_id = u.id
        WHERE u.is_active = true
@@ -30,7 +31,8 @@ const getById = async (req, res, next) => {
     const patientResult = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
               p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone
+              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
+              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
        FROM patients p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1`,
@@ -114,6 +116,7 @@ const updateById = async (req, res, next) => {
       firstName, lastName, phone,
       dateOfBirth, gender, bloodType, address,
       emergencyContact, emergencyRelationship, emergencyPhone,
+      insuranceProvider, insurancePolicyNumber, insurancePlanType, insuranceExpiryDate,
     } = req.body;
 
     const userUpdate = buildSetClauses({
@@ -130,6 +133,10 @@ const updateById = async (req, res, next) => {
       emergency_contact: emergencyContact !== undefined ? (emergencyContact || null) : undefined,
       emergency_relationship: emergencyRelationship !== undefined ? (emergencyRelationship || null) : undefined,
       emergency_phone: emergencyPhone !== undefined ? (emergencyPhone || null) : undefined,
+      insurance_provider: insuranceProvider !== undefined ? (insuranceProvider || null) : undefined,
+      insurance_policy_number: insurancePolicyNumber !== undefined ? (insurancePolicyNumber || null) : undefined,
+      insurance_plan_type: insurancePlanType !== undefined ? (insurancePlanType || null) : undefined,
+      insurance_expiry_date: insuranceExpiryDate !== undefined ? (insuranceExpiryDate || null) : undefined,
     });
 
     if (userUpdate.setClauses.length === 0 && profileUpdate.setClauses.length === 0) {
@@ -166,7 +173,8 @@ const updateById = async (req, res, next) => {
     const result = await client.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
               p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone
+              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
+              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
        FROM patients p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1`,
@@ -189,7 +197,8 @@ const getMe = async (req, res, next) => {
     const result = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
               p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone
+              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
+              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
        FROM patients p
        JOIN users u ON p.user_id = u.id
        WHERE p.user_id = $1`,
@@ -222,6 +231,10 @@ async function mapPatient(row) {
     emergencyContact: row.emergency_contact,
     emergencyRelationship: row.emergency_relationship,
     emergencyPhone: row.emergency_phone,
+    insuranceProvider: row.insurance_provider,
+    insurancePolicyNumber: row.insurance_policy_number,
+    insurancePlanType: row.insurance_plan_type,
+    insuranceExpiryDate: row.insurance_expiry_date,
   };
 }
 
@@ -299,7 +312,8 @@ const uploadProfileImage = async (req, res, next) => {
     const result = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
               p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone
+              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
+              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
        FROM patients p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1`,
@@ -339,7 +353,8 @@ const deleteProfileImage = async (req, res, next) => {
     const result = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
               p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone
+              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
+              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
        FROM patients p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1`,

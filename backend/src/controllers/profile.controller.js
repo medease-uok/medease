@@ -6,7 +6,8 @@ const ROLE_QUERIES = {
   patient: {
     query: `SELECT u.id AS user_id, u.first_name, u.last_name, u.email, u.phone, u.role,
                    p.id AS profile_id, p.date_of_birth, p.gender, p.blood_type, p.address,
-                   p.profile_image_url, p.emergency_contact, p.emergency_relationship, p.emergency_phone
+                   p.profile_image_url, p.emergency_contact, p.emergency_relationship, p.emergency_phone,
+                   p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
             FROM users u
             JOIN patients p ON p.user_id = u.id
             WHERE u.id = $1`,
@@ -73,6 +74,10 @@ async function mapProfileRow(row) {
         emergencyContact: row.emergency_contact,
         emergencyRelationship: row.emergency_relationship,
         emergencyPhone: row.emergency_phone,
+        insuranceProvider: row.insurance_provider,
+        insurancePolicyNumber: row.insurance_policy_number,
+        insurancePlanType: row.insurance_plan_type,
+        insuranceExpiryDate: row.insurance_expiry_date,
       };
     case 'doctor':
       return {

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, FileText, Pill, FlaskConical, Stethoscope,
-  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Loader2, Trash2,
+  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Loader2, Trash2, Shield,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -224,6 +224,42 @@ function ProfileCard({ profile, onEdit, onImageUpdate }) {
                   <p className="text-xs text-slate-400 mb-0.5">Phone</p>
                   <p className="text-sm font-medium text-slate-800">{profile.emergencyPhone}</p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {profile.insuranceProvider && (
+            <div className="mt-5 p-4 bg-blue-50/70 border border-blue-100 rounded-xl">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Shield className="w-3.5 h-3.5 text-blue-500" />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Insurance</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Provider</p>
+                  <p className="text-sm font-medium text-slate-800">{profile.insuranceProvider}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Policy No.</p>
+                  <p className="text-sm font-medium text-slate-800">{profile.insurancePolicyNumber}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-0.5">Plan Type</p>
+                  <p className="text-sm font-medium text-slate-800">{profile.insurancePlanType}</p>
+                </div>
+                {profile.insuranceExpiryDate && (
+                  <div>
+                    <p className="text-xs text-slate-400 mb-0.5">Expires</p>
+                    <p className={`text-sm font-medium ${new Date(profile.insuranceExpiryDate) < new Date() ? 'text-red-600' : 'text-slate-800'}`}>
+                      {formatDate(profile.insuranceExpiryDate)}
+                      {new Date(profile.insuranceExpiryDate) < new Date() && (
+                        <span className="ml-1 text-xs text-red-500 font-semibold">Expired</span>
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}

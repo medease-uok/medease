@@ -6,6 +6,19 @@ import ImageCropModal from './ImageCropModal';
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENDERS = ['Male', 'Female', 'Other'];
 const RELATIONSHIPS = ['Spouse', 'Parent', 'Child', 'Sibling', 'Guardian', 'Friend', 'Other'];
+const INSURANCE_PROVIDERS = [
+  'Sri Lanka Insurance Corporation',
+  'Ceylinco Insurance',
+  'AIA Insurance Lanka',
+  'Allianz Insurance Lanka',
+  'Union Assurance',
+  'Softlogic Life Insurance',
+  'Janashakthi Insurance',
+  'Fairfirst Insurance',
+  'HNB Assurance',
+  'Other',
+];
+const INSURANCE_PLAN_TYPES = ['Inpatient', 'Outpatient', 'Comprehensive'];
 const COUNTRY_CODE = '+94';
 const PHONE_PATTERN = /^[7-9]\d{8}$/;
 const NAME_PATTERN = /^[A-Za-z\s]+$/;
@@ -89,6 +102,10 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
     emergencyContact: profile.emergencyContact || '',
     emergencyRelationship: profile.emergencyRelationship || '',
     emergencyPhone: stripCountryCode(profile.emergencyPhone),
+    insuranceProvider: profile.insuranceProvider || '',
+    insurancePolicyNumber: profile.insurancePolicyNumber || '',
+    insurancePlanType: profile.insurancePlanType || '',
+    insuranceExpiryDate: profile.insuranceExpiryDate ? profile.insuranceExpiryDate.split('T')[0] : '',
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -137,6 +154,12 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
     if (!form.emergencyPhone.trim()) errs.emergencyPhone = 'Emergency phone is required';
     else if (!PHONE_PATTERN.test(form.emergencyPhone)) errs.emergencyPhone = '9 digits starting with 7, 8, or 9';
 
+    const hasInsurance = form.insuranceProvider || form.insurancePolicyNumber;
+    if (hasInsurance) {
+      if (!form.insuranceProvider) errs.insuranceProvider = 'Provider is required when policy details are provided';
+      if (!form.insurancePolicyNumber.trim()) errs.insurancePolicyNumber = 'Policy number is required';
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -160,7 +183,7 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
       for (const [key, value] of Object.entries(submitted)) {
         const original = profile[key] ?? '';
         let normalised;
-        if (key === 'dateOfBirth' && original) {
+        if ((key === 'dateOfBirth' || key === 'insuranceExpiryDate') && original) {
           normalised = original.split('T')[0];
         } else if (phoneFields.includes(key)) {
           normalised = original.replace(/^\+94\s?/, '').replace(/^/, COUNTRY_CODE);
@@ -198,15 +221,15 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
     <>
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={saving ? undefined : onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 rounded-t-2xl flex items-center justify-between z-10">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-slate-200 px-8 py-5 rounded-t-2xl flex items-center justify-between z-10">
           <h2 className="text-xl font-bold text-slate-900 font-heading">Edit Profile</h2>
           <button onClick={onClose} aria-label="Close modal" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="px-8 py-6 space-y-8">
           {apiError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               {apiError}
@@ -214,7 +237,7 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
           )}
 
           <div>
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Profile Photo</h3>
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Profile Photo</h3>
             <div className="flex items-center gap-4">
               <div className="relative">
                 {profile.profileImageUrl ? (
@@ -267,9 +290,9 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
             {imageError && <p className="mt-2 text-sm text-red-600">{imageError}</p>}
           </div>
 
-          <div>
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Personal Information</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="pt-2 border-t border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Personal Information</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">First Name *</label>
                 <input type="text" name="firstName" value={form.firstName} onChange={handleChange} className={inputClass(errors.firstName)} />
@@ -330,9 +353,9 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
             </div>
           </div>
 
-          <div>
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Emergency Contact</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="pt-2 border-t border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Emergency Contact</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Contact Name *</label>
                 <input type="text" name="emergencyContact" value={form.emergencyContact} onChange={handleChange} className={inputClass(errors.emergencyContact)} />
@@ -370,7 +393,40 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="pt-2 border-t border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Insurance Information</h3>
+            <p className="text-xs text-slate-400 mb-3">Optional — fill in if you have private health insurance.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Insurance Provider</label>
+                <select name="insuranceProvider" value={form.insuranceProvider} onChange={handleChange} className={inputClass(errors.insuranceProvider)}>
+                  <option value="">None</option>
+                  {INSURANCE_PROVIDERS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+                {errors.insuranceProvider && <p className="mt-1 text-sm text-red-600">{errors.insuranceProvider}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Policy / Member No.</label>
+                <input type="text" name="insurancePolicyNumber" value={form.insurancePolicyNumber} onChange={handleChange} maxLength={50} className={inputClass(errors.insurancePolicyNumber)} />
+                {errors.insurancePolicyNumber && <p className="mt-1 text-sm text-red-600">{errors.insurancePolicyNumber}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Plan Type</label>
+                <select name="insurancePlanType" value={form.insurancePlanType} onChange={handleChange} className={inputClass(errors.insurancePlanType)}>
+                  <option value="">Select Plan Type</option>
+                  {INSURANCE_PLAN_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                {errors.insurancePlanType && <p className="mt-1 text-sm text-red-600">{errors.insurancePlanType}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Policy Expiry Date</label>
+                <input type="date" name="insuranceExpiryDate" value={form.insuranceExpiryDate} onChange={handleChange} className={inputClass(errors.insuranceExpiryDate)} />
+                {errors.insuranceExpiryDate && <p className="mt-1 text-sm text-red-600">{errors.insuranceExpiryDate}</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <button type="button" onClick={onClose} className="px-5 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium">
               Cancel
             </button>

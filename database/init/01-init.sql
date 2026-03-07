@@ -53,6 +53,10 @@ CREATE TABLE patients (
   emergency_contact VARCHAR(100),
   emergency_relationship VARCHAR(50),
   emergency_phone VARCHAR(20),
+  insurance_provider VARCHAR(100),
+  insurance_policy_number VARCHAR(50),
+  insurance_plan_type VARCHAR(20),
+  insurance_expiry_date DATE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

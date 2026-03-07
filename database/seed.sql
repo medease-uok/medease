@@ -61,13 +61,13 @@ INSERT INTO doctors (id, user_id, specialization, license_number, department, av
 -- PATIENTS (profiles)
 -- ============================================
 
-INSERT INTO patients (id, user_id, date_of_birth, gender, blood_type, address, emergency_contact, emergency_relationship, emergency_phone, profile_image_url) VALUES
-  ('ce000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', '1990-03-15', 'Female', 'O+', '45 Galle Road, Colombo 03', 'Amal Fernando', 'Spouse', '+94771234567', 'default-images/58509051_9439729.jpg'),
-  ('ce000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', '1985-07-22', 'Male', 'A+', '12 Kandy Road, Peradeniya', 'Kamala Rajapaksa', 'Parent', '+94772345678', 'default-images/58509043_9439678.jpg'),
-  ('ce000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', '1995-11-08', 'Female', 'B+', '78 Temple Road, Nugegoda', 'Sunil Weerasinghe', 'Parent', '+94773456789', 'default-images/58509055_9439726.jpg'),
-  ('ce000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000004', '1978-01-30', 'Male', 'AB-', '23 Lake Drive, Kurunegala', 'Priya Jayasuriya', 'Spouse', '+94774567890', 'default-images/58509054_9441186.jpg'),
-  ('ce000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000005', '2000-06-12', 'Female', 'O-', '56 Beach Road, Matara', 'Kumari Abeywickrama', 'Parent', '+94775678901', 'default-images/58509058_9442242.jpg'),
-  ('ce000000-0000-0000-0000-000000000006', 'c0000000-0000-0000-0000-000000000006', '1992-09-25', 'Male', 'A-', '34 Hill Street, Galle', 'Nirmala Gunasekara', 'Sibling', '+94776789012', 'default-images/58509057_9440461.jpg');
+INSERT INTO patients (id, user_id, date_of_birth, gender, blood_type, address, emergency_contact, emergency_relationship, emergency_phone, profile_image_url, insurance_provider, insurance_policy_number, insurance_plan_type, insurance_expiry_date) VALUES
+  ('ce000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', '1990-03-15', 'Female', 'O+', '45 Galle Road, Colombo 03', 'Amal Fernando', 'Spouse', '+94771234567', 'default-images/58509051_9439729.jpg', 'Sri Lanka Insurance Corporation', 'SLIC-HI-2024-08932', 'Comprehensive', '2027-03-31'),
+  ('ce000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', '1985-07-22', 'Male', 'A+', '12 Kandy Road, Peradeniya', 'Kamala Rajapaksa', 'Parent', '+94772345678', 'default-images/58509043_9439678.jpg', 'Ceylinco Insurance', 'CEY-MED-2024-45210', 'Inpatient', '2026-12-31'),
+  ('ce000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', '1995-11-08', 'Female', 'B+', '78 Temple Road, Nugegoda', 'Sunil Weerasinghe', 'Parent', '+94773456789', 'default-images/58509055_9439726.jpg', 'AIA Insurance Lanka', 'AIA-HP-2025-71034', 'Comprehensive', '2027-06-30'),
+  ('ce000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000004', '1978-01-30', 'Male', 'AB-', '23 Lake Drive, Kurunegala', 'Priya Jayasuriya', 'Spouse', '+94774567890', 'default-images/58509054_9441186.jpg', NULL, NULL, NULL, NULL),
+  ('ce000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000005', '2000-06-12', 'Female', 'O-', '56 Beach Road, Matara', 'Kumari Abeywickrama', 'Parent', '+94775678901', 'default-images/58509058_9442242.jpg', 'Allianz Insurance Lanka', 'ALZ-SL-2025-33891', 'Outpatient', '2026-09-30'),
+  ('ce000000-0000-0000-0000-000000000006', 'c0000000-0000-0000-0000-000000000006', '1992-09-25', 'Male', 'A-', '34 Hill Street, Galle', 'Nirmala Gunasekara', 'Sibling', '+94776789012', 'default-images/58509057_9440461.jpg', 'Union Assurance', 'UA-HEALTH-2024-12567', 'Inpatient', '2026-04-15');
 
 -- ============================================
 -- NURSES (profiles)
