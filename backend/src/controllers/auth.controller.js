@@ -155,20 +155,26 @@ const register = async (req, res, next) => {
 
     await client.query('COMMIT');
 
-    // Generate email verification token and save it
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationExpires = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
-    await db.query(
-      'UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE id = $3',
-      [verificationToken, verificationExpires, user.id]
-    );
+    // Admins are auto-verified; all other roles must verify via email
+    if (role === 'admin') {
+      await db.query(
+        'UPDATE users SET email_verified = TRUE WHERE id = $1',
+        [user.id]
+      );
+    } else {
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationExpires = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
+      await db.query(
+        'UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE id = $3',
+        [verificationToken, verificationExpires, user.id]
+      );
 
-    // Send verification email (fire-and-forget; registration still succeeds if SMTP is down)
-    try {
-      await sendRegistrationVerificationEmail(email, firstName, verificationToken);
-    } catch (emailErr) {
-      // Log but don't fail registration — user can request a resend later
-      console.error('Failed to send verification email:', emailErr.message);
+      // Send verification email (fire-and-forget; registration still succeeds if SMTP is down)
+      try {
+        await sendRegistrationVerificationEmail(email, firstName, verificationToken);
+      } catch (emailErr) {
+        console.error('Failed to send verification email:', emailErr.message);
+      }
     }
 
     await auditLog({
@@ -181,7 +187,9 @@ const register = async (req, res, next) => {
 
     res.status(201).json({
       status: 'success',
-      message: 'Registration successful. Please verify your email before logging in.',
+      message: role === 'admin'
+        ? 'Registration successful. Your account is pending approval.'
+        : 'Registration successful. Please verify your email before logging in.',
       data: {
         user: {
           id: user.id,
