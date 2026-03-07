@@ -47,6 +47,7 @@ CREATE TABLE patients (
   gender VARCHAR(20),
   blood_type VARCHAR(5),
   address TEXT,
+  profile_image_url TEXT,
   emergency_contact VARCHAR(100),
   emergency_relationship VARCHAR(50),
   emergency_phone VARCHAR(20),

@@ -20,6 +20,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1004.0",
+    "@aws-sdk/s3-request-presigner": "^3.1004.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -27,6 +29,7 @@
     "express-validator": "^7.3.1",
     "ioredis": "^5.10.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.1.1",
     "pg": "^8.20.0"
   },
   "devDependencies": {
@@ -34,6 +37,8 @@
     "nodemon": "^3.1.14"
   },
   "jest": {
-    "testMatch": ["<rootDir>/src/tests/**/*.test.js"]
+    "testMatch": [
+      "<rootDir>/src/tests/**/*.test.js"
+    ]
   }
 }

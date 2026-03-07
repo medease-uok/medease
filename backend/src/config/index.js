@@ -11,4 +11,10 @@ module.exports = {
   refreshTokenTTL: parseInt(process.env.REFRESH_TOKEN_TTL, 10) || 7 * 24 * 60 * 60,
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3001',
   logLevel: process.env.LOG_LEVEL || 'debug',
+  s3: {
+    bucket: process.env.S3_BUCKET,
+    region: process.env.S3_REGION || 'ap-south-1',
+    accessKeyId: process.env.S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+  },
 };
