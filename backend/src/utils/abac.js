@@ -151,13 +151,14 @@ async function buildAccessFilter(resourceType, subject, columnMap, paramOffset =
 
   const orClauses = [];
   const params = [];
-  let paramIdx = paramOffset;
 
   for (const policy of policies) {
-    const fragment = conditionToSQL(policy.conditions, subject, columnMap, params, paramIdx);
+    const savedLength = params.length;
+    const fragment = conditionToSQL(policy.conditions, subject, columnMap, params, paramOffset);
     if (fragment) {
-      paramIdx = paramOffset + params.length;
       orClauses.push(fragment.sql);
+    } else {
+      params.length = savedLength; // rollback any orphaned params
     }
   }
 
@@ -172,20 +173,24 @@ async function buildAccessFilter(resourceType, subject, columnMap, paramOffset =
 /**
  * Recursively convert a condition tree to SQL.
  */
-function conditionToSQL(condition, subject, columnMap, params, paramIdx) {
+function conditionToSQL(condition, subject, columnMap, params, paramOffset) {
   if (condition.any) {
     const parts = condition.any
-      .map((c) => conditionToSQL(c, subject, columnMap, params, paramIdx + params.length))
+      .map((c) => conditionToSQL(c, subject, columnMap, params, paramOffset))
       .filter(Boolean);
     if (parts.length === 0) return null;
     return { sql: `(${parts.map((p) => p.sql).join(' OR ')})` };
   }
 
   if (condition.all) {
+    const savedLength = params.length;
     const parts = condition.all
-      .map((c) => conditionToSQL(c, subject, columnMap, params, paramIdx + params.length))
-      .filter(Boolean);
-    if (parts.length === 0) return null;
+      .map((c) => conditionToSQL(c, subject, columnMap, params, paramOffset));
+    // In an AND block, if any condition is null (failed), the whole block fails
+    if (parts.some((p) => p === null)) {
+      params.length = savedLength; // rollback any params pushed by matched siblings
+      return null;
+    }
     return { sql: `(${parts.map((p) => p.sql).join(' AND ')})` };
   }
 
@@ -196,7 +201,6 @@ function conditionToSQL(condition, subject, columnMap, params, paramIdx) {
 
   // Subject-only conditions evaluate immediately
   if (attrPath.startsWith('subject.')) {
-    const val = resolveAttr(attrPath, { subject });
     const result = evaluateCondition(condition, { subject });
     return result ? { sql: 'TRUE' } : null;
   }
@@ -211,28 +215,28 @@ function conditionToSQL(condition, subject, columnMap, params, paramIdx) {
 
     switch (op) {
       case 'equals': {
-        const idx = paramIdx + params.length;
+        const idx = paramOffset + params.length;
         params.push(expected);
         return { sql: `${sqlCol} = $${idx}` };
       }
       case 'equals_ref': {
         const refValue = resolveAttr(expected, { subject });
         if (refValue == null) return null;
-        const idx = paramIdx + params.length;
+        const idx = paramOffset + params.length;
         params.push(refValue);
         return { sql: `${sqlCol} = $${idx}` };
       }
       case 'in': {
         if (!Array.isArray(expected) || expected.length === 0) return null;
         const placeholders = expected.map((v) => {
-          const idx = paramIdx + params.length;
+          const idx = paramOffset + params.length;
           params.push(v);
           return `$${idx}`;
         });
         return { sql: `${sqlCol} IN (${placeholders.join(', ')})` };
       }
       case 'not_equals': {
-        const idx = paramIdx + params.length;
+        const idx = paramOffset + params.length;
         params.push(expected);
         return { sql: `${sqlCol} != $${idx}` };
       }
