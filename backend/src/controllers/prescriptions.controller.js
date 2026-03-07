@@ -1,25 +1,12 @@
 const db = require('../config/database');
-const { buildAccessFilter } = require('../utils/abac');
 
 const getAll = async (req, res, next) => {
   try {
-    const subject = {
-      id: req.user.id,
-      role: req.user.role,
-      patientId: req.user.patientId,
-      doctorId: req.user.doctorId,
-      pharmacistId: req.user.pharmacistId,
-    };
+    const { role, id: userId } = req.user;
+    let query;
+    let params = [];
 
-    const columnMap = {
-      patient_id: 'rx.patient_id',
-      doctor_id: 'rx.doctor_id',
-      status: 'rx.status',
-    };
-
-    const { clause, params } = await buildAccessFilter('prescription', subject, columnMap);
-
-    const query = `
+    const baseSelect = `
       SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
              rx.frequency, rx.duration, rx.status, rx.created_at,
              pu.first_name || ' ' || pu.last_name AS patient_name,
@@ -28,9 +15,16 @@ const getAll = async (req, res, next) => {
       JOIN patients p ON rx.patient_id = p.id
       JOIN users pu ON p.user_id = pu.id
       LEFT JOIN doctors d ON rx.doctor_id = d.id
-      LEFT JOIN users du ON d.user_id = du.id
-      WHERE ${clause}
-      ORDER BY rx.created_at DESC`;
+      LEFT JOIN users du ON d.user_id = du.id`;
+
+    if (role === 'patient') {
+      query = `${baseSelect}
+        WHERE p.user_id = $1
+        ORDER BY rx.created_at DESC`;
+      params = [userId];
+    } else {
+      query = `${baseSelect} ORDER BY rx.created_at DESC`;
+    }
 
     const result = await db.query(query, params);
 
