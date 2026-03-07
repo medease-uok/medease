@@ -14,7 +14,8 @@ import {
 
 
 const navConfig = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['patient', 'doctor', 'nurse', 'lab_technician', 'pharmacist', 'admin'] },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['doctor', 'nurse', 'lab_technician', 'pharmacist', 'admin'] },
+  { path: '/my-health', label: 'My Health', icon: Activity, roles: ['patient'] },
   { path: '/patients', label: 'Patients', icon: Users, roles: ['doctor', 'nurse', 'admin'] },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: ['patient', 'admin'] },
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ['patient', 'doctor', 'nurse', 'admin'] },

@@ -6,7 +6,7 @@ export default function RoleGuard({ roles, children }) {
   const role = currentUser?.role;
 
   if (!role || !roles.includes(role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={role === 'patient' ? '/my-health' : '/dashboard'} replace />;
   }
 
   return children;
