@@ -54,7 +54,8 @@ const updatePatientValidation = [
   body('insurancePolicyNumber')
     .optional({ values: 'falsy' })
     .trim()
-    .isLength({ max: 50 }).withMessage('Policy number must not exceed 50 characters.'),
+    .isLength({ max: 50 }).withMessage('Policy number must not exceed 50 characters.')
+    .matches(/^[A-Z0-9\-]+$/i).withMessage('Policy number may only contain letters, digits, and hyphens.'),
   body('insurancePlanType')
     .optional({ values: 'falsy' })
     .trim()
@@ -62,6 +63,16 @@ const updatePatientValidation = [
   body('insuranceExpiryDate')
     .optional({ values: 'falsy' })
     .isISO8601().withMessage('Insurance expiry date must be a valid date.'),
+  body('insurancePolicyNumber').custom((value, { req }) => {
+    const provider = req.body.insuranceProvider;
+    if (value && !provider) {
+      throw new Error('Insurance provider is required when policy number is provided.');
+    }
+    if (provider && !value) {
+      throw new Error('Policy number is required when insurance provider is provided.');
+    }
+    return true;
+  }),
 ];
 
 module.exports = { updatePatientValidation };

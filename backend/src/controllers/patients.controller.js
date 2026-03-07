@@ -2,15 +2,18 @@ const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
 
+const PATIENT_SELECT = `
+  SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
+         p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
+         p.emergency_contact, p.emergency_relationship, p.emergency_phone,
+         p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
+  FROM patients p
+  JOIN users u ON p.user_id = u.id`;
+
 const getAll = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
-              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
-       FROM patients p
-       JOIN users u ON p.user_id = u.id
+      `${PATIENT_SELECT}
        WHERE u.is_active = true
        ORDER BY u.last_name, u.first_name`
     );
@@ -29,13 +32,7 @@ const getById = async (req, res, next) => {
     // req.resource is set by checkResourceAccess('patient') middleware
     // which already verified ABAC access — just fetch full details
     const patientResult = await db.query(
-      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
-              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
-       FROM patients p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
+      `${PATIENT_SELECT} WHERE p.id = $1`,
       [id]
     );
 
@@ -171,13 +168,7 @@ const updateById = async (req, res, next) => {
     }
 
     const result = await client.query(
-      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
-              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
-       FROM patients p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
+      `${PATIENT_SELECT} WHERE p.id = $1`,
       [id]
     );
 
@@ -195,13 +186,7 @@ const updateById = async (req, res, next) => {
 const getMe = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
-              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
-       FROM patients p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.user_id = $1`,
+      `${PATIENT_SELECT} WHERE p.user_id = $1`,
       [req.user.id]
     );
 
@@ -308,15 +293,8 @@ const uploadProfileImage = async (req, res, next) => {
     // Clean up old image (best-effort)
     deleteFromS3(oldKey);
 
-    // Return the full updated profile
     const result = await db.query(
-      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
-              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
-       FROM patients p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
+      `${PATIENT_SELECT} WHERE p.id = $1`,
       [id]
     );
 
@@ -351,13 +329,7 @@ const deleteProfileImage = async (req, res, next) => {
     deleteFromS3(oldKey);
 
     const result = await db.query(
-      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-              p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
-              p.emergency_contact, p.emergency_relationship, p.emergency_phone,
-              p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
-       FROM patients p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
+      `${PATIENT_SELECT} WHERE p.id = $1`,
       [id]
     );
 
