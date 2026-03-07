@@ -166,9 +166,9 @@ export default function UserProfileCard({ profile, onProfileUpdate, onEdit }) {
             )}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-5 border-t border-slate-100">
+          <div className="flex flex-wrap justify-center gap-x-16 gap-y-8 mt-6 pt-5 border-t border-slate-100">
             {age !== null && (
-              <div className="flex flex-col items-center text-center gap-1">
+              <div className="flex flex-col items-center text-center gap-1 min-w-[5rem]">
                 <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
                   <User className="w-4 h-4 text-slate-500" />
                 </div>
@@ -177,7 +177,7 @@ export default function UserProfileCard({ profile, onProfileUpdate, onEdit }) {
               </div>
             )}
             {profile.phone && (
-              <div className="flex flex-col items-center text-center gap-1">
+              <div className="flex flex-col items-center text-center gap-1 min-w-[5rem]">
                 <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
                   <Phone className="w-4 h-4 text-slate-500" />
                 </div>
@@ -191,7 +191,7 @@ export default function UserProfileCard({ profile, onProfileUpdate, onEdit }) {
               const Icon = field.icon;
               const [bgClass, textClass] = field.color.split(' ');
               return (
-                <div key={field.key} className="flex flex-col items-center text-center gap-1">
+                <div key={field.key} className="flex flex-col items-center text-center gap-1 min-w-[5rem]">
                   <div className={`w-9 h-9 rounded-full ${bgClass} flex items-center justify-center`}>
                     <Icon className={`w-4 h-4 ${textClass}`} />
                   </div>
