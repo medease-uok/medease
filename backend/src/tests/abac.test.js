@@ -17,7 +17,6 @@ jest.mock('../config/database', () => ({
 
 const { evaluateAccess, evaluateCondition, buildAccessFilter, loadPolicies, invalidatePolicyCache } = require('../utils/abac');
 
-// Standard ABAC policies matching database/init/03-abac-policies.sql
 const POLICIES = [
   {
     id: 'p1', name: 'appointment_admin_nurse_view', resource_type: 'appointment', effect: 'allow', priority: 10,
@@ -118,7 +117,6 @@ beforeEach(() => {
   mockRedisSet.mockReset();
   mockRedisDel.mockReset();
   mockDbQuery.mockReset();
-  // Return policies from cache
   mockRedisGet.mockResolvedValue(JSON.stringify(POLICIES));
 });
 
