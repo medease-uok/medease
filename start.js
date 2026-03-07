@@ -31,11 +31,14 @@ const DB_USER = 'medease_user';
 const DB_NAME = 'medease';
 
 function runSQL(sql) {
-  const escaped = sql.replace(/'/g, "'\\''");
   execSync(
-    `docker exec ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc '${escaped}'`,
-    { stdio: 'pipe' }
+    `docker exec -i ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME}`,
+    { input: sql, stdio: ['pipe', 'pipe', 'pipe'] }
   );
+}
+
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function waitForDB(maxAttempts = 30) {
@@ -47,13 +50,13 @@ function waitForDB(maxAttempts = 30) {
       );
       // Check that core schema exists (users table from 01-init.sql)
       execSync(
-        `docker exec ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc "SELECT 1 FROM users LIMIT 1"`,
-        { stdio: 'pipe' }
+        `docker exec -i ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tA`,
+        { input: 'SELECT 1 FROM users LIMIT 1', stdio: ['pipe', 'pipe', 'pipe'] }
       );
       break;
     } catch {
       if (i < maxAttempts - 1) {
-        execSync('sleep 2');
+        sleep(2000);
       } else {
         console.error('Error: Database did not become ready in time.');
         process.exit(1);
@@ -64,8 +67,8 @@ function waitForDB(maxAttempts = 30) {
   // Ensure RBAC tables exist (may be missing if DB was created before 02-roles-permissions.sql)
   try {
     execSync(
-      `docker exec ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc "SELECT 1 FROM roles LIMIT 1"`,
-      { stdio: 'pipe' }
+      `docker exec -i ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tA`,
+      { input: 'SELECT 1 FROM roles LIMIT 1', stdio: ['pipe', 'pipe', 'pipe'] }
     );
   } catch {
     console.log('RBAC tables not found — applying roles & permissions schema...');
@@ -78,9 +81,22 @@ function waitForDB(maxAttempts = 30) {
   }
 }
 
+function querySQL(sql) {
+  return execSync(
+    `docker exec -i ${DB_CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tA`,
+    { input: sql, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
+  ).trim();
+}
+
 function createAdminUser({ firstName, lastName, email, phone, password }) {
   const esc = (s) => s.replace(/'/g, "''");
   const phoneVal = phone ? `'${esc(phone)}'` : 'NULL';
+
+  const existing = querySQL(`SELECT id FROM users WHERE email = '${esc(email)}'`);
+  if (existing) {
+    console.log(`Admin user with email "${email}" already exists — skipping creation.`);
+    return;
+  }
 
   const sql = `
     WITH new_user AS (

@@ -9,18 +9,16 @@ const DB_USER = 'medease_user';
 const DB_NAME = 'medease';
 
 function runSQL(sql) {
-  const escaped = sql.replace(/'/g, "'\\''");
   execSync(
-    `docker exec ${CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc '${escaped}'`,
-    { stdio: 'pipe' }
+    `docker exec -i ${CONTAINER} psql -U ${DB_USER} -d ${DB_NAME}`,
+    { input: sql, stdio: ['pipe', 'pipe', 'pipe'] }
   );
 }
 
 function querySQL(sql) {
-  const escaped = sql.replace(/'/g, "'\\''");
   return execSync(
-    `docker exec ${CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tAc '${escaped}'`,
-    { encoding: 'utf8' }
+    `docker exec -i ${CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} -tA`,
+    { input: sql, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
   ).trim();
 }
 
