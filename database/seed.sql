@@ -168,6 +168,21 @@ INSERT INTO lab_reports (patient_id, technician_id, test_name, result, notes, re
   ('ce000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001', 'MRI Left Knee', 'Partial tear of anterior cruciate ligament (Grade 2). Mild joint effusion. Menisci intact.', 'ACL partially torn. No meniscal damage. Conservative management may be appropriate.', NOW() - INTERVAL '5 days');
 
 -- ============================================
+-- PATIENT ALLERGIES
+-- ============================================
+
+INSERT INTO patient_allergies (patient_id, allergen, severity, reaction, noted_at) VALUES
+  ('ce000000-0000-0000-0000-000000000001', 'Penicillin', 'severe', 'Anaphylaxis — throat swelling, difficulty breathing', '2018-06-10'),
+  ('ce000000-0000-0000-0000-000000000001', 'Shellfish', 'moderate', 'Hives and facial swelling', '2020-01-15'),
+  ('ce000000-0000-0000-0000-000000000002', 'Aspirin', 'moderate', 'Gastrointestinal bleeding, stomach pain', '2019-03-22'),
+  ('ce000000-0000-0000-0000-000000000003', 'Latex', 'mild', 'Contact dermatitis, skin redness', '2021-08-05'),
+  ('ce000000-0000-0000-0000-000000000003', 'Pollen', 'mild', 'Sneezing, runny nose, watery eyes', '2015-04-01'),
+  ('ce000000-0000-0000-0000-000000000004', 'Sulfonamides', 'severe', 'Stevens-Johnson syndrome risk — documented', '2017-11-20'),
+  ('ce000000-0000-0000-0000-000000000004', 'Ibuprofen', 'moderate', 'Skin rash and mild bronchospasm', '2022-02-14'),
+  ('ce000000-0000-0000-0000-000000000005', 'Peanuts', 'severe', 'Anaphylaxis — carries EpiPen', '2010-09-01'),
+  ('ce000000-0000-0000-0000-000000000006', 'Codeine', 'mild', 'Nausea and mild itching', '2023-05-30');
+
+-- ============================================
 -- Mark all seeded users as email-verified (they are test accounts)
 -- ============================================
 

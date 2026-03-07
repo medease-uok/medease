@@ -9,9 +9,12 @@ const { checkResourceAccess } = require('../middleware/abac');
 const validate = require('../middleware/validate');
 const { updatePatientValidation } = require('../validators/patients.validators');
 const { upload } = require('../middleware/upload');
+const allergiesRoutes = require('./allergies.routes');
 
 router.use(authenticate);
 router.use(resolveSubject);
+
+router.use('/:patientId/allergies', allergiesRoutes);
 
 router.get('/me', authorize('patient'), getMe);
 router.get('/', authorize('doctor', 'nurse', 'admin'), getAll);

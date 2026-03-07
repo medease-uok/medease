@@ -143,6 +143,17 @@ CREATE TABLE lab_reports (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Patient allergies table
+CREATE TABLE patient_allergies (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+  allergen VARCHAR(200) NOT NULL,
+  severity VARCHAR(20) NOT NULL CHECK (severity IN ('mild', 'moderate', 'severe')),
+  reaction TEXT,
+  noted_at DATE DEFAULT CURRENT_DATE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Audit logs table
 CREATE TABLE audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -166,6 +177,7 @@ CREATE INDEX idx_appointments_scheduled ON appointments(scheduled_at);
 CREATE INDEX idx_medical_records_patient ON medical_records(patient_id);
 CREATE INDEX idx_prescriptions_patient ON prescriptions(patient_id);
 CREATE INDEX idx_lab_reports_patient ON lab_reports(patient_id);
+CREATE INDEX idx_patient_allergies_patient ON patient_allergies(patient_id);
 CREATE INDEX idx_nurses_user ON nurses(user_id);
 CREATE INDEX idx_nurses_department ON nurses(department);
 CREATE INDEX idx_pharmacists_user ON pharmacists(user_id);
@@ -177,6 +189,7 @@ ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medical_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lab_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patient_allergies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nurses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pharmacists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
