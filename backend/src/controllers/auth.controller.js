@@ -67,6 +67,7 @@ const register = async (req, res, next) => {
     firstName, lastName, email, phone, role, password,
     dateOfBirth, gender, bloodType, address,
     emergencyContact, emergencyRelationship, emergencyPhone,
+    insuranceProvider, insurancePolicyNumber, insurancePlanType, insuranceExpiryDate,
     specialization, licenseNumber, department,
   } = req.body;
 
@@ -111,11 +112,14 @@ const register = async (req, res, next) => {
       case 'patient':
         await client.query(
           `INSERT INTO patients (user_id, date_of_birth, gender, blood_type, address,
-             emergency_contact, emergency_relationship, emergency_phone, profile_image_url)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+             emergency_contact, emergency_relationship, emergency_phone,
+             insurance_provider, insurance_policy_number, insurance_plan_type, insurance_expiry_date,
+             profile_image_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
           [user.id, dateOfBirth, gender, bloodType || null, address || null,
            emergencyContact || null, emergencyRelationship || null, emergencyPhone || null,
-           pickDefaultAvatar(gender)]
+           insuranceProvider || null, insurancePolicyNumber || null, insurancePlanType || null,
+           insuranceExpiryDate || null, pickDefaultAvatar(gender)]
         );
         break;
 
@@ -278,6 +282,11 @@ const login = async (req, res, next) => {
       'EX',
       config.otp.ttlSeconds
     );
+
+    // Log OTP in development for testing (seeded accounts use fake emails)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEV] OTP for ${user.email}: ${otp}`);
+    }
 
     // Send OTP email
     await sendLoginOtpEmail(user.email, user.first_name, otp);

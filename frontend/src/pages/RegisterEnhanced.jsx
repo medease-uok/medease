@@ -16,7 +16,13 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  MapPin,
+  UserCheck,
+  Users,
+  Shield,
+  CreditCard,
+  FileText,
 } from 'lucide-react';
 
 
@@ -122,7 +128,9 @@ export default function RegisterEnhanced() {
     firstName: '', lastName: '', email: '', phone: '', role: 'patient',
     password: '', confirmPassword: '', dateOfBirth: '', gender: '',
     bloodType: '', address: '', emergencyContact: '', emergencyRelationship: '',
-    emergencyPhone: '', specialization: '', licenseNumber: '', department: '',
+    emergencyPhone: '', insuranceProvider: '', insurancePolicyNumber: '',
+    insurancePlanType: '', insuranceExpiryDate: '',
+    specialization: '', licenseNumber: '', department: '',
   });
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -392,19 +400,84 @@ export default function RegisterEnhanced() {
                             {fieldErrors.gender && <p className="mt-1 text-sm text-red-600">{fieldErrors.gender}</p>}
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-2">Blood Type</label>
-                          <div className="relative">
-                            <Heart className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                            <select
-                              name="bloodType"
-                              value={form.bloodType}
-                              onChange={handleChange}
-                              className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary"
-                            >
-                              <option value="">Select Blood Type</option>
-                              {bloodTypes.map((bt) => <option key={bt} value={bt}>{bt}</option>)}
-                            </select>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Blood Type</label>
+                            <div className="relative">
+                              <Heart className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                              <select
+                                name="bloodType"
+                                value={form.bloodType}
+                                onChange={handleChange}
+                                className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary"
+                              >
+                                <option value="">Select Blood Type</option>
+                                {bloodTypes.map((bt) => <option key={bt} value={bt}>{bt}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                          <InputField label="Address" name="address" icon={MapPin} value={form.address} onChange={handleChange} disabled={loading} placeholder="Your address" />
+                        </div>
+
+                        {/* Emergency Contact */}
+                        <div className="border-t border-slate-200 pt-4 mt-2">
+                          <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <Users className="w-4 h-4 text-slate-500" />
+                            Emergency Contact
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <InputField label="Contact Name" name="emergencyContact" icon={UserCheck} value={form.emergencyContact} onChange={handleChange} disabled={loading} placeholder="Full name" maxLength={100} />
+                            <InputField label="Relationship" name="emergencyRelationship" value={form.emergencyRelationship} onChange={handleChange} disabled={loading} placeholder="e.g. Parent, Spouse" maxLength={50} />
+                          </div>
+                          <div className="mt-4">
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Emergency Phone</label>
+                            <div className="flex gap-2">
+                              <div className="w-20 flex items-center justify-center border border-slate-300 rounded-lg bg-slate-50 text-slate-700 font-medium">
+                                +94
+                              </div>
+                              <div className="flex-1 relative">
+                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                <input
+                                  type="tel"
+                                  name="emergencyPhone"
+                                  value={form.emergencyPhone}
+                                  onChange={handleChange}
+                                  placeholder="7XXXXXXXX"
+                                  maxLength={10}
+                                  className={`w-full pl-11 pr-4 py-3 border ${fieldErrors.emergencyPhone ? 'border-red-500' : 'border-slate-300'} rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all`}
+                                />
+                              </div>
+                            </div>
+                            {fieldErrors.emergencyPhone && <p className="mt-1 text-sm text-red-600">{fieldErrors.emergencyPhone}</p>}
+                          </div>
+                        </div>
+
+                        {/* Insurance Details */}
+                        <div className="border-t border-slate-200 pt-4 mt-2">
+                          <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                            <Shield className="w-4 h-4 text-slate-500" />
+                            Insurance Details
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <InputField label="Insurance Provider" name="insuranceProvider" icon={CreditCard} value={form.insuranceProvider} onChange={handleChange} disabled={loading} placeholder="Provider name" maxLength={100} />
+                            <InputField label="Policy Number" name="insurancePolicyNumber" icon={FileText} value={form.insurancePolicyNumber} onChange={handleChange} disabled={loading} placeholder="Policy number" maxLength={50} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 mt-4">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">Plan Type</label>
+                              <select
+                                name="insurancePlanType"
+                                value={form.insurancePlanType}
+                                onChange={handleChange}
+                                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary"
+                              >
+                                <option value="">Select Plan</option>
+                                <option value="Inpatient">Inpatient</option>
+                                <option value="Outpatient">Outpatient</option>
+                                <option value="Comprehensive">Comprehensive</option>
+                              </select>
+                            </div>
+                            <InputField label="Expiry Date" name="insuranceExpiryDate" type="date" icon={Calendar} value={form.insuranceExpiryDate} onChange={handleChange} disabled={loading} />
                           </div>
                         </div>
                       </>
