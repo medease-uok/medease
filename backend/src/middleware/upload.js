@@ -1,5 +1,6 @@
 const multer = require('multer');
-const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const path = require('path');
 const crypto = require('crypto');
 const config = require('../config');
@@ -7,6 +8,7 @@ const AppError = require('../utils/AppError');
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const PRESIGNED_URL_EXPIRY = 3600; // 1 hour in seconds
 
 const s3 = new S3Client({
   region: config.s3.region,
@@ -31,7 +33,7 @@ const upload = multer({
 });
 
 /**
- * Upload a buffer to S3 and return the public URL.
+ * Upload a buffer to S3 and return the S3 key.
  * Key format: profile-images/<patientId>/<randomHash>.<ext>
  */
 async function uploadToS3(file, patientId) {
@@ -46,17 +48,27 @@ async function uploadToS3(file, patientId) {
     ContentType: file.mimetype,
   }));
 
-  return `https://${config.s3.bucket}.s3.${config.s3.region}.amazonaws.com/${key}`;
+  return key;
 }
 
 /**
- * Delete an object from S3 by its full URL.
+ * Generate a presigned GET URL for a private S3 object.
  */
-async function deleteFromS3(url) {
-  if (!url) return;
+async function getPresignedImageUrl(key) {
+  if (!key) return null;
+  const command = new GetObjectCommand({
+    Bucket: config.s3.bucket,
+    Key: key,
+  });
+  return getSignedUrl(s3, command, { expiresIn: PRESIGNED_URL_EXPIRY });
+}
+
+/**
+ * Delete an object from S3 by its key.
+ */
+async function deleteFromS3(key) {
+  if (!key) return;
   try {
-    const urlObj = new URL(url);
-    const key = urlObj.pathname.slice(1); // remove leading /
     await s3.send(new DeleteObjectCommand({
       Bucket: config.s3.bucket,
       Key: key,
@@ -66,4 +78,4 @@ async function deleteFromS3(url) {
   }
 }
 
-module.exports = { upload, uploadToS3, deleteFromS3 };
+module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl };

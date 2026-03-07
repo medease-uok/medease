@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, FileText, Pill, FlaskConical, Stethoscope,
-  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil,
+  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Camera, Loader2, Trash2,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -40,15 +40,101 @@ function StatusBadge({ status }) {
   );
 }
 
-function ProfileCard({ profile, onEdit }) {
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+function ProfileCard({ profile, onEdit, onImageUpdate }) {
   const age = calculateAge(profile.dateOfBirth);
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState('');
+
+  const handleImageSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setImageError('Only JPEG, PNG, and WebP images are allowed.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      setImageError('Image must be under 5 MB.');
+      return;
+    }
+
+    setImageError('');
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('profileImage', file);
+      const res = await api.upload(`/patients/${profile.id}/profile-image`, formData);
+      onImageUpdate(res.data);
+    } catch (err) {
+      setImageError(err.message || 'Failed to upload image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImageDelete = async () => {
+    setImageError('');
+    setUploading(true);
+    try {
+      const res = await api.delete(`/patients/${profile.id}/profile-image`);
+      onImageUpdate(res.data);
+    } catch (err) {
+      setImageError(err.message || 'Failed to remove image.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <Card className="hover:shadow-lg transition-shadow duration-300">
       <CardContent className="pt-6">
         <div className="flex items-start gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-cta flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-            {(profile.firstName?.[0] || '')}{(profile.lastName?.[0] || '')}
+          <div className="relative group flex-shrink-0">
+            {profile.profileImageUrl ? (
+              <img
+                src={profile.profileImageUrl}
+                alt={`${profile.firstName} ${profile.lastName}`}
+                className="w-16 h-16 rounded-2xl object-cover"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-cta flex items-center justify-center text-white text-xl font-bold">
+                {(profile.firstName?.[0] || '')}{(profile.lastName?.[0] || '')}
+              </div>
+            )}
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+            >
+              {uploading ? (
+                <Loader2 className="w-5 h-5 text-white animate-spin" />
+              ) : (
+                <Camera className="w-5 h-5 text-white" />
+              )}
+            </button>
+            {profile.profileImageUrl && !uploading && (
+              <button
+                type="button"
+                onClick={handleImageDelete}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                aria-label="Remove profile image"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleImageSelect}
+            />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between">
@@ -120,6 +206,9 @@ function ProfileCard({ profile, onEdit }) {
             )}
           </div>
         </div>
+        {imageError && (
+          <p className="mt-3 text-sm text-red-600">{imageError}</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -253,7 +342,7 @@ export default function PatientDashboard() {
         </div>
       )}
 
-      {profile && <ProfileCard profile={profile} onEdit={() => setEditOpen(true)} />}
+      {profile && <ProfileCard profile={profile} onEdit={() => setEditOpen(true)} onImageUpdate={(updated) => setProfile(updated)} />}
 
       {editOpen && profile && (
         <EditProfileModal

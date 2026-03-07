@@ -1,6 +1,6 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
-const { uploadToS3, deleteFromS3 } = require('../middleware/upload');
+const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
 
 const getAll = async (req, res, next) => {
   try {
@@ -14,7 +14,7 @@ const getAll = async (req, res, next) => {
        ORDER BY u.last_name, u.first_name`
     );
 
-    const patients = result.rows.map(mapPatient);
+    const patients = await Promise.all(result.rows.map(mapPatient));
     res.json({ status: 'success', data: patients });
   } catch (err) {
     return next(err);
@@ -41,7 +41,7 @@ const getById = async (req, res, next) => {
       throw new AppError('Patient not found.', 404);
     }
 
-    const patient = mapPatient(patientResult.rows[0]);
+    const patient = await mapPatient(patientResult.rows[0]);
 
     const [recordsResult, rxResult, labsResult] = await Promise.all([
       db.query(
@@ -175,7 +175,7 @@ const updateById = async (req, res, next) => {
 
     await client.query('COMMIT');
 
-    res.json({ status: 'success', data: mapPatient(result.rows[0]) });
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
   } catch (err) {
     await client.query('ROLLBACK');
     return next(err);
@@ -200,13 +200,13 @@ const getMe = async (req, res, next) => {
       throw new AppError('Patient profile not found.', 404);
     }
 
-    res.json({ status: 'success', data: mapPatient(result.rows[0]) });
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
   } catch (err) {
     return next(err);
   }
 };
 
-function mapPatient(row) {
+async function mapPatient(row) {
   return {
     id: row.id,
     userId: row.user_id,
@@ -218,7 +218,7 @@ function mapPatient(row) {
     gender: row.gender,
     bloodType: row.blood_type,
     address: row.address,
-    profileImageUrl: row.profile_image_url,
+    profileImageUrl: await getPresignedImageUrl(row.profile_image_url),
     emergencyContact: row.emergency_contact,
     emergencyRelationship: row.emergency_relationship,
     emergencyPhone: row.emergency_phone,
@@ -284,16 +284,16 @@ const uploadProfileImage = async (req, res, next) => {
       return next(new AppError('Patient not found.', 404));
     }
 
-    const oldUrl = current.rows[0].profile_image_url;
-    const newUrl = await uploadToS3(req.file, id);
+    const oldKey = current.rows[0].profile_image_url;
+    const newKey = await uploadToS3(req.file, id);
 
     await db.query(
       'UPDATE patients SET profile_image_url = $1, updated_at = NOW() WHERE id = $2',
-      [newUrl, id]
+      [newKey, id]
     );
 
     // Clean up old image (best-effort)
-    deleteFromS3(oldUrl);
+    deleteFromS3(oldKey);
 
     // Return the full updated profile
     const result = await db.query(
@@ -306,7 +306,7 @@ const uploadProfileImage = async (req, res, next) => {
       [id]
     );
 
-    res.json({ status: 'success', data: mapPatient(result.rows[0]) });
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
   } catch (err) {
     return next(err);
   }
@@ -324,8 +324,8 @@ const deleteProfileImage = async (req, res, next) => {
       return next(new AppError('Patient not found.', 404));
     }
 
-    const oldUrl = current.rows[0].profile_image_url;
-    if (!oldUrl) {
+    const oldKey = current.rows[0].profile_image_url;
+    if (!oldKey) {
       return next(new AppError('No profile image to delete.', 400));
     }
 
@@ -334,7 +334,7 @@ const deleteProfileImage = async (req, res, next) => {
       [id]
     );
 
-    deleteFromS3(oldUrl);
+    deleteFromS3(oldKey);
 
     const result = await db.query(
       `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
@@ -346,7 +346,7 @@ const deleteProfileImage = async (req, res, next) => {
       [id]
     );
 
-    res.json({ status: 'success', data: mapPatient(result.rows[0]) });
+    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
   } catch (err) {
     return next(err);
   }

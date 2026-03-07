@@ -13,7 +13,7 @@ module.exports = {
   logLevel: process.env.LOG_LEVEL || 'debug',
   s3: {
     bucket: process.env.S3_BUCKET,
-    region: process.env.S3_REGION || 'ap-south-1',
+    region: process.env.S3_REGION || 'eu-north-1',
     accessKeyId: process.env.S3_ACCESS_KEY_ID,
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
   },
