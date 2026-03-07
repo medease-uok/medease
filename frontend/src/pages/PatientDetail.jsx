@@ -48,6 +48,10 @@ export default function PatientDetail() {
           { label: 'Emergency Contact', value: patient.emergencyContact },
           { label: 'Relationship', value: patient.emergencyRelationship },
           { label: 'Emergency Phone', value: patient.emergencyPhone },
+          { label: 'Insurance Provider', value: patient.insuranceProvider },
+          { label: 'Policy No.', value: patient.insurancePolicyNumber },
+          { label: 'Plan Type', value: patient.insurancePlanType },
+          { label: 'Insurance Expiry', value: patient.insuranceExpiryDate ? new Date(patient.insuranceExpiryDate).toLocaleDateString() : null },
         ]}
       />
 
