@@ -95,11 +95,27 @@ function ProfileCard({ profile, onEdit }) {
             </div>
 
             {profile.emergencyContact && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg">
-                <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">Emergency Contact</p>
-                <p className="text-sm text-slate-700">
-                  {profile.emergencyContact} ({profile.emergencyRelationship}) &middot; {profile.emergencyPhone}
-                </p>
+              <div className="mt-5 p-4 bg-red-50/70 border border-red-100 rounded-xl">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+                    <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-red-600">Emergency Contact</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-0.5">Name</p>
+                    <p className="text-sm font-medium text-slate-800">{profile.emergencyContact}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-0.5">Relationship</p>
+                    <p className="text-sm font-medium text-slate-800">{profile.emergencyRelationship}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-0.5">Phone</p>
+                    <p className="text-sm font-medium text-slate-800">{profile.emergencyPhone}</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
