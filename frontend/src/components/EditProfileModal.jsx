@@ -98,6 +98,7 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
     dateOfBirth: profile.dateOfBirth ? profile.dateOfBirth.split('T')[0] : '',
     gender: profile.gender || '',
     bloodType: profile.bloodType || '',
+    organDonor: profile.organDonor || false,
     address: profile.address || '',
     emergencyContact: profile.emergencyContact || '',
     emergencyRelationship: profile.emergencyRelationship || '',
@@ -349,6 +350,17 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
                 <label className="block text-sm font-medium text-slate-700 mb-1">Address *</label>
                 <input type="text" name="address" value={form.address} onChange={handleChange} maxLength={ADDRESS_MAX_LENGTH} className={inputClass(errors.address)} />
                 {errors.address && <p className="mt-1 text-sm text-red-600">{errors.address}</p>}
+              </div>
+              <div className="sm:col-span-2">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={form.organDonor}
+                    onChange={(e) => setForm((prev) => ({ ...prev, organDonor: e.target.checked }))}
+                    className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm text-slate-700 group-hover:text-slate-900">Registered organ donor</span>
+                </label>
               </div>
             </div>
           </div>

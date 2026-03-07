@@ -51,6 +51,7 @@ CREATE TABLE patients (
   date_of_birth DATE,
   gender VARCHAR(20),
   blood_type VARCHAR(5),
+  organ_donor BOOLEAN DEFAULT false,
   address TEXT,
   profile_image_url TEXT,
   emergency_contact VARCHAR(100),

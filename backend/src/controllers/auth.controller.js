@@ -65,7 +65,7 @@ async function createRefreshToken(userId) {
 const register = async (req, res, next) => {
   const {
     firstName, lastName, email, phone, role, password,
-    dateOfBirth, gender, bloodType, address,
+    dateOfBirth, gender, bloodType, organDonor, address,
     emergencyContact, emergencyRelationship, emergencyPhone,
     insuranceProvider, insurancePolicyNumber, insurancePlanType, insuranceExpiryDate,
     specialization, licenseNumber, department,
@@ -111,12 +111,12 @@ const register = async (req, res, next) => {
     switch (role) {
       case 'patient':
         await client.query(
-          `INSERT INTO patients (user_id, date_of_birth, gender, blood_type, address,
+          `INSERT INTO patients (user_id, date_of_birth, gender, blood_type, organ_donor, address,
              emergency_contact, emergency_relationship, emergency_phone,
              insurance_provider, insurance_policy_number, insurance_plan_type, insurance_expiry_date,
              profile_image_url)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [user.id, dateOfBirth, gender, bloodType || null, address || null,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+          [user.id, dateOfBirth, gender, bloodType || null, organDonor === true, address || null,
            emergencyContact || null, emergencyRelationship || null, emergencyPhone || null,
            insuranceProvider || null, insurancePolicyNumber || null, insurancePlanType || null,
            insuranceExpiryDate || null, pickDefaultAvatar(gender)]

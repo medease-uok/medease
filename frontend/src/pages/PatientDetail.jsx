@@ -52,6 +52,7 @@ export default function PatientDetail() {
           { label: 'Date of Birth', value: new Date(patient.dateOfBirth).toLocaleDateString() },
           { label: 'Gender', value: patient.gender },
           { label: 'Blood Type', value: patient.bloodType },
+          { label: 'Organ Donor', value: patient.organDonor ? 'Yes' : 'No' },
           { label: 'Address', value: patient.address },
           { label: 'Emergency Contact', value: patient.emergencyContact },
           { label: 'Relationship', value: patient.emergencyRelationship },

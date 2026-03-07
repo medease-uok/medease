@@ -4,7 +4,7 @@ const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middlewar
 
 const PATIENT_SELECT = `
   SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
-         p.date_of_birth, p.gender, p.blood_type, p.address, p.profile_image_url,
+         p.date_of_birth, p.gender, p.blood_type, p.organ_donor, p.address, p.profile_image_url,
          p.emergency_contact, p.emergency_relationship, p.emergency_phone,
          p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
   FROM patients p
@@ -119,7 +119,7 @@ const updateById = async (req, res, next) => {
     const { id } = req.params;
     const {
       firstName, lastName, phone,
-      dateOfBirth, gender, bloodType, address,
+      dateOfBirth, gender, bloodType, organDonor, address,
       emergencyContact, emergencyRelationship, emergencyPhone,
       insuranceProvider, insurancePolicyNumber, insurancePlanType, insuranceExpiryDate,
     } = req.body;
@@ -134,6 +134,7 @@ const updateById = async (req, res, next) => {
       date_of_birth: dateOfBirth,
       gender: gender,
       blood_type: bloodType !== undefined ? (bloodType || null) : undefined,
+      organ_donor: organDonor !== undefined ? (organDonor === true) : undefined,
       address: address !== undefined ? (address || null) : undefined,
       emergency_contact: emergencyContact !== undefined ? (emergencyContact || null) : undefined,
       emergency_relationship: emergencyRelationship !== undefined ? (emergencyRelationship || null) : undefined,
@@ -231,6 +232,7 @@ async function mapPatient(row) {
     dateOfBirth: row.date_of_birth,
     gender: row.gender,
     bloodType: row.blood_type,
+    organDonor: row.organ_donor,
     address: row.address,
     profileImageUrl: await getPresignedImageUrl(row.profile_image_url),
     emergencyContact: row.emergency_contact,

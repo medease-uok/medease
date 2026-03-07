@@ -132,7 +132,7 @@ export default function RegisterEnhanced() {
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '', role: 'patient',
     password: '', confirmPassword: '', dateOfBirth: '', gender: '',
-    bloodType: '', address: '', emergencyContact: '', emergencyRelationship: '',
+    bloodType: '', organDonor: false, address: '', emergencyContact: '', emergencyRelationship: '',
     emergencyPhone: '', insuranceProvider: '', insurancePolicyNumber: '',
     insurancePlanType: '', insuranceExpiryDate: '',
     specialization: '', licenseNumber: '', department: '',
@@ -445,6 +445,15 @@ export default function RegisterEnhanced() {
                           </div>
                           <InputField label="Address" name="address" icon={MapPin} value={form.address} onChange={handleChange} disabled={loading} placeholder="Your address" />
                         </div>
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={form.organDonor}
+                            onChange={(e) => setForm({ ...form, organDonor: e.target.checked })}
+                            className="w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary"
+                          />
+                          <span className="text-sm text-slate-700 group-hover:text-slate-900">I am a registered organ donor</span>
+                        </label>
 
                         {/* Emergency Contact */}
                         <div className="border-t border-slate-200 pt-4 mt-2">

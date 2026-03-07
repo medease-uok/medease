@@ -5,7 +5,7 @@ const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middlewar
 const ROLE_QUERIES = {
   patient: {
     query: `SELECT u.id AS user_id, u.first_name, u.last_name, u.email, u.phone, u.role,
-                   p.id AS profile_id, p.date_of_birth, p.gender, p.blood_type, p.address,
+                   p.id AS profile_id, p.date_of_birth, p.gender, p.blood_type, p.organ_donor, p.address,
                    p.profile_image_url, p.emergency_contact, p.emergency_relationship, p.emergency_phone,
                    p.insurance_provider, p.insurance_policy_number, p.insurance_plan_type, p.insurance_expiry_date
             FROM users u
@@ -70,6 +70,7 @@ async function mapProfileRow(row) {
         ...base,
         gender: row.gender,
         bloodType: row.blood_type,
+        organDonor: row.organ_donor,
         address: row.address,
         emergencyContact: row.emergency_contact,
         emergencyRelationship: row.emergency_relationship,

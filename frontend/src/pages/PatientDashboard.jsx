@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Calendar, FileText, Pill, FlaskConical, Stethoscope,
   Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Loader2, Trash2, Shield,
-  Plus, X, AlertTriangle,
+  Plus, X, AlertTriangle, Heart,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -184,6 +184,13 @@ function ProfileCard({ profile, onEdit, onImageUpdate }) {
                 <p className="text-sm font-medium text-slate-700">{profile.bloodType}</p>
               </div>
             )}
+            <div className="flex flex-col items-center text-center gap-1">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center ${profile.organDonor ? 'bg-emerald-50' : 'bg-slate-100'}`}>
+                <Heart className={`w-4 h-4 ${profile.organDonor ? 'text-emerald-500' : 'text-slate-400'}`} />
+              </div>
+              <p className="text-xs text-slate-400">Organ Donor</p>
+              <p className={`text-sm font-medium ${profile.organDonor ? 'text-emerald-600' : 'text-slate-500'}`}>{profile.organDonor ? 'Yes' : 'No'}</p>
+            </div>
             {profile.phone && (
               <div className="flex flex-col items-center text-center gap-1">
                 <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
