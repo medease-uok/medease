@@ -90,6 +90,99 @@ const getById = async (req, res, next) => {
   }
 };
 
+function buildSetClauses(fieldMap) {
+  const setClauses = [];
+  const params = [];
+  let idx = 1;
+
+  for (const [column, value] of Object.entries(fieldMap)) {
+    if (value !== undefined) {
+      setClauses.push(`${column} = $${idx++}`);
+      params.push(value ?? null);
+    }
+  }
+
+  return { setClauses, params, nextIdx: idx };
+}
+
+const updateById = async (req, res, next) => {
+  const client = await db.getClient();
+  try {
+    const { id } = req.params;
+    const {
+      firstName, lastName, phone,
+      dateOfBirth, gender, bloodType, address,
+      emergencyContact, emergencyRelationship, emergencyPhone,
+    } = req.body;
+
+    const userUpdate = buildSetClauses({
+      first_name: firstName,
+      last_name: lastName,
+      phone: phone !== undefined ? (phone || null) : undefined,
+    });
+
+    const profileUpdate = buildSetClauses({
+      date_of_birth: dateOfBirth,
+      gender: gender,
+      blood_type: bloodType !== undefined ? (bloodType || null) : undefined,
+      address: address !== undefined ? (address || null) : undefined,
+      emergency_contact: emergencyContact !== undefined ? (emergencyContact || null) : undefined,
+      emergency_relationship: emergencyRelationship !== undefined ? (emergencyRelationship || null) : undefined,
+      emergency_phone: emergencyPhone !== undefined ? (emergencyPhone || null) : undefined,
+    });
+
+    if (userUpdate.setClauses.length === 0 && profileUpdate.setClauses.length === 0) {
+      return next(new AppError('No valid fields provided for update.', 400));
+    }
+
+    await client.query('BEGIN');
+
+    const patientResult = await client.query(
+      'SELECT user_id FROM patients WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+    if (patientResult.rows.length === 0) {
+      throw new AppError('Resource not found.', 404);
+    }
+    const userId = patientResult.rows[0].user_id;
+
+    if (userUpdate.setClauses.length > 0) {
+      userUpdate.params.push(userId);
+      await client.query(
+        `UPDATE users SET ${userUpdate.setClauses.join(', ')}, updated_at = NOW() WHERE id = $${userUpdate.nextIdx}`,
+        userUpdate.params
+      );
+    }
+
+    if (profileUpdate.setClauses.length > 0) {
+      profileUpdate.params.push(id);
+      await client.query(
+        `UPDATE patients SET ${profileUpdate.setClauses.join(', ')}, updated_at = NOW() WHERE id = $${profileUpdate.nextIdx}`,
+        profileUpdate.params
+      );
+    }
+
+    const result = await client.query(
+      `SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
+              p.date_of_birth, p.gender, p.blood_type, p.address,
+              p.emergency_contact, p.emergency_relationship, p.emergency_phone
+       FROM patients p
+       JOIN users u ON p.user_id = u.id
+       WHERE p.id = $1`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({ status: 'success', data: mapPatient(result.rows[0]) });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    return next(err);
+  } finally {
+    client.release();
+  }
+};
+
 const getMe = async (req, res, next) => {
   try {
     const result = await db.query(
@@ -172,4 +265,4 @@ function mapLabReport(row) {
   };
 }
 
-module.exports = { getAll, getById, getMe };
+module.exports = { getAll, getById, getMe, updateById };
