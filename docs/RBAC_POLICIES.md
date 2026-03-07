@@ -1,6 +1,6 @@
-# Role-Based Access Control (RBAC) Policies
+# Access Control Policies (RBAC + ABAC)
 
-This document describes the permission-based access control system used in MedEase. It covers all permissions, system roles, role hierarchy, and permission resolution.
+This document describes the access control system used in MedEase. It covers role-based permissions (RBAC), attribute-based policies (ABAC), role hierarchy, and permission resolution.
 
 ## Table of Contents
 
@@ -9,6 +9,7 @@ This document describes the permission-based access control system used in MedEa
 - [System Roles](#system-roles)
 - [Role Hierarchy](#role-hierarchy)
 - [Permission Resolution](#permission-resolution)
+- [Attribute-Based Access Control (ABAC)](#attribute-based-access-control-abac)
 - [Caching](#caching)
 - [Frontend Permission System](#frontend-permission-system)
 - [Permission Management UI](#permission-management-ui)
@@ -224,11 +225,138 @@ JOIN permissions p ON p.id = rp.permission_id
 
 ---
 
+## Attribute-Based Access Control (ABAC)
+
+ABAC adds fine-grained, resource-level access control on top of RBAC. While RBAC answers "does this user have the permission to view medical records?", ABAC answers "can this user view **this specific** medical record?"
+
+### How it works
+
+ABAC policies are stored in the `abac_policies` table. Each policy targets a **resource type** and defines **conditions** that must match for access to be granted or denied.
+
+```mermaid
+flowchart TD
+    A[User requests resource] --> B[RBAC check: has permission?]
+    B -- No --> C[403 Forbidden]
+    B -- Yes --> D[Resolve subject attributes]
+    D --> E[Load ABAC policies for resource type]
+    E --> F{Any DENY policy matches?}
+    F -- Yes --> C
+    F -- No --> G{Any ALLOW policy matches?}
+    G -- Yes --> H[Access granted]
+    G -- No --> C
+```
+
+### Subject Attributes
+
+Resolved automatically by the `resolveSubject` middleware and cached in Redis:
+
+| Attribute | Source | Description |
+|---|---|---|
+| `subject.id` | JWT token | User UUID |
+| `subject.role` | JWT token | User role (admin, doctor, patient, etc.) |
+| `subject.patientId` | `patients` table | Patient profile UUID (if role is patient) |
+| `subject.doctorId` | `doctors` table | Doctor profile UUID (if role is doctor) |
+| `subject.nurseId` | `nurses` table | Nurse profile UUID (if role is nurse) |
+| `subject.pharmacistId` | `pharmacists` table | Pharmacist profile UUID (if role is pharmacist) |
+
+### Resource Attributes
+
+Fetched from the database record being accessed. Any column on the resource table is available as `resource.<column_name>`:
+
+| Resource Type | Key Attributes |
+|---|---|
+| `appointment` | `patient_id`, `doctor_id`, `status` |
+| `medical_record` | `patient_id`, `doctor_id` |
+| `prescription` | `patient_id`, `doctor_id`, `status` |
+| `lab_report` | `patient_id`, `technician_id` |
+| `patient` | `user_id` |
+
+### Condition Language
+
+Policies use a JSON condition language with logical combinators and comparison operators:
+
+```json
+{
+  "any": [
+    { "subject.role": { "in": ["admin", "nurse"] } },
+    {
+      "all": [
+        { "subject.role": { "equals": "doctor" } },
+        { "resource.doctor_id": { "equals_ref": "subject.doctorId" } }
+      ]
+    },
+    { "resource.patient_id": { "equals_ref": "subject.patientId" } }
+  ]
+}
+```
+
+**Combinators:**
+
+| Combinator | Behavior |
+|---|---|
+| `any` | OR — at least one child must be true |
+| `all` | AND — every child must be true |
+
+**Operators:**
+
+| Operator | Description | Example |
+|---|---|---|
+| `equals` | Exact value match | `{ "subject.role": { "equals": "admin" } }` |
+| `not_equals` | Not equal | `{ "resource.status": { "not_equals": "cancelled" } }` |
+| `in` | Value in list | `{ "subject.role": { "in": ["admin", "nurse"] } }` |
+| `not_in` | Value not in list | `{ "subject.role": { "not_in": ["patient"] } }` |
+| `equals_ref` | Match against another attribute | `{ "resource.doctor_id": { "equals_ref": "subject.doctorId" } }` |
+| `exists` | Attribute is non-null (true) or null (false) | `{ "resource.technician_id": { "exists": true } }` |
+
+### Policy Evaluation
+
+1. **Deny-first**: Deny policies (highest priority first) are evaluated before allow policies
+2. **Any-match allow**: At least one allow policy must match for access to be granted
+3. **No policies = unrestricted**: If no policies exist for a resource type, access is allowed (RBAC still applies)
+
+### Default Policies
+
+The system seeds sensible default policies:
+
+| Resource | Policy | Effect |
+|---|---|---|
+| Appointments | Admins and nurses see all | allow |
+| Appointments | Patients see own (patient_id match) | allow |
+| Appointments | Doctors see own (doctor_id match) | allow |
+| Medical Records | Admins and nurses see all | allow |
+| Medical Records | Patients see own | allow |
+| Medical Records | Doctors see records they created | allow |
+| Prescriptions | Admins see all | allow |
+| Prescriptions | Pharmacists see all | allow |
+| Prescriptions | Patients see own | allow |
+| Prescriptions | Doctors see prescriptions they created | allow |
+| Lab Reports | Admins and doctors see all | allow |
+| Lab Reports | Patients see own | allow |
+| Lab Reports | Technicians see reports they created | allow |
+| Patients | Admins, doctors, nurses see all | allow |
+| Patients | Patients see own profile | allow |
+
+### How ABAC is Applied
+
+**List endpoints** (e.g. `GET /appointments`): The ABAC engine converts policies into SQL WHERE clauses using `buildAccessFilter()`, so filtering happens at the database level.
+
+**Single-resource endpoints** (e.g. `GET /patients/:id`): The `checkResourceAccess` middleware fetches the resource, evaluates all policies against it, and returns 403 if no allow policy matches.
+
+---
+
 ## Caching
 
-Resolved permissions are cached in Redis with a 5-minute TTL under the key `perms:<userId>`.
+Three types of data are cached in Redis with a 5-minute TTL:
 
-Cache is invalidated when:
+| Cache Key | Contents |
+|---|---|
+| `perms:<userId>` | Resolved RBAC permission names for a user |
+| `subject:<userId>` | Subject attributes (patientId, doctorId, etc.) |
+| `abac:policies` | All active ABAC policies |
+
+### RBAC Cache Invalidation
+
+RBAC permission cache is invalidated when:
 
 - A role's permissions are updated (via `updateRole`)
 - A role is deleted (via `deleteRole`)
@@ -256,6 +384,11 @@ WITH RECURSIVE descendants AS (
 SELECT DISTINCT ur.user_id FROM user_roles ur
 JOIN descendants d ON ur.role_id = d.id
 ```
+
+### ABAC Cache Invalidation
+
+- **Policy cache** (`abac:policies`): Invalidated whenever an ABAC policy is created, updated, or deleted
+- **Subject cache** (`subject:<userId>`): Invalidated when user profile data changes
 
 ---
 
@@ -307,7 +440,9 @@ Wraps routes to restrict access by role. Used in `App.jsx` route definitions.
 
 ## Permission Management UI
 
-Available at `/permissions` (admin only). Provides a visual interface for:
+Available at `/permissions` (admin only). Provides two tabs:
+
+### Roles & Permissions Tab
 
 - Viewing all roles with hierarchy indentation
 - Creating custom roles with optional parent selection
@@ -315,6 +450,15 @@ Available at `/permissions` (admin only). Provides a visual interface for:
 - Viewing inherited permissions (shown as non-editable with visual distinction)
 - Setting/changing parent roles with cycle-safe dropdown
 - Deleting custom roles
+
+### Access Policies (ABAC) Tab
+
+- Viewing all ABAC policies grouped by resource type
+- Creating new policies with name, resource type, effect, priority, and JSON conditions
+- Editing existing policy conditions and metadata
+- Toggling policies active/inactive without deleting
+- Deleting policies
+- Human-readable condition summary for each policy
 
 ---
 
@@ -356,6 +500,17 @@ erDiagram
     roles ||--o{ role_permissions : "grants"
     permissions ||--o{ role_permissions : "granted by"
     roles ||--o| roles : "parent_role_id"
+
+    abac_policies {
+        UUID id PK
+        VARCHAR name UK
+        TEXT description
+        VARCHAR resource_type
+        JSONB conditions
+        VARCHAR effect
+        INT priority
+        BOOLEAN is_active
+    }
 ```
 
 ---
@@ -371,3 +526,6 @@ All role and permission changes are recorded in the audit log:
 | `DELETE_ROLE` | Custom role deleted |
 | `ASSIGN_ROLE` | Role assigned to a user |
 | `REMOVE_ROLE` | Role removed from a user |
+| `CREATE_ABAC_POLICY` | New ABAC policy created |
+| `UPDATE_ABAC_POLICY` | ABAC policy conditions, effect, or priority changed |
+| `DELETE_ABAC_POLICY` | ABAC policy deleted |

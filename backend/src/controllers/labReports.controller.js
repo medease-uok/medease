@@ -1,12 +1,22 @@
 const db = require('../config/database');
+const { buildAccessFilter } = require('../utils/abac');
 
 const getAll = async (req, res, next) => {
   try {
-    const { role, id: userId } = req.user;
-    let query;
-    let params = [];
+    const subject = {
+      id: req.user.id,
+      role: req.user.role,
+      patientId: req.user.patientId,
+    };
 
-    const baseSelect = `
+    const columnMap = {
+      patient_id: 'lr.patient_id',
+      technician_id: 'lr.technician_id',
+    };
+
+    const { clause, params } = await buildAccessFilter('lab_report', subject, columnMap);
+
+    const query = `
       SELECT lr.id, lr.patient_id, lr.technician_id, lr.test_name, lr.result,
              lr.notes, lr.report_date,
              pu.first_name || ' ' || pu.last_name AS patient_name,
@@ -14,16 +24,9 @@ const getAll = async (req, res, next) => {
       FROM lab_reports lr
       JOIN patients p ON lr.patient_id = p.id
       JOIN users pu ON p.user_id = pu.id
-      LEFT JOIN users tu ON lr.technician_id = tu.id`;
-
-    if (role === 'patient') {
-      query = `${baseSelect}
-        WHERE p.user_id = $1
-        ORDER BY lr.report_date DESC`;
-      params = [userId];
-    } else {
-      query = `${baseSelect} ORDER BY lr.report_date DESC`;
-    }
+      LEFT JOIN users tu ON lr.technician_id = tu.id
+      WHERE ${clause}
+      ORDER BY lr.report_date DESC`;
 
     const result = await db.query(query, params);
 
