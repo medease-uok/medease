@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Plus, Save, Trash2, ChevronDown, ChevronRight,
-  Check, X, AlertCircle, Loader2, GitBranch, FileCode, ToggleLeft, ToggleRight,
+  Check, X, AlertCircle, Loader2, GitBranch,
 } from 'lucide-react';
 import api from '../services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -25,20 +25,7 @@ function groupByCategory(permissions) {
   return groups;
 }
 
-const RESOURCE_TYPES = ['appointment', 'medical_record', 'prescription', 'lab_report', 'patient'];
-
-const resourceTypeLabels = {
-  appointment: 'Appointments',
-  medical_record: 'Medical Records',
-  prescription: 'Prescriptions',
-  lab_report: 'Lab Reports',
-  patient: 'Patients',
-};
-
 export default function PermissionManagement() {
-  const [activeTab, setActiveTab] = useState('roles');
-
-  // RBAC state
   const [roles, setRoles] = useState([]);
   const [allPermissions, setAllPermissions] = useState([]);
   const [selectedRoleId, setSelectedRoleId] = useState(null);
@@ -57,15 +44,6 @@ export default function PermissionManagement() {
   const [newRoleParent, setNewRoleParent] = useState('');
   const [dirty, setDirty] = useState(false);
   const [editingParent, setEditingParent] = useState(null);
-
-  // ABAC state
-  const [policies, setPolicies] = useState([]);
-  const [policiesLoading, setPoliciesLoading] = useState(false);
-  const [showPolicyModal, setShowPolicyModal] = useState(false);
-  const [editingPolicy, setEditingPolicy] = useState(null);
-  const [policyForm, setPolicyForm] = useState({
-    name: '', description: '', resourceType: 'appointment', effect: 'allow', priority: 0, conditions: '',
-  });
 
   const fetchRoles = useCallback(async () => {
     try {
@@ -88,25 +66,9 @@ export default function PermissionManagement() {
     }
   }, []);
 
-  const fetchPolicies = useCallback(async () => {
-    setPoliciesLoading(true);
-    try {
-      const res = await api.get('/abac-policies');
-      setPolicies(res.data);
-    } catch {
-      setError('Failed to load ABAC policies.');
-    } finally {
-      setPoliciesLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     Promise.all([fetchRoles(), fetchPermissions()]).finally(() => setLoading(false));
   }, [fetchRoles, fetchPermissions]);
-
-  useEffect(() => {
-    if (activeTab === 'abac' && policies.length === 0) fetchPolicies();
-  }, [activeTab, policies.length, fetchPolicies]);
 
   const selectRole = async (roleId) => {
     if (roleId === selectedRoleId) return;
@@ -230,104 +192,6 @@ export default function PermissionManagement() {
     setSuccess('');
   };
 
-  const openPolicyModal = (policy = null) => {
-    if (policy) {
-      setEditingPolicy(policy);
-      setPolicyForm({
-        name: policy.name,
-        description: policy.description || '',
-        resourceType: policy.resourceType,
-        effect: policy.effect,
-        priority: policy.priority,
-        conditions: JSON.stringify(policy.conditions, null, 2),
-      });
-    } else {
-      setEditingPolicy(null);
-      setPolicyForm({
-        name: '', description: '', resourceType: 'appointment', effect: 'allow', priority: 0,
-        conditions: JSON.stringify({ any: [{ "subject.role": { in: ["admin"] } }] }, null, 2),
-      });
-    }
-    setShowPolicyModal(true);
-  };
-
-  const handleSavePolicy = async () => {
-    setError('');
-    let conditions;
-    try {
-      conditions = JSON.parse(policyForm.conditions);
-    } catch {
-      setError('Invalid JSON in conditions field.');
-      return;
-    }
-
-    const payload = {
-      name: policyForm.name,
-      description: policyForm.description || null,
-      resourceType: policyForm.resourceType,
-      effect: policyForm.effect,
-      priority: Number(policyForm.priority),
-      conditions,
-    };
-
-    try {
-      if (editingPolicy) {
-        await api.patch(`/abac-policies/${editingPolicy.id}`, payload);
-        setSuccess('Policy updated successfully.');
-      } else {
-        await api.post('/abac-policies', payload);
-        setSuccess('Policy created successfully.');
-      }
-      setShowPolicyModal(false);
-      await fetchPolicies();
-    } catch (err) {
-      setError(err.data?.message || 'Failed to save policy.');
-    }
-  };
-
-  const handleTogglePolicy = async (policy) => {
-    setError('');
-    try {
-      await api.patch(`/abac-policies/${policy.id}`, { isActive: !policy.isActive });
-      await fetchPolicies();
-    } catch (err) {
-      setError(err.data?.message || 'Failed to toggle policy.');
-    }
-  };
-
-  const handleDeletePolicy = async (policy) => {
-    if (!window.confirm(`Delete policy "${policy.name}"? This cannot be undone.`)) return;
-    setError('');
-    try {
-      await api.delete(`/abac-policies/${policy.id}`);
-      setSuccess('Policy deleted successfully.');
-      await fetchPolicies();
-    } catch (err) {
-      setError(err.data?.message || 'Failed to delete policy.');
-    }
-  };
-
-  const describeCondition = (cond, depth = 0) => {
-    if (cond.any) return cond.any.map((c) => describeCondition(c, depth + 1)).join(' OR ');
-    if (cond.all) return cond.all.map((c) => describeCondition(c, depth + 1)).join(' AND ');
-    const entries = Object.entries(cond);
-    if (entries.length === 0) return '(empty)';
-    const [attr, ops] = entries[0];
-    const [op, val] = Object.entries(ops)[0];
-    if (op === 'equals') return `${attr} = "${val}"`;
-    if (op === 'equals_ref') return `${attr} = ${val}`;
-    if (op === 'in') return `${attr} in [${val.join(', ')}]`;
-    if (op === 'not_equals') return `${attr} != "${val}"`;
-    if (op === 'exists') return `${attr} ${val ? 'exists' : 'is null'}`;
-    return `${attr} ${op} ${JSON.stringify(val)}`;
-  };
-
-  const policiesByResource = {};
-  for (const p of policies) {
-    if (!policiesByResource[p.resourceType]) policiesByResource[p.resourceType] = [];
-    policiesByResource[p.resourceType].push(p);
-  }
-
   const grouped = groupByCategory(allPermissions);
   const inheritedPermIds = new Set(inheritedPermissions.map((p) => p.id));
 
@@ -373,50 +237,15 @@ export default function PermissionManagement() {
             Permission Management
           </h1>
           <p className="text-slate-500 mt-1">
-            Manage roles, hierarchy, and attribute-based access policies.
+            Manage roles, hierarchy, and permissions across the system.
           </p>
         </div>
-        {activeTab === 'roles' ? (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Role
-          </button>
-        ) : (
-          <button
-            onClick={() => openPolicyModal()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Policy
-          </button>
-        )}
-      </div>
-
-      <div className="flex gap-1 border-b border-slate-200">
         <button
-          onClick={() => setActiveTab('roles')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'roles'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-700 transition-colors"
         >
-          <Shield className="w-4 h-4" />
-          Roles & Permissions
-        </button>
-        <button
-          onClick={() => setActiveTab('abac')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'abac'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <FileCode className="w-4 h-4" />
-          Access Policies (ABAC)
+          <Plus className="w-4 h-4" />
+          New Role
         </button>
       </div>
 
@@ -440,18 +269,6 @@ export default function PermissionManagement() {
         </div>
       )}
 
-      {activeTab === 'abac' ? (
-        <AbacPanel
-          policies={policies}
-          policiesLoading={policiesLoading}
-          policiesByResource={policiesByResource}
-          resourceTypeLabels={resourceTypeLabels}
-          describeCondition={describeCondition}
-          onEdit={openPolicyModal}
-          onToggle={handleTogglePolicy}
-          onDelete={handleDeletePolicy}
-        />
-      ) : (
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         <Card>
           <CardHeader>
@@ -680,7 +497,6 @@ export default function PermissionManagement() {
           ) : null}
         </Card>
       </div>
-      )}
 
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -747,206 +563,6 @@ export default function PermissionManagement() {
           </div>
         </div>
       )}
-
-      {showPolicyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
-            <div className="p-6 border-b border-slate-200">
-              <h2 className="text-lg font-semibold font-heading text-slate-900">
-                {editingPolicy ? 'Edit Policy' : 'Create Access Policy'}
-              </h2>
-              <p className="text-sm text-slate-500 mt-1">
-                Define attribute-based conditions for resource access.
-              </p>
-            </div>
-            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Policy Name</label>
-                <input
-                  type="text"
-                  value={policyForm.name}
-                  onChange={(e) => setPolicyForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. doctor_own_records"
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
-                <input
-                  type="text"
-                  value={policyForm.description}
-                  onChange={(e) => setPolicyForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Optional description"
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Resource Type</label>
-                  <select
-                    value={policyForm.resourceType}
-                    onChange={(e) => setPolicyForm((f) => ({ ...f, resourceType: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    {RESOURCE_TYPES.map((rt) => (
-                      <option key={rt} value={rt}>{resourceTypeLabels[rt]}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Effect</label>
-                  <select
-                    value={policyForm.effect}
-                    onChange={(e) => setPolicyForm((f) => ({ ...f, effect: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    <option value="allow">Allow</option>
-                    <option value="deny">Deny</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Priority</label>
-                  <input
-                    type="number"
-                    value={policyForm.priority}
-                    onChange={(e) => setPolicyForm((f) => ({ ...f, priority: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Conditions (JSON)
-                </label>
-                <textarea
-                  value={policyForm.conditions}
-                  onChange={(e) => setPolicyForm((f) => ({ ...f, conditions: e.target.value }))}
-                  rows={8}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-primary focus:border-transparent"
-                  spellCheck={false}
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  Use &quot;any&quot; (OR), &quot;all&quot; (AND) with operators: equals, equals_ref, in, not_equals, exists
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-slate-200">
-              <button
-                onClick={() => setShowPolicyModal(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSavePolicy}
-                disabled={!policyForm.name.trim()}
-                className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {editingPolicy ? 'Update Policy' : 'Create Policy'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AbacPanel({ policies, policiesLoading, policiesByResource, resourceTypeLabels, describeCondition, onEdit, onToggle, onDelete }) {
-  if (policiesLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-      </div>
-    );
-  }
-
-  if (policies.length === 0) {
-    return (
-      <Card>
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-            <FileCode className="w-8 h-8 text-slate-400" />
-          </div>
-          <p className="font-semibold text-slate-900">No ABAC policies</p>
-          <p className="text-sm text-slate-500 mt-1">
-            Create attribute-based policies to control resource-level access.
-          </p>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {Object.entries(policiesByResource).map(([resourceType, typePolicies]) => (
-        <Card key={resourceType}>
-          <CardHeader>
-            <CardTitle className="text-base">{resourceTypeLabels[resourceType] || resourceType}</CardTitle>
-            <CardDescription>{typePolicies.length} {typePolicies.length === 1 ? 'policy' : 'policies'}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {typePolicies.map((policy) => (
-                <div
-                  key={policy.id}
-                  className={`flex items-start justify-between p-4 rounded-lg border transition-colors ${
-                    policy.isActive
-                      ? 'border-slate-200 bg-white'
-                      : 'border-slate-100 bg-slate-50 opacity-60'
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-sm text-slate-900">{policy.name}</p>
-                      <Badge variant={policy.effect === 'allow' ? 'success' : 'destructive'} className="text-[10px] px-1.5 py-0">
-                        {policy.effect}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                        priority: {policy.priority}
-                      </Badge>
-                    </div>
-                    {policy.description && (
-                      <p className="text-xs text-slate-500 mb-1.5">{policy.description}</p>
-                    )}
-                    <p className="text-xs text-slate-600 font-mono bg-slate-50 px-2 py-1 rounded border border-slate-100 inline-block">
-                      {describeCondition(policy.conditions)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 ml-3 flex-shrink-0">
-                    <button
-                      onClick={() => onToggle(policy)}
-                      className="p-1.5 text-slate-400 hover:text-primary transition-colors"
-                      title={policy.isActive ? 'Disable' : 'Enable'}
-                    >
-                      {policy.isActive ? (
-                        <ToggleRight className="w-5 h-5 text-green-500" />
-                      ) : (
-                        <ToggleLeft className="w-5 h-5" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => onEdit(policy)}
-                      className="p-1.5 text-slate-400 hover:text-primary transition-colors"
-                      title="Edit"
-                    >
-                      <FileCode className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(policy)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
     </div>
   );
 }
