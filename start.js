@@ -100,8 +100,8 @@ function createAdminUser({ firstName, lastName, email, phone, password }) {
 
   const sql = `
     WITH new_user AS (
-      INSERT INTO users (email, password_hash, first_name, last_name, role, phone, is_active)
-      VALUES ('${esc(email)}', crypt('${esc(password)}', gen_salt('bf', 12)), '${esc(firstName)}', '${esc(lastName)}', 'admin', ${phoneVal}, true)
+      INSERT INTO users (email, password_hash, first_name, last_name, role, phone, is_active, email_verified)
+      VALUES ('${esc(email)}', crypt('${esc(password)}', gen_salt('bf', 12)), '${esc(firstName)}', '${esc(lastName)}', 'admin', ${phoneVal}, true, true)
       RETURNING id
     )
     INSERT INTO user_roles (user_id, role_id)

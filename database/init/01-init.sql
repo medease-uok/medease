@@ -36,6 +36,9 @@ CREATE TABLE users (
   date_of_birth DATE,
   profile_image_url TEXT,
   is_active BOOLEAN DEFAULT false,
+  email_verified BOOLEAN DEFAULT false,
+  verification_token VARCHAR(255),
+  verification_token_expires TIMESTAMP,
   mfa_enabled BOOLEAN DEFAULT false,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -155,6 +158,7 @@ CREATE TABLE audit_logs (
 -- Indexes
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_verification_token ON users(verification_token);
 CREATE INDEX idx_appointments_patient ON appointments(patient_id);
 CREATE INDEX idx_appointments_doctor ON appointments(doctor_id);
 CREATE INDEX idx_appointments_status ON appointments(status);
