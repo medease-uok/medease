@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, FileText, Pill, FlaskConical, Stethoscope,
-  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight,
+  Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
+import EditProfileModal from '../components/EditProfileModal';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -39,7 +40,7 @@ function StatusBadge({ status }) {
   );
 }
 
-function ProfileCard({ profile }) {
+function ProfileCard({ profile, onEdit }) {
   const age = calculateAge(profile.dateOfBirth);
 
   return (
@@ -50,10 +51,21 @@ function ProfileCard({ profile }) {
             {(profile.firstName?.[0] || '')}{(profile.lastName?.[0] || '')}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-slate-900 font-heading">
-              {profile.firstName} {profile.lastName}
-            </h2>
-            <p className="text-sm text-slate-500 mt-0.5">{profile.email}</p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 font-heading">
+                  {profile.firstName} {profile.lastName}
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">{profile.email}</p>
+              </div>
+              <button
+                onClick={onEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Edit
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
               {age !== null && (
@@ -114,7 +126,7 @@ function QuickNavCard({ icon: Icon, label, count, color, onClick }) {
 }
 
 export default function PatientDashboard() {
-  const { currentUser } = useAuth();
+  const { currentUser, updateUser } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState(null);
@@ -123,6 +135,7 @@ export default function PatientDashboard() {
   const [labReports, setLabReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -224,7 +237,19 @@ export default function PatientDashboard() {
         </div>
       )}
 
-      {profile && <ProfileCard profile={profile} />}
+      {profile && <ProfileCard profile={profile} onEdit={() => setEditOpen(true)} />}
+
+      {editOpen && profile && (
+        <EditProfileModal
+          profile={profile}
+          onClose={() => setEditOpen(false)}
+          onSaved={(updated) => {
+            setProfile(updated);
+            updateUser({ firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone });
+            setEditOpen(false);
+          }}
+        />
+      )}
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <QuickNavCard
