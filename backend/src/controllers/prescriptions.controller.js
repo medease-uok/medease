@@ -2,6 +2,7 @@ const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
+const auditLog = require('../utils/auditLog');
 
 const mapPrescription = (row) => ({
   id: row.id,
@@ -49,6 +50,9 @@ const getAll = async (req, res, next) => {
       ORDER BY rx.created_at DESC`;
 
     const result = await db.query(query, params);
+
+    await auditLog({ userId: req.user.id, action: 'VIEW_PRESCRIPTIONS', resourceType: 'prescription', ip: req.ip });
+
     res.json({ status: 'success', data: result.rows.map(mapPrescription) });
   } catch (err) {
     return next(err);
@@ -66,7 +70,6 @@ const create = async (req, res, next) => {
     const doctorId = req.user.doctorId;
     if (!doctorId) throw new AppError('Only doctors can create prescriptions.', 403);
 
-    // Verify patient and get doctor name in parallel
     const [patientCheck, doctorInfo] = await Promise.all([
       db.query(
         `SELECT p.id, u.id AS user_id, u.first_name, u.last_name
@@ -90,7 +93,6 @@ const create = async (req, res, next) => {
       [patientId, doctorId, medication, dosage, frequency, duration || null]
     );
 
-    // Fire-and-forget notification
     createNotification({
       recipientId: patient.user_id,
       type: 'prescription_created',
@@ -99,6 +101,8 @@ const create = async (req, res, next) => {
       referenceId: result.rows[0].id,
       referenceType: 'prescription',
     });
+
+    await auditLog({ userId: req.user.id, action: 'CREATE_PRESCRIPTION', resourceType: 'prescription', resourceId: result.rows[0].id, ip: req.ip, details: { patientId, medication } });
 
     res.status(201).json({ status: 'success', data: { id: result.rows[0].id } });
   } catch (err) {
@@ -116,7 +120,6 @@ const updateStatus = async (req, res, next) => {
       throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400);
     }
 
-    // Verify prescription exists and check ownership
     const existing = await db.query(
       `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication,
               d.user_id AS doctor_user_id
@@ -128,7 +131,6 @@ const updateStatus = async (req, res, next) => {
     if (existing.rows.length === 0) throw new AppError('Prescription not found.', 404);
     const rx = existing.rows[0];
 
-    // Only the prescribing doctor, pharmacist, or admin can update
     const userId = req.user.id;
     const isDoctor = userId === rx.doctor_user_id;
     if (!isDoctor && !['pharmacist', 'admin'].includes(req.user.role)) {
@@ -159,6 +161,8 @@ const updateStatus = async (req, res, next) => {
         referenceType: 'prescription',
       });
     }
+
+    await auditLog({ userId: req.user.id, action: 'UPDATE_PRESCRIPTION_STATUS', resourceType: 'prescription', resourceId: id, ip: req.ip, details: { status, medication: rx.medication } });
 
     res.json({ status: 'success', data: { id: result.rows[0].id, status: result.rows[0].status } });
   } catch (err) {

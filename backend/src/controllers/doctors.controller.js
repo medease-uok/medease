@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
+const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
 
 const getAll = async (req, res, next) => {
   try {
@@ -13,7 +14,8 @@ const getAll = async (req, res, next) => {
     );
 
     const doctors = result.rows.map(mapDoctor);
-    res.json({ status: 'success', data: doctors });
+    const isOwner = false;
+    res.json({ status: 'success', data: maskSensitiveFields(doctors, req.user.role, isOwner) });
   } catch (err) {
     return next(err);
   }
@@ -37,6 +39,8 @@ const getById = async (req, res, next) => {
     }
 
     const doctor = mapDoctor(doctorResult.rows[0]);
+    const isOwner = req.user.id === doctorResult.rows[0].user_id;
+    const maskedDoctor = maskSensitiveFields(doctor, req.user.role, isOwner);
 
     const [apptsResult, rxResult] = await Promise.all([
       db.query(
@@ -65,7 +69,7 @@ const getById = async (req, res, next) => {
     res.json({
       status: 'success',
       data: {
-        doctor,
+        doctor: maskedDoctor,
         appointments: apptsResult.rows.map((row) => ({
           id: row.id,
           patientId: row.patient_id,

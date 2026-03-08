@@ -101,8 +101,6 @@ async function sendLoginOtpEmail(to, firstName, otp) {
     </html>
   `;
 
-  // Use SMTP_FROM as-is if provided (e.g. "MedEase <noreply@example.com>"),
-  // otherwise fall back to a plain address.
   const from = config.smtp.from || `"MedEase" <${config.smtp.user}>`;
 
   const info = await transporter.sendMail({

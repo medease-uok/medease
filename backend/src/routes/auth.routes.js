@@ -12,14 +12,15 @@ const {
 const validate = require('../middleware/validate');
 const verifyCaptcha = require('../middleware/verifyCaptcha');
 const authenticate = require('../middleware/authenticate');
+const { authLimiter } = require('../middleware/rateLimit');
 
 router.post('/register', verifyCaptcha, validate(registerValidation), register);
-router.post('/login', validate(loginValidation), login);
-router.post('/verify-otp', validate(verifyOtpValidation), verifyOtp);
+router.post('/login', authLimiter, validate(loginValidation), login);
+router.post('/verify-otp', authLimiter, validate(verifyOtpValidation), verifyOtp);
 router.get('/verify-email', verifyEmail);
-router.post('/resend-verification', resendVerification);
-router.post('/forgot-password', validate(forgotPasswordValidation), forgotPassword);
-router.post('/verify-reset-otp', validate(verifyResetOtpValidation), verifyResetOtp);
+router.post('/resend-verification', authLimiter, resendVerification);
+router.post('/forgot-password', authLimiter, validate(forgotPasswordValidation), forgotPassword);
+router.post('/verify-reset-otp', authLimiter, validate(verifyResetOtpValidation), verifyResetOtp);
 router.post('/reset-password', validate(resetPasswordValidation), resetPassword);
 router.post('/refresh', refresh);
 router.post('/logout', authenticate, logout);

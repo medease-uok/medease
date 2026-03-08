@@ -9,7 +9,6 @@ const auditLog = require('../utils/auditLog');
 const { sendLoginOtpEmail, sendRegistrationVerificationEmail, sendPasswordResetOtpEmail } = require('../utils/emailService');
 const { getUserPermissions } = require('../utils/permissions');
 
-/** Masks most of an email address for safe display, e.g. jo***@example.com */
 function maskEmail(email) {
   const atIndex = email.lastIndexOf('@');
   if (atIndex < 1) return '***@***';
@@ -19,7 +18,6 @@ function maskEmail(email) {
   return `${visible}***@${domain}`;
 }
 
-/** Redis key helpers */
 const otpKey = (userId) => `login_otp:${userId}`;
 const pwdResetOtpKey = (userId) => `pwd_reset_otp:${userId}`;
 const pwdResetTokenKey = (userId) => `pwd_reset_token:${userId}`;
@@ -319,10 +317,6 @@ const login = async (req, res, next) => {
   }
 };
 
-/**
- * POST /auth/verify-otp
- * Validates the emailed OTP and, on success, returns the JWT access + refresh tokens.
- */
 const verifyOtp = async (req, res, next) => {
   const { email, otp, pendingLoginToken } = req.body;
 
@@ -416,10 +410,6 @@ const verifyOtp = async (req, res, next) => {
   }
 };
 
-/**
- * GET /auth/verify-email?token=...
- * Marks the user's email as verified.
- */
 const verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.query;
@@ -467,10 +457,6 @@ const verifyEmail = async (req, res, next) => {
   }
 };
 
-/**
- * POST /auth/resend-verification
- * Re-sends the verification email for an unverified account.
- */
 const resendVerification = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -516,10 +502,6 @@ const resendVerification = async (req, res, next) => {
   }
 };
 
-/**
- * POST /auth/forgot-password
- * Sends a 6-digit OTP to the user's email to begin the password-reset flow.
- */
 const forgotPassword = async (req, res, next) => {
   const { email } = req.body;
   try {
@@ -564,10 +546,6 @@ const forgotPassword = async (req, res, next) => {
   }
 };
 
-/**
- * POST /auth/verify-reset-otp
- * Validates the OTP and returns a short-lived reset token.
- */
 const verifyResetOtp = async (req, res, next) => {
   const { email, otp } = req.body;
   try {
@@ -622,10 +600,6 @@ const verifyResetOtp = async (req, res, next) => {
   }
 };
 
-/**
- * POST /auth/reset-password
- * Sets a new password using the reset token issued by verifyResetOtp.
- */
 const resetPassword = async (req, res, next) => {
   const { userId, resetToken, newPassword } = req.body;
   try {

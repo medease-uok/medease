@@ -1,8 +1,9 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
+const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
+const auditLog = require('../utils/auditLog');
 
-// Human-readable labels for profile change tracking
 const TRACK_FIELDS = {
   first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
   date_of_birth: 'Date of Birth', gender: 'Gender', blood_type: 'Blood Type',
@@ -14,7 +15,6 @@ const TRACK_FIELDS = {
   insurance_expiry_date: 'Insurance Expiry',
 };
 
-/** Safely convert a DB value to a comparable string. */
 function toStr(val) {
   if (val === null || val === undefined) return '';
   if (Array.isArray(val)) return [...val].sort().join(', ');
@@ -39,7 +39,11 @@ const getAll = async (req, res, next) => {
     );
 
     const patients = await Promise.all(result.rows.map(mapPatient));
-    res.json({ status: 'success', data: patients });
+    const masked = maskSensitiveFields(patients, req.user.role, false);
+
+    await auditLog({ userId: req.user.id, action: 'VIEW_PATIENTS_LIST', resourceType: 'patient', ip: req.ip });
+
+    res.json({ status: 'success', data: masked });
   } catch (err) {
     return next(err);
   }
@@ -49,8 +53,6 @@ const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // req.resource is set by checkResourceAccess('patient') middleware
-    // which already verified ABAC access — just fetch full details
     const patientResult = await db.query(
       `${PATIENT_SELECT} WHERE p.id = $1`,
       [id]
@@ -61,6 +63,10 @@ const getById = async (req, res, next) => {
     }
 
     const patient = await mapPatient(patientResult.rows[0]);
+    const isOwner = req.user.id === patientResult.rows[0].user_id;
+    const maskedPatient = maskSensitiveFields(patient, req.user.role, isOwner);
+
+    await auditLog({ userId: req.user.id, action: 'VIEW_PATIENT', resourceType: 'patient', resourceId: id, ip: req.ip });
 
     const [recordsResult, rxResult, labsResult, allergiesResult] = await Promise.all([
       db.query(
@@ -106,7 +112,7 @@ const getById = async (req, res, next) => {
     res.json({
       status: 'success',
       data: {
-        patient,
+        patient: maskedPatient,
         allergies: allergiesResult.rows.map(mapAllergy),
         medicalRecords: recordsResult.rows.map(mapRecord),
         prescriptions: rxResult.rows.map(mapPrescription),
@@ -173,7 +179,6 @@ const updateById = async (req, res, next) => {
 
     await client.query('BEGIN');
 
-    // Snapshot old values before update
     const oldResult = await client.query(
       `${PATIENT_SELECT} WHERE p.id = $1 FOR UPDATE`,
       [id]
@@ -206,7 +211,6 @@ const updateById = async (req, res, next) => {
     );
     const newRow = result.rows[0];
 
-    // Log changed fields to profile_change_history
     for (const [col, label] of Object.entries(TRACK_FIELDS)) {
       const oldStr = toStr(oldRow[col]);
       const newStr = toStr(newRow[col]);
@@ -221,7 +225,12 @@ const updateById = async (req, res, next) => {
 
     await client.query('COMMIT');
 
-    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+    const updated = await mapPatient(result.rows[0]);
+    const isOwner = req.user.id === result.rows[0].user_id;
+
+    await auditLog({ userId: req.user.id, action: 'UPDATE_PATIENT', resourceType: 'patient', resourceId: id, ip: req.ip });
+
+    res.json({ status: 'success', data: maskSensitiveFields(updated, req.user.role, isOwner) });
   } catch (err) {
     await client.query('ROLLBACK');
     return next(err);
@@ -347,7 +356,6 @@ const uploadProfileImage = async (req, res, next) => {
       return next(new AppError('No image file provided.', 400));
     }
 
-    // Get current image URL for cleanup
     const current = await db.query(
       'SELECT profile_image_url FROM patients WHERE id = $1',
       [id]
@@ -364,7 +372,6 @@ const uploadProfileImage = async (req, res, next) => {
       [newKey, id]
     );
 
-    // Clean up old image (best-effort)
     deleteFromS3(oldKey);
 
     const result = await db.query(
@@ -372,7 +379,9 @@ const uploadProfileImage = async (req, res, next) => {
       [id]
     );
 
-    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+    const mapped = await mapPatient(result.rows[0]);
+    const isOwner = req.user.id === result.rows[0].user_id;
+    res.json({ status: 'success', data: maskSensitiveFields(mapped, req.user.role, isOwner) });
   } catch (err) {
     return next(err);
   }
@@ -407,7 +416,9 @@ const deleteProfileImage = async (req, res, next) => {
       [id]
     );
 
-    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+    const mapped2 = await mapPatient(result.rows[0]);
+    const isOwner2 = req.user.id === result.rows[0].user_id;
+    res.json({ status: 'success', data: maskSensitiveFields(mapped2, req.user.role, isOwner2) });
   } catch (err) {
     return next(err);
   }
@@ -421,7 +432,6 @@ const getPrescriptions = async (req, res, next) => {
     const offset = (page - 1) * limit;
     const status = req.query.status;
 
-    // Verify patient exists
     const patientCheck = await db.query('SELECT id FROM patients WHERE id = $1', [id]);
     if (patientCheck.rows.length === 0) {
       throw new AppError('Patient not found.', 404);
@@ -435,8 +445,6 @@ const getPrescriptions = async (req, res, next) => {
       whereClause += ` AND rx.status = $${params.length}`;
     }
 
-    // NOTE: whereClause is shared between countQuery and dataQuery.
-    // Any changes to filters must be reflected in both.
     const countResult = await db.query(
       `SELECT COUNT(*) FROM prescriptions rx ${whereClause}`,
       params
@@ -458,6 +466,8 @@ const getPrescriptions = async (req, res, next) => {
 
     const prescriptions = dataResult.rows.map(mapPrescription);
 
+    await auditLog({ userId: req.user.id, action: 'VIEW_PATIENT_PRESCRIPTIONS', resourceType: 'patient', resourceId: id, ip: req.ip });
+
     res.json({
       status: 'success',
       data: prescriptions,
@@ -474,15 +484,13 @@ const getHistory = async (req, res, next) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 20), 100);
     const offset = (page - 1) * limit;
-    const type = req.query.type; // optional filter: 'visit', 'diagnosis', 'prescription', 'lab'
+    const type = req.query.type;
 
-    // Verify patient exists
     const patientCheck = await db.query('SELECT id FROM patients WHERE id = $1', [id]);
     if (patientCheck.rows.length === 0) {
       throw new AppError('Patient not found.', 404);
     }
 
-    // Build a UNION ALL of all history event types, each tagged with its type
     const typeClauses = [];
     const typeParams = [id];
 
@@ -556,14 +564,12 @@ const getHistory = async (req, res, next) => {
 
     const unionQuery = typeClauses.join(' UNION ALL ');
 
-    // Get total count
     const countResult = await db.query(
       `SELECT COUNT(*) FROM (${unionQuery}) AS history`,
       typeParams
     );
     const total = parseInt(countResult.rows[0].count);
 
-    // Get paginated results
     const dataResult = await db.query(
       `SELECT * FROM (${unionQuery}) AS history
        ORDER BY event_date DESC
@@ -577,6 +583,8 @@ const getHistory = async (req, res, next) => {
       eventDate: row.event_date,
       ...row.details,
     }));
+
+    await auditLog({ userId: req.user.id, action: 'VIEW_PATIENT_HISTORY', resourceType: 'patient', resourceId: id, ip: req.ip });
 
     res.json({
       status: 'success',

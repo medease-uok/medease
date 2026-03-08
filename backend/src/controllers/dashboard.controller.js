@@ -129,7 +129,6 @@ const getStats = async (req, res, next) => {
       }
     }
 
-    // Recent appointments (for all roles)
     let recentQuery;
     let recentParams = [];
 
@@ -184,17 +183,11 @@ const getStats = async (req, res, next) => {
   }
 };
 
-/**
- * GET /dashboard/activity
- * Returns a role-filtered combined activity feed (appointments, prescriptions,
- * medical records, lab reports).  For admin, also includes audit-log entries.
- */
 const getActivity = async (req, res, next) => {
   try {
     const { role, id: userId } = req.user;
     const activities = [];
 
-    /* ───── helpers ───── */
     const patientId = async () => {
       const r = await db.query('SELECT id FROM patients WHERE user_id = $1', [userId]);
       return r.rows[0]?.id;
@@ -204,7 +197,6 @@ const getActivity = async (req, res, next) => {
       return r.rows[0]?.id;
     };
 
-    /* ───── 1. Appointments ───── */
     {
       const base = `
         SELECT a.id, a.scheduled_at AS ts, a.status,
@@ -244,7 +236,6 @@ const getActivity = async (req, res, next) => {
       }
     }
 
-    /* ───── 2. Prescriptions ───── */
     {
       const base = `
         SELECT pr.id, pr.created_at AS ts, pr.medication, pr.status,
@@ -282,7 +273,6 @@ const getActivity = async (req, res, next) => {
       }
     }
 
-    /* ───── 3. Medical Records ───── */
     {
       const base = `
         SELECT mr.id, mr.created_at AS ts, mr.diagnosis,
@@ -320,7 +310,6 @@ const getActivity = async (req, res, next) => {
       }
     }
 
-    /* ───── 4. Lab Reports ───── */
     {
       const base = `
         SELECT lr.id, lr.report_date AS ts, lr.test_name, lr.result,
@@ -356,7 +345,6 @@ const getActivity = async (req, res, next) => {
       }
     }
 
-    /* ───── 5. Audit logs (admin only) ───── */
     if (role === 'admin') {
       const rows = (await db.query(`
         SELECT al.id, al.created_at AS ts, al.action, al.resource_type,
@@ -391,7 +379,6 @@ const getActivity = async (req, res, next) => {
       }
     }
 
-    /* Sort everything by timestamp descending and limit */
     activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     res.json({ status: 'success', data: activities.slice(0, 20) });
