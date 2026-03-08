@@ -23,10 +23,16 @@ MedEase is a web-based hospital management system that streamlines patient care,
 - **Electronic Medical Records (EMR)** - Secure digital patient records, prescriptions, and medical history
 - **Lab Reports** - Upload, view, and manage laboratory test results
 - **Prescription Management** - Electronic prescriptions with pharmacy dispensing
+- **Patient Allergy Tracking** - CRUD management of patient allergies with severity levels (mild, moderate, severe)
+- **Organ Donor Management** - Track organ donor status, card number, and organs to donate
+- **Insurance Management** - Patient insurance details including provider, policy number, plan type, and expiry
+- **Profile Change History** - Track all patient profile modifications with pagination and audit trail
 - **Role-Based Access Control (RBAC)** - Granular permissions system with 26 permissions across 6 categories
 - **Attribute-Based Access Control (ABAC)** - Fine-grained, policy-driven access filtering on resources (appointments, records, prescriptions, lab reports)
 - **Email Verification** - OTP-based email verification on registration with resend and cooldown
-- **Profile Image Uploads** - S3-backed profile images with presigned URLs
+- **Multi-Step Login** - Credentials verification followed by OTP email verification
+- **Password Reset** - OTP-based password recovery flow
+- **Profile Image Uploads** - S3-backed profile images with presigned URLs and image cropping
 - **Patient Dashboard** - Dedicated health dashboard for patients with profile, appointments, prescriptions, and lab reports
 - **Audit Logging** - Track all user actions for security and compliance
 - **Session Management** - JWT access tokens with refresh token rotation and inactivity timeout
@@ -90,8 +96,8 @@ medease/
 │       │   ├── database.js     # PostgreSQL connection pool
 │       │   └── redis.js        # Redis client
 │       ├── controllers/        # Route handlers
-│       │   ├── auth.controller.js        # Login, register, refresh, logout
-│       │   ├── admin.controller.js       # User management, audit logs
+│       │   ├── auth.controller.js        # Login, register, OTP, password reset
+│       │   ├── admin.controller.js       # User management, audit logs, profile history
 │       │   ├── roles.controller.js       # RBAC management
 │       │   ├── abac.controller.js        # ABAC policy CRUD
 │       │   ├── profile.controller.js     # Profile management with S3 image uploads
@@ -101,6 +107,7 @@ medease/
 │       │   ├── medicalRecords.controller.js
 │       │   ├── prescriptions.controller.js
 │       │   ├── labReports.controller.js
+│       │   ├── allergies.controller.js   # Patient allergy CRUD
 │       │   └── dashboard.controller.js
 │       ├── middleware/
 │       │   ├── authenticate.js   # JWT verification
@@ -111,14 +118,15 @@ medease/
 │       │   ├── verifyCaptcha.js  # Cloudflare Turnstile verification
 │       │   ├── validate.js       # Request validation
 │       │   └── errorHandler.js   # Global error handling
-│       ├── routes/               # API route definitions
+│       ├── routes/               # API route definitions (incl. allergies)
+│       ├── tests/                # Jest unit tests (auth, RBAC, ABAC)
 │       ├── utils/
 │       │   ├── abac.js           # ABAC policy engine (evaluate, build SQL filters)
 │       │   ├── emailService.js   # Nodemailer (verification, OTP, password reset)
 │       │   ├── permissions.js    # Permission checks with Redis caching
 │       │   ├── auditLog.js       # Audit logging utility
 │       │   └── AppError.js       # Custom error class
-│       ├── validators/           # Input validation schemas
+│       ├── validators/           # Input validation schemas (auth, patients, allergies)
 │       └── index.js              # Express server entry point
 ├── frontend/
 │   └── src/
@@ -132,6 +140,11 @@ medease/
 │       │   ├── ActivityFeed.jsx       # Role-filtered activity feed
 │       │   ├── QuickActions.jsx       # Role-aware quick action buttons
 │       │   ├── PatientCard.jsx        # Patient card with avatar
+│       │   ├── UserProfileCard.jsx    # User profile display card
+│       │   ├── EditProfileModal.jsx   # Patient profile edit modal
+│       │   ├── EditStaffProfileModal.jsx # Staff profile edit modal
+│       │   ├── ImageCropModal.jsx     # Profile image cropping
+│       │   ├── ProfileImageLightbox.jsx # Full-size image viewer
 │       │   ├── RoleGuard.jsx         # Route-level role protection
 │       │   ├── Can.jsx               # Permission-based conditional rendering
 │       │   ├── StatusBadge.jsx # Status indicator badge
@@ -140,8 +153,8 @@ medease/
 │       ├── hooks/
 │       │   └── usePermissions.js # Permission checking hook (can, canAny, canAll)
 │       ├── pages/              # Page components
-│       │   ├── Login.jsx       # Login with credentials
-│       │   ├── RegisterEnhanced.jsx  # Registration with CAPTCHA & T&C
+│       │   ├── Login.jsx       # Multi-step login (credentials + OTP)
+│       │   ├── RegisterEnhanced.jsx  # Registration with CAPTCHA, insurance, organ donor & T&C
 │       │   ├── VerifyEmail.jsx # Email verification with token/resend
 │       │   ├── DashboardEnhanced.jsx # Role-based dashboard for staff
 │       │   ├── PatientDashboard.jsx  # Patient health dashboard with profile image
@@ -219,11 +232,11 @@ npm start -- -d
 | Backend API | http://localhost:5001 | Express REST API |
 | PostgreSQL | localhost:5433 | Database (auto-initialized) |
 | Redis | localhost:6379 | Token & permission caching |
-| Adminer | http://localhost:5050 | Database web UI |
+| Adminer | http://localhost:5051 | Database web UI |
 
 > PostgreSQL uses port **5433** to avoid conflicts with locally installed PostgreSQL.
 
-### 3. Secrets Management
+### 4. Secrets Management
 
 Secrets (API keys, JWT secret, refresh token secret) are stored in `secrets.enc` — an AES-256 encrypted file safe to commit. Team members decrypt it at runtime using a shared password.
 
@@ -247,7 +260,7 @@ npm start
 
 > `.env.development` files are gitignored — they are generated by `start.js` from `.env.example` + vault secrets. If `secrets.enc` does not exist, defaults from `.env.example` are used.
 
-### 4. Create Admin User (Standalone)
+### 5. Create Admin User (Standalone)
 
 If you need to create an additional admin after initial setup:
 
@@ -257,7 +270,7 @@ npm run create-admin
 
 Requires Docker services to be running.
 
-### 5. Run Without Docker (Alternative)
+### 6. Run Without Docker (Alternative)
 
 ```bash
 # Start only database services
@@ -276,7 +289,7 @@ npm install
 npm run dev
 ```
 
-### 6. Test Data
+### 7. Test Data
 
 When seeding, the following sample data is created:
 
@@ -291,6 +304,7 @@ When seeding, the following sample data is created:
 | Medical Records | 8 | Diagnoses and treatment plans |
 | Prescriptions | 11 | Active, dispensed, expired, cancelled |
 | Lab Reports | 10 | CBC, MRI, ECG, X-Ray, and more |
+| Patient Allergies | 9 | Penicillin, Shellfish, Aspirin, Latex, Pollen, and more |
 | Audit Logs | 15 | Login, view, create, update actions |
 
 All test accounts use the password **`Password@123`**.
@@ -306,7 +320,7 @@ All test accounts use the password **`Password@123`**.
 
 > **Warning:** These credentials are for local development only.
 
-### 7. Useful Commands
+### 8. Useful Commands
 
 ```bash
 npm start                    # Start all services (interactive)
@@ -327,11 +341,13 @@ cd backend && npm run db:seed   # Seed database manually
 
 1. **Register** creates the account and sends a verification email with a link/token
 2. **Verify Email** — user clicks the link or enters the token on `/verify-email` to activate their account
-3. **Login** returns a JWT access token (15-minute expiry) and an opaque refresh token (7-day TTL, stored in Redis)
-4. **Access token** is sent as `Authorization: Bearer <token>` on every API request
-5. **On 401**, the frontend silently calls `/auth/refresh` to rotate the refresh token and get a new access token
-6. **On inactivity** (15 minutes with no clicks, keystrokes, or scrolling), the refresh is skipped and the user is logged out
-7. **Logout** invalidates the refresh token server-side via Redis
+3. **Login (step 1)** — user submits credentials; server validates and sends an OTP to the user's email
+4. **Login (step 2)** — user submits the OTP; server returns a JWT access token (15-minute expiry) and an opaque refresh token (7-day TTL, stored in Redis)
+5. **Access token** is sent as `Authorization: Bearer <token>` on every API request
+6. **On 401**, the frontend silently calls `/auth/refresh` to rotate the refresh token and get a new access token
+7. **On inactivity** (15 minutes with no clicks, keystrokes, or scrolling), the refresh is skipped and the user is logged out
+8. **Password Reset** — user requests reset via email → verifies OTP → sets new password
+9. **Logout** invalidates the refresh token server-side via Redis
 
 ### Authorization Layers
 
@@ -395,14 +411,23 @@ permissions          roles                  user_roles
                      │   roles.id (hierarchy)└── permission_id → permissions.id
                      └── created_at
 
-abac_policies
+abac_policies                       patient_allergies
+├── id                              ├── id
+├── name                            ├── patient_id → patients.id
+├── resource_type                   ├── allergen
+├── conditions (JSONB)              ├── severity (mild/moderate/severe)
+├── effect (allow/deny)             ├── reaction
+├── priority                        ├── noted_at
+├── is_active                       └── created_at
+└── created_at
+
+profile_change_history
 ├── id
-├── name                    # Unique policy name
-├── resource_type           # appointment, medical_record, prescription, lab_report, patient
-├── conditions (JSONB)      # JSON condition tree (any/all/equals/equals_ref/in/exists)
-├── effect                  # allow | deny
-├── priority                # Higher = evaluated first
-├── is_active
+├── patient_id → patients.id
+├── changed_by → users.id
+├── field_name
+├── old_value
+├── new_value
 └── created_at
 ```
 
