@@ -18,6 +18,17 @@ const NOTIFICATION_ICONS = {
   system: Info,
 };
 
+const NOTIFICATION_ROUTES = {
+  appointment_scheduled: '/appointments',
+  appointment_cancelled: '/appointments',
+  appointment_confirmed: '/appointments',
+  prescription_created: '/prescriptions',
+  prescription_dispensed: '/prescriptions',
+  lab_report_ready: '/lab-reports',
+  medical_record_created: '/medical-records',
+  system: null,
+};
+
 const NOTIFICATION_COLORS = {
   appointment_scheduled: 'bg-blue-100 text-blue-600',
   appointment_cancelled: 'bg-red-100 text-red-600',
@@ -42,15 +53,17 @@ const formatTimeAgo = (iso) => {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-function NotificationItem({ notification, onMarkRead }) {
+function NotificationItem({ notification, onMarkRead, onClick }) {
   const Icon = NOTIFICATION_ICONS[notification.type] || Info;
   const color = NOTIFICATION_COLORS[notification.type] || NOTIFICATION_COLORS.system;
+  const route = NOTIFICATION_ROUTES[notification.type];
 
   return (
     <div
+      onClick={() => onClick(notification)}
       className={`flex gap-3 p-3 hover:bg-slate-50 transition-colors ${
-        !notification.isRead ? 'bg-primary/5' : ''
-      }`}
+        route ? 'cursor-pointer' : ''
+      } ${!notification.isRead ? 'bg-primary/5' : ''}`}
     >
       <div className={`w-8 h-8 rounded-full ${color} flex items-center justify-center flex-shrink-0 mt-0.5`}>
         <Icon className="w-4 h-4" aria-hidden="true" />
@@ -130,6 +143,21 @@ export default function Header({ title }) {
         setUnreadCount((prev) => Math.max(0, prev - 1));
       })
       .catch(() => {});
+  };
+
+  const handleNotificationClick = (notification) => {
+    let route = NOTIFICATION_ROUTES[notification.type];
+    // Patients see their records under Medical History
+    if (route === '/medical-records' && currentUser?.role === 'patient') {
+      route = '/medical-history';
+    }
+    if (!notification.isRead) {
+      markAsRead(notification.id);
+    }
+    if (route) {
+      setOpen(false);
+      navigate(route);
+    }
   };
 
   const markAllAsRead = () => {
@@ -212,6 +240,7 @@ export default function Header({ title }) {
                       key={n.id}
                       notification={n}
                       onMarkRead={markAsRead}
+                      onClick={handleNotificationClick}
                     />
                   ))}
                 </div>
