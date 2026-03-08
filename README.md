@@ -32,9 +32,11 @@ MedEase is a web-based hospital management system that streamlines patient care,
 - **Email Verification** - OTP-based email verification on registration with resend and cooldown
 - **Multi-Step Login** - Credentials verification followed by OTP email verification
 - **Password Reset** - OTP-based password recovery flow
+- **Real-Time Notifications** - In-app notifications for appointments, prescriptions, lab reports, and system events with click-to-navigate
 - **Profile Image Uploads** - S3-backed profile images with presigned URLs and image cropping
 - **Patient Dashboard** - Dedicated health dashboard for patients with profile, appointments, prescriptions, and lab reports
-- **Audit Logging** - Track all user actions for security and compliance
+- **Data Privacy Controls** - Role-based field masking for PII/PHI, rate limiting on sensitive endpoints, and comprehensive audit logging
+- **Audit Logging** - Track all user actions with contextual JSONB details for security and compliance
 - **Session Management** - JWT access tokens with refresh token rotation and inactivity timeout
 - **CAPTCHA Protection** - Cloudflare Turnstile on registration to prevent bot signups
 - **Encrypted Secrets** - AES-256 encrypted vault for team secret sharing
@@ -108,23 +110,26 @@ medease/
 │       │   ├── prescriptions.controller.js
 │       │   ├── labReports.controller.js
 │       │   ├── allergies.controller.js   # Patient allergy CRUD
+│       │   ├── notifications.controller.js  # In-app notifications
 │       │   └── dashboard.controller.js
 │       ├── middleware/
 │       │   ├── authenticate.js   # JWT verification
 │       │   ├── authorize.js      # Role-based + permission-based authorization
 │       │   ├── abac.js           # ABAC resource-level access checks
 │       │   ├── resolveSubject.js # Resolves user profile IDs for ABAC
+│       │   ├── rateLimit.js      # Rate limiting (sensitive data + auth endpoints)
 │       │   ├── upload.js         # Multer + S3 file upload (presigned URLs)
 │       │   ├── verifyCaptcha.js  # Cloudflare Turnstile verification
 │       │   ├── validate.js       # Request validation
 │       │   └── errorHandler.js   # Global error handling
 │       ├── routes/               # API route definitions (incl. allergies)
-│       ├── tests/                # Jest unit tests (auth, RBAC, ABAC)
+│       ├── tests/                # Jest unit tests (auth, RBAC, ABAC, data masking)
 │       ├── utils/
 │       │   ├── abac.js           # ABAC policy engine (evaluate, build SQL filters)
+│       │   ├── maskSensitiveFields.js # Role-based PII/PHI field masking
 │       │   ├── emailService.js   # Nodemailer (verification, OTP, password reset)
 │       │   ├── permissions.js    # Permission checks with Redis caching
-│       │   ├── auditLog.js       # Audit logging utility
+│       │   ├── auditLog.js       # Audit logging with JSONB details
 │       │   └── AppError.js       # Custom error class
 │       ├── validators/           # Input validation schemas (auth, patients, allergies)
 │       └── index.js              # Express server entry point
@@ -305,6 +310,7 @@ When seeding, the following sample data is created:
 | Prescriptions | 11 | Active, dispensed, expired, cancelled |
 | Lab Reports | 10 | CBC, MRI, ECG, X-Ray, and more |
 | Patient Allergies | 9 | Penicillin, Shellfish, Aspirin, Latex, Pollen, and more |
+| Notifications | 42 | Appointments, prescriptions, lab reports, system alerts (mix of read/unread) |
 | Audit Logs | 15 | Login, view, create, update actions |
 
 All test accounts use the password **`Password@123`**.
@@ -383,6 +389,26 @@ const result = await db.query(`SELECT ... WHERE ${clause}`, params);
 ```
 
 Admins can manage ABAC policies at runtime via the `/api/abac-policies` endpoints (CRUD).
+
+**4. Data Privacy Controls:**
+
+Sensitive fields (PII/PHI) are masked based on the viewer's role and resource ownership:
+
+| Field | Admin | Doctor | Nurse | Other Roles | Owner |
+|-------|-------|--------|-------|-------------|-------|
+| Phone | Full | Masked (last 4) | Masked (last 4) | Masked (last 4) | Full |
+| Email | Full | Masked (2 chars + domain) | Masked | Masked | Full |
+| Address | Full | Full | Redacted | Redacted | Full |
+| Emergency Contact | Full | Full | Masked | Masked | Full |
+| Insurance Policy No. | Full | Masked | Masked | Masked | Full |
+| Insurance Provider | Full | Full | Full | Hidden | Full |
+| License Number | Full | Masked | Masked | Masked | Full |
+
+Rate limiting protects sensitive endpoints:
+- **Sensitive data** (patient records, prescriptions, lab reports): 30 requests/minute per IP
+- **Authentication** (login, OTP, password reset): 10 requests/minute per IP
+
+All data access is audit-logged with contextual details (action type, resource ID, viewer IP, and operation-specific metadata stored as JSONB).
 
 **Frontend route guards** (role-based):
 ```jsx
