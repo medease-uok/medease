@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   Calendar, FileText, Pill, FlaskConical, AlertCircle,
   ChevronLeft, ChevronRight, Clock, Stethoscope, Filter,
+  Search, CalendarDays, X,
 } from 'lucide-react';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
@@ -48,7 +49,9 @@ const FILTER_OPTIONS = [
 
 const formatDate = (iso) => {
   if (!iso) return '-';
-  return new Date(iso).toLocaleDateString('en-US', {
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
 };
@@ -58,6 +61,12 @@ const formatTime = (iso) => {
   return new Date(iso).toLocaleTimeString('en-US', {
     hour: '2-digit', minute: '2-digit',
   });
+};
+
+const matchesSearch = (event, query) => {
+  const q = query.toLowerCase();
+  return ['doctorName', 'diagnosis', 'treatment', 'medication', 'testName', 'notes', 'technicianName', 'result']
+    .some((field) => event[field]?.toLowerCase().includes(q));
 };
 
 function StatusBadge({ status }) {
@@ -252,8 +261,12 @@ export default function MedicalHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState(null);
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
+  const deferredSearch = useDeferredValue(search);
 
   useEffect(() => {
     let mounted = true;
@@ -262,6 +275,8 @@ export default function MedicalHistory() {
 
     const params = new URLSearchParams({ page, limit: 15 });
     if (activeFilter) params.set('type', activeFilter);
+    if (dateFrom) params.set('from', dateFrom);
+    if (dateTo) params.set('to', dateTo);
 
     api.get(`/patients/me/history?${params}`)
       .then((res) => {
@@ -278,10 +293,33 @@ export default function MedicalHistory() {
       });
 
     return () => { mounted = false; };
-  }, [activeFilter, page]);
+  }, [activeFilter, dateFrom, dateTo, page]);
+
+  const filteredEvents = useMemo(
+    () => deferredSearch
+      ? events.filter((e) => matchesSearch(e, deferredSearch))
+      : events,
+    [events, deferredSearch],
+  );
 
   const handleFilterChange = (value) => {
     setActiveFilter(value);
+    setPage(1);
+  };
+
+  const handleDateChange = (from, to) => {
+    setDateFrom(from);
+    setDateTo(to);
+    setPage(1);
+  };
+
+  const hasFilters = activeFilter || search || dateFrom || dateTo;
+
+  const clearAllFilters = () => {
+    setActiveFilter(null);
+    setSearch('');
+    setDateFrom('');
+    setDateTo('');
     setPage(1);
   };
 
@@ -296,40 +334,91 @@ export default function MedicalHistory() {
         </p>
       </div>
 
-      {/* Filter pills */}
+      {/* Filters and search */}
       <Card>
-        <CardContent className="py-4 pt-4">
-          <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Filter by event type">
-            <Filter className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            {FILTER_OPTIONS.map((opt) => (
-              <button
-                key={opt.value || 'all'}
-                onClick={() => handleFilterChange(opt.value)}
-                aria-pressed={activeFilter === opt.value}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  activeFilter === opt.value
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+        <CardContent className="py-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+                <label htmlFor="history-search" className="sr-only">Search medical history</label>
+                <input
+                  id="history-search"
+                  type="search"
+                  placeholder="Search doctors, diagnoses, medications..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                />
+              </div>
+              <div className="flex items-center gap-2" role="group" aria-label="Filter by date range">
+                <CalendarDays className="w-4 h-4 text-slate-400 flex-shrink-0" aria-hidden="true" />
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="history-date-from" className="sr-only">From date</label>
+                  <input
+                    id="history-date-from"
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={(e) => handleDateChange(e.target.value, dateTo)}
+                    className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                  />
+                  <span className="text-sm text-slate-400">to</span>
+                  <label htmlFor="history-date-to" className="sr-only">To date</label>
+                  <input
+                    id="history-date-to"
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(e) => handleDateChange(dateFrom, e.target.value)}
+                    className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                  />
+                </div>
+                {(dateFrom || dateTo) && (
+                  <button
+                    onClick={() => handleDateChange('', '')}
+                    className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                    aria-label="Clear date range"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Filter by event type">
+              <Filter className="w-4 h-4 text-slate-400" aria-hidden="true" />
+              {FILTER_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value || 'all'}
+                  onClick={() => handleFilterChange(opt.value)}
+                  aria-pressed={activeFilter === opt.value}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                    activeFilter === opt.value
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Summary stats */}
       {!loading && !error && (
-        <div className="flex items-center gap-4 text-sm text-slate-500">
-          <span>{pagination.total} {pagination.total === 1 ? 'event' : 'events'} found</span>
+        <output aria-live="polite" className="flex items-center gap-4 text-sm text-slate-500">
+          <span>{deferredSearch ? filteredEvents.length : pagination.total} {(deferredSearch ? filteredEvents.length : pagination.total) === 1 ? 'event' : 'events'} found</span>
           {activeFilter && (
             <span className="flex items-center gap-1">
               <span className={`w-2 h-2 rounded-full ${EVENT_CONFIG[activeFilter]?.dot}`} />
-              Showing {EVENT_CONFIG[activeFilter]?.label || activeFilter} only
+              {EVENT_CONFIG[activeFilter]?.label || activeFilter}
             </span>
           )}
-        </div>
+          {search && <span>matching &quot;{search}&quot;</span>}
+          {(dateFrom || dateTo) && <span>from {dateFrom || '...'} to {dateTo || '...'}</span>}
+        </output>
       )}
 
       {/* Error */}
@@ -338,7 +427,7 @@ export default function MedicalHistory() {
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
           <p className="text-sm text-red-700">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => { setPage(1); setError(null); }}
             className="ml-auto px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
           >
             Retry
@@ -347,42 +436,44 @@ export default function MedicalHistory() {
       )}
 
       {/* Loading skeleton */}
-      {loading && <TimelineSkeleton />}
+      {loading && !error && <TimelineSkeleton />}
 
       {/* Timeline */}
-      {!loading && !error && events.length > 0 && (
+      {!loading && !error && filteredEvents.length > 0 && (
         <>
           <ol className="pl-1 list-none" aria-label="Medical history timeline">
-            {events.map((event) => (
+            {filteredEvents.map((event) => (
               <TimelineEvent key={event.id} event={event} />
             ))}
           </ol>
-          <Pagination
-            page={page}
-            totalPages={pagination.totalPages}
-            onPageChange={setPage}
-          />
+          {!deferredSearch && (
+            <Pagination
+              page={page}
+              totalPages={pagination.totalPages}
+              onPageChange={setPage}
+            />
+          )}
         </>
       )}
 
       {/* Empty state */}
-      {!loading && !error && events.length === 0 && (
+      {!loading && !error && filteredEvents.length === 0 && (
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
               <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <p className="text-lg font-medium text-slate-700">No medical history found</p>
               <p className="text-sm text-slate-500 mt-1">
-                {activeFilter
-                  ? `No ${EVENT_CONFIG[activeFilter]?.label.toLowerCase() || activeFilter} records found.`
+                {hasFilters
+                  ? 'Try adjusting your search or filters.'
                   : 'Your medical timeline will appear here as records are added.'}
               </p>
-              {activeFilter && (
+              {hasFilters && (
                 <button
-                  onClick={() => handleFilterChange(null)}
+                  onClick={clearAllFilters}
                   className="mt-3 px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
                 >
-                  Clear filter
+                  Clear filters
                 </button>
               )}
             </div>
