@@ -124,6 +124,53 @@ const getAuditLogs = async (req, res, next) => {
   }
 };
 
+const getProfileChangeHistory = async (req, res, next) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 50), 100);
+    const offset = (page - 1) * limit;
+
+    const countResult = await db.query(
+      'SELECT COUNT(*) FROM profile_change_history'
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    const result = await db.query(
+      `SELECT pch.id, pch.patient_id, pch.field_name, pch.old_value, pch.new_value, pch.created_at,
+              u_patient.first_name || ' ' || u_patient.last_name AS patient_name,
+              COALESCE(u_changed.first_name || ' ' || u_changed.last_name, 'Deleted User') AS changed_by_name,
+              u_changed.role AS changed_by_role
+       FROM profile_change_history pch
+       JOIN patients p ON pch.patient_id = p.id
+       JOIN users u_patient ON p.user_id = u_patient.id
+       LEFT JOIN users u_changed ON pch.changed_by = u_changed.id
+       ORDER BY pch.created_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    const history = result.rows.map((row) => ({
+      id: row.id,
+      patientId: row.patient_id,
+      patientName: row.patient_name,
+      fieldName: row.field_name,
+      oldValue: row.old_value,
+      newValue: row.new_value,
+      changedByName: row.changed_by_name,
+      changedByRole: row.changed_by_role,
+      createdAt: row.created_at,
+    }));
+
+    res.json({
+      status: 'success',
+      data: history,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 function mapUser(row) {
   return {
     id: row.id,
@@ -179,4 +226,4 @@ async function getProfileData(userId, role) {
   return data;
 }
 
-module.exports = { getUsers, getPendingUsers, approveUser, rejectUser, getAuditLogs };
+module.exports = { getUsers, getPendingUsers, approveUser, rejectUser, getAuditLogs, getProfileChangeHistory };

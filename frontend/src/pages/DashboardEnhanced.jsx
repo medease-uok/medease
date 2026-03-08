@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Calendar, FileText, Activity, Stethoscope, Pill, FlaskConical,
-  CheckCircle2, XCircle, Shield, ClipboardList, UserCheck, AlertTriangle,
+  CheckCircle2, XCircle, Shield, ClipboardList, UserCheck, AlertTriangle, History,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -110,6 +110,7 @@ const adminTabs = [
   { id: 'users', label: 'User Management', icon: Users },
   { id: 'pending', label: 'Pending Approvals', icon: UserCheck },
   { id: 'logs', label: 'Audit Logs', icon: ClipboardList },
+  { id: 'changes', label: 'Profile Changes', icon: History },
 ];
 
 const appointmentTableConfig = {
@@ -150,7 +151,9 @@ export default function DashboardEnhanced() {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [activeUsers, setActiveUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [profileChanges, setProfileChanges] = useState([]);
   const [adminLoading, setAdminLoading] = useState(true);
+  const [adminError, setAdminError] = useState('');
   const [adminSearch, setAdminSearch] = useState('');
 
   useEffect(() => {
@@ -192,13 +195,18 @@ export default function DashboardEnhanced() {
       api.get('/admin/users/pending'),
       api.get('/admin/users'),
       api.get('/admin/audit-logs'),
+      api.get('/admin/profile-changes'),
     ])
-      .then(([pendingRes, usersRes, logsRes]) => {
+      .then(([pendingRes, usersRes, logsRes, changesRes]) => {
         setPendingUsers(pendingRes.data);
         setActiveUsers(usersRes.data.filter((u) => u.isActive));
         setAuditLogs(logsRes.data);
+        setProfileChanges(changesRes.data);
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        setAdminError('Failed to load admin data. Please refresh the page.');
+      })
       .finally(() => setAdminLoading(false));
   }, [isAdmin]);
 
@@ -255,6 +263,9 @@ export default function DashboardEnhanced() {
   );
   const filteredLogs = auditLogs.filter((l) =>
     `${l.userName} ${l.action} ${l.resourceType} ${l.ipAddress}`.toLowerCase().includes(adminSearch.toLowerCase())
+  );
+  const filteredChanges = profileChanges.filter((c) =>
+    `${c.patientName} ${c.fieldName} ${c.changedByName} ${c.oldValue} ${c.newValue}`.toLowerCase().includes(adminSearch.toLowerCase())
   );
 
   return (
@@ -370,6 +381,10 @@ export default function DashboardEnhanced() {
             {adminLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : adminError ? (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {adminError}
               </div>
             ) : (
               <div className="space-y-6">
@@ -524,6 +539,56 @@ export default function DashboardEnhanced() {
                           <TableRow>
                             <TableCell colSpan={6} className="h-24 text-center text-slate-500">
                               No logs found
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {adminTab === 'changes' && (
+                  <div className="rounded-md border border-slate-200">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Patient</TableHead>
+                          <TableHead>Field</TableHead>
+                          <TableHead>Old Value</TableHead>
+                          <TableHead>New Value</TableHead>
+                          <TableHead>Changed By</TableHead>
+                          <TableHead>Timestamp</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredChanges.length > 0 ? (
+                          filteredChanges.map((change, idx) => (
+                            <TableRow key={change.id}>
+                              <TableCell className="font-medium">{change.patientName}</TableCell>
+                              <TableCell>
+                                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded font-medium">
+                                  {change.fieldName}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-red-600 text-sm max-w-[150px] truncate" title={change.oldValue || '-'}>
+                                {change.oldValue || <span className="text-slate-400 italic">empty</span>}
+                              </TableCell>
+                              <TableCell className="text-green-600 text-sm max-w-[150px] truncate" title={change.newValue || '-'}>
+                                {change.newValue || <span className="text-slate-400 italic">empty</span>}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {change.changedByName}
+                                {change.changedByRole && (
+                                  <span className="ml-1 text-xs text-slate-400">({change.changedByRole})</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm">{new Date(change.createdAt).toLocaleString()}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center text-slate-500">
+                              No profile changes recorded
                             </TableCell>
                           </TableRow>
                         )}
