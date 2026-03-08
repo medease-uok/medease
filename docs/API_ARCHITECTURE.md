@@ -79,6 +79,7 @@ Manages patient profiles and medical history.
 | PATCH | /patients/{id} | Partial update | Patient |
 | GET | /patients | List patients | Admin |
 | GET | /patients/{id}/history | Unified medical history timeline | Patient/Doctor/Nurse/Admin |
+| GET | /patients/{id}/prescriptions | Patient prescriptions (paginated) | Patient/Doctor/Nurse/Admin |
 
 ### Example – Update Profile
 
@@ -148,6 +149,49 @@ GET /patients/{id}/history?page=1&limit=20&type=diagnosis
 | `diagnosis` | medical_records | diagnosis, treatment, notes, doctorName |
 | `prescription` | prescriptions | medication, dosage, frequency, duration, status, doctorName |
 | `lab` | lab_reports | testName, result, notes, technicianName |
+
+### Example – Fetch Prescriptions
+
+```
+GET /patients/{id}/prescriptions?page=1&limit=20&status=active
+```
+
+**Query Parameters:**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| page | 1 | Page number |
+| limit | 20 | Items per page (max 100) |
+| status | (all) | Filter by: `active`, `dispensed`, `expired`, `cancelled` |
+
+**Response**
+```json
+200 OK
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "patientId": "uuid",
+      "doctorId": "uuid",
+      "doctorName": "Dr. Nimal Perera",
+      "medication": "Amlodipine",
+      "dosage": "5mg",
+      "frequency": "Once daily",
+      "duration": "30 days",
+      "status": "active",
+      "createdAt": "2026-03-05T10:30:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 8,
+    "totalPages": 1
+  }
+}
+```
+
 
 ---
 

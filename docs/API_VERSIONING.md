@@ -81,6 +81,7 @@ v2  -- next version (introduced only when breaking changes are required)
     GET    /
     GET    /:id
     GET    /:id/history
+    GET    /:id/prescriptions
 
   /doctors
     GET    /

@@ -413,6 +413,61 @@ const deleteProfileImage = async (req, res, next) => {
   }
 };
 
+const getPrescriptions = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 20), 100);
+    const offset = (page - 1) * limit;
+    const status = req.query.status;
+
+    // Verify patient exists
+    const patientCheck = await db.query('SELECT id FROM patients WHERE id = $1', [id]);
+    if (patientCheck.rows.length === 0) {
+      throw new AppError('Patient not found.', 404);
+    }
+
+    const params = [id];
+    let whereClause = 'WHERE rx.patient_id = $1';
+
+    if (status) {
+      params.push(status);
+      whereClause += ` AND rx.status = $${params.length}`;
+    }
+
+    // NOTE: whereClause is shared between countQuery and dataQuery.
+    // Any changes to filters must be reflected in both.
+    const countResult = await db.query(
+      `SELECT COUNT(*) FROM prescriptions rx ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    const dataResult = await db.query(
+      `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
+              rx.frequency, rx.duration, rx.status, rx.created_at,
+              'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
+       FROM prescriptions rx
+       LEFT JOIN doctors d ON rx.doctor_id = d.id
+       LEFT JOIN users du ON d.user_id = du.id
+       ${whereClause}
+       ORDER BY rx.created_at DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset]
+    );
+
+    const prescriptions = dataResult.rows.map(mapPrescription);
+
+    res.json({
+      status: 'success',
+      data: prescriptions,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const getHistory = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -533,4 +588,4 @@ const getHistory = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, getMe, getHistory, updateById, uploadProfileImage, deleteProfileImage };
+module.exports = { getAll, getById, getMe, getHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage };
