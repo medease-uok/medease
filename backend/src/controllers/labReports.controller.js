@@ -73,8 +73,8 @@ const create = async (req, res, next) => {
       [patientId, technicianId, testName, testResult || null, notes || null]
     );
 
-    // Notify patient
-    await createNotification({
+    // Fire-and-forget: notify patient
+    createNotification({
       recipientId: patient.user_id,
       type: 'lab_report_ready',
       title: 'Lab Report Ready',
@@ -83,25 +83,28 @@ const create = async (req, res, next) => {
       referenceType: 'lab_report',
     });
 
-    // Notify the patient's doctors (those with existing appointments)
-    const doctors = await db.query(
+    // Notify the patient's doctors in parallel (fire-and-forget)
+    db.query(
       `SELECT DISTINCT u.id AS user_id
        FROM appointments a
        JOIN doctors d ON a.doctor_id = d.id
        JOIN users u ON d.user_id = u.id
        WHERE a.patient_id = $1 AND a.status IN ('scheduled', 'confirmed', 'in_progress')`,
       [patientId]
-    );
-    for (const doc of doctors.rows) {
-      await createNotification({
-        recipientId: doc.user_id,
-        type: 'lab_report_ready',
-        title: 'Lab Report Ready',
-        message: `${testName} results for ${patient.first_name} ${patient.last_name} are available.`,
-        referenceId: insertResult.rows[0].id,
-        referenceType: 'lab_report',
-      });
-    }
+    ).then((doctors) =>
+      Promise.all(
+        doctors.rows.map((doc) =>
+          createNotification({
+            recipientId: doc.user_id,
+            type: 'lab_report_ready',
+            title: 'Lab Report Ready',
+            message: `${testName} results for ${patient.first_name} ${patient.last_name} are available.`,
+            referenceId: insertResult.rows[0].id,
+            referenceType: 'lab_report',
+          })
+        )
+      )
+    ).catch((err) => console.error('Failed to notify doctors:', err.message));
 
     res.status(201).json({ status: 'success', data: { id: insertResult.rows[0].id } });
   } catch (err) {
@@ -122,22 +125,23 @@ const update = async (req, res, next) => {
     if (result.rows.length === 0) throw new AppError('Lab report not found.', 404);
     const report = result.rows[0];
 
-    // Notify patient that results were updated
+    // Fire-and-forget: notify patient that results were updated
     if (testResult) {
-      const patient = await db.query(
+      db.query(
         `SELECT u.id AS user_id FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
         [report.patient_id]
-      );
-      if (patient.rows[0]) {
-        await createNotification({
-          recipientId: patient.rows[0].user_id,
-          type: 'lab_report_ready',
-          title: 'Lab Results Updated',
-          message: `Your ${report.test_name} results have been updated.`,
-          referenceId: id,
-          referenceType: 'lab_report',
-        });
-      }
+      ).then((patient) => {
+        if (patient.rows[0]) {
+          createNotification({
+            recipientId: patient.rows[0].user_id,
+            type: 'lab_report_ready',
+            title: 'Lab Results Updated',
+            message: `Your ${report.test_name} results have been updated.`,
+            referenceId: id,
+            referenceType: 'lab_report',
+          });
+        }
+      }).catch((err) => console.error('Failed to notify patient:', err.message));
     }
 
     res.json({ status: 'success', data: { id: report.id } });

@@ -66,13 +66,23 @@ const create = async (req, res, next) => {
     const doctorId = req.user.doctorId;
     if (!doctorId) throw new AppError('Only doctors can create prescriptions.', 403);
 
-    const patientCheck = await db.query(
-      `SELECT p.id, u.id AS user_id, u.first_name, u.last_name
-       FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
-      [patientId]
-    );
+    // Verify patient and get doctor name in parallel
+    const [patientCheck, doctorInfo] = await Promise.all([
+      db.query(
+        `SELECT p.id, u.id AS user_id, u.first_name, u.last_name
+         FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
+        [patientId]
+      ),
+      db.query(
+        `SELECT u.first_name, u.last_name FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
+        [doctorId]
+      ),
+    ]);
     if (patientCheck.rows.length === 0) throw new AppError('Patient not found.', 404);
     const patient = patientCheck.rows[0];
+    const docName = doctorInfo.rows[0]
+      ? `Dr. ${doctorInfo.rows[0].first_name} ${doctorInfo.rows[0].last_name}`
+      : 'Your doctor';
 
     const result = await db.query(
       `INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration)
@@ -80,16 +90,8 @@ const create = async (req, res, next) => {
       [patientId, doctorId, medication, dosage, frequency, duration || null]
     );
 
-    // Get doctor name for notification
-    const doctorInfo = await db.query(
-      `SELECT u.first_name, u.last_name FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
-      [doctorId]
-    );
-    const docName = doctorInfo.rows[0]
-      ? `Dr. ${doctorInfo.rows[0].first_name} ${doctorInfo.rows[0].last_name}`
-      : 'Your doctor';
-
-    await createNotification({
+    // Fire-and-forget notification
+    createNotification({
       recipientId: patient.user_id,
       type: 'prescription_created',
       title: 'New Prescription',
@@ -114,12 +116,29 @@ const updateStatus = async (req, res, next) => {
       throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400);
     }
 
+    // Verify prescription exists and check ownership
+    const existing = await db.query(
+      `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication,
+              d.user_id AS doctor_user_id
+       FROM prescriptions rx
+       LEFT JOIN doctors d ON rx.doctor_id = d.id
+       WHERE rx.id = $1`,
+      [id]
+    );
+    if (existing.rows.length === 0) throw new AppError('Prescription not found.', 404);
+    const rx = existing.rows[0];
+
+    // Only the prescribing doctor, pharmacist, or admin can update
+    const userId = req.user.id;
+    const isDoctor = userId === rx.doctor_user_id;
+    if (!isDoctor && !['pharmacist', 'admin'].includes(req.user.role)) {
+      throw new AppError('You do not have permission to update this prescription.', 403);
+    }
+
     const result = await db.query(
-      `UPDATE prescriptions SET status = $1 WHERE id = $2 RETURNING id, patient_id, medication, status`,
+      `UPDATE prescriptions SET status = $1 WHERE id = $2 RETURNING id, status`,
       [status, id]
     );
-    if (result.rows.length === 0) throw new AppError('Prescription not found.', 404);
-    const rx = result.rows[0];
 
     const patient = await db.query(
       `SELECT u.id AS user_id FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
@@ -131,7 +150,7 @@ const updateStatus = async (req, res, next) => {
       const title = status === 'dispensed' ? 'Prescription Dispensed' : 'Prescription Cancelled';
       const verb = status === 'dispensed' ? 'dispensed' : 'cancelled';
 
-      await createNotification({
+      createNotification({
         recipientId: patient.rows[0].user_id,
         type: notifType,
         title,
@@ -141,7 +160,7 @@ const updateStatus = async (req, res, next) => {
       });
     }
 
-    res.json({ status: 'success', data: { id: rx.id, status: rx.status } });
+    res.json({ status: 'success', data: { id: result.rows[0].id, status: result.rows[0].status } });
   } catch (err) {
     return next(err);
   }

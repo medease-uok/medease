@@ -54,40 +54,43 @@ const create = async (req, res, next) => {
   try {
     const { patientId, diagnosis, treatment, notes } = req.body;
 
-    if (!patientId) {
-      throw new AppError('patientId is required.', 400);
+    if (!patientId || !diagnosis) {
+      throw new AppError('patientId and diagnosis are required.', 400);
     }
 
     const doctorId = req.user.doctorId;
     if (!doctorId) throw new AppError('Only doctors can create medical records.', 403);
 
-    const patientCheck = await db.query(
-      `SELECT p.id, u.id AS user_id, u.first_name, u.last_name
-       FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
-      [patientId]
-    );
+    // Verify patient and get doctor name in parallel
+    const [patientCheck, doctorInfo] = await Promise.all([
+      db.query(
+        `SELECT p.id, u.id AS user_id, u.first_name, u.last_name
+         FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
+        [patientId]
+      ),
+      db.query(
+        `SELECT u.first_name, u.last_name FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
+        [doctorId]
+      ),
+    ]);
     if (patientCheck.rows.length === 0) throw new AppError('Patient not found.', 404);
     const patient = patientCheck.rows[0];
-
-    const result = await db.query(
-      `INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [patientId, doctorId, diagnosis || null, treatment || null, notes || null]
-    );
-
-    const doctorInfo = await db.query(
-      `SELECT u.first_name, u.last_name FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
-      [doctorId]
-    );
     const docName = doctorInfo.rows[0]
       ? `Dr. ${doctorInfo.rows[0].first_name} ${doctorInfo.rows[0].last_name}`
       : 'Your doctor';
 
-    await createNotification({
+    const result = await db.query(
+      `INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [patientId, doctorId, diagnosis, treatment || null, notes || null]
+    );
+
+    // Fire-and-forget notification
+    createNotification({
       recipientId: patient.user_id,
       type: 'medical_record_created',
       title: 'New Medical Record',
-      message: `${docName} added a new record${diagnosis ? `: ${diagnosis}` : ''}.`,
+      message: `${docName} added a new record: ${diagnosis}.`,
       referenceId: result.rows[0].id,
       referenceType: 'medical_record',
     });
