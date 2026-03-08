@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAll } = require('../controllers/appointments.controller');
+const { getAll, create, updateStatus } = require('../controllers/appointments.controller');
 const authenticate = require('../middleware/authenticate');
 const { requirePermission } = require('../middleware/authorize');
 const resolveSubject = require('../middleware/resolveSubject');
@@ -9,5 +9,7 @@ router.use(authenticate);
 router.use(resolveSubject);
 
 router.get('/', requirePermission('view_appointments', 'view_own_appointments'), getAll);
+router.post('/', requirePermission('create_appointment'), create);
+router.patch('/:id/status', requirePermission('update_appointment_status', 'cancel_appointment'), updateStatus);
 
 module.exports = router;

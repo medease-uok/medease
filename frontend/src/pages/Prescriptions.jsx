@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
-  Pill, AlertCircle, Search, Clock, User, Stethoscope,
+  Pill, AlertCircle, Search, Clock, User, Stethoscope, CalendarDays, X,
 } from 'lucide-react';
 import { prescriptionStatuses } from '../constants';
 import { useAuth } from '../data/AuthContext';
@@ -104,6 +104,8 @@ function ListSkeleton() {
 export default function Prescriptions() {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -131,11 +133,18 @@ export default function Prescriptions() {
   }, []);
 
   const filtered = useMemo(
-    () => prescriptions.filter((rx) =>
-      (filter === 'all' || rx.status === filter) &&
-      (!deferredSearch || matchesSearch(rx, deferredSearch))
-    ),
-    [prescriptions, filter, deferredSearch],
+    () => prescriptions.filter((rx) => {
+      if (filter !== 'all' && rx.status !== filter) return false;
+      if (deferredSearch && !matchesSearch(rx, deferredSearch)) return false;
+      if (dateFrom || dateTo) {
+        const rxDate = rx.createdAt ? new Date(rx.createdAt).getTime() : NaN;
+        if (isNaN(rxDate)) return false;
+        if (dateFrom && rxDate < new Date(dateFrom).getTime()) return false;
+        if (dateTo && rxDate > new Date(dateTo + 'T23:59:59').getTime()) return false;
+      }
+      return true;
+    }),
+    [prescriptions, filter, deferredSearch, dateFrom, dateTo],
   );
 
   const statusCounts = useMemo(
@@ -162,18 +171,53 @@ export default function Prescriptions() {
       {/* Filters and search */}
       <Card>
         <CardContent className="py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
-              <label htmlFor="rx-search" className="sr-only">Search prescriptions</label>
-              <input
-                id="rx-search"
-                type="search"
-                placeholder="Search medications, doctors..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
-              />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+                <label htmlFor="rx-search" className="sr-only">Search prescriptions</label>
+                <input
+                  id="rx-search"
+                  type="search"
+                  placeholder="Search medications, doctors..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                />
+              </div>
+              <div className="flex items-center gap-2" role="group" aria-label="Filter by date range">
+                <CalendarDays className="w-4 h-4 text-slate-400 flex-shrink-0" aria-hidden="true" />
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="rx-date-from" className="sr-only">From date</label>
+                  <input
+                    id="rx-date-from"
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                  />
+                  <span className="text-sm text-slate-400">to</span>
+                  <label htmlFor="rx-date-to" className="sr-only">To date</label>
+                  <input
+                    id="rx-date-to"
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                  />
+                </div>
+                {(dateFrom || dateTo) && (
+                  <button
+                    onClick={() => { setDateFrom(''); setDateTo(''); }}
+                    className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                    aria-label="Clear date range"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Filter by status">
               <button
@@ -232,6 +276,7 @@ export default function Prescriptions() {
           {filtered.length} {filtered.length === 1 ? 'prescription' : 'prescriptions'}
           {filter !== 'all' && ` (${STATUS_STYLES[filter]?.label || filter})`}
           {search && ` matching "${search}"`}
+          {(dateFrom || dateTo) && ` from ${dateFrom || '...'} to ${dateTo || '...'}`}
         </output>
       )}
 
@@ -252,15 +297,15 @@ export default function Prescriptions() {
               <Pill className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <p className="text-lg font-medium text-slate-700">No prescriptions found</p>
               <p className="text-sm text-slate-500 mt-1">
-                {search || filter !== 'all'
-                  ? 'Try adjusting your search or filter.'
+                {search || filter !== 'all' || dateFrom || dateTo
+                  ? 'Try adjusting your search or filters.'
                   : isPatient
                     ? 'Your prescriptions will appear here when prescribed by a doctor.'
                     : 'No prescriptions in the system yet.'}
               </p>
-              {(search || filter !== 'all') && (
+              {(search || filter !== 'all' || dateFrom || dateTo) && (
                 <button
-                  onClick={() => { setSearch(''); setFilter('all'); }}
+                  onClick={() => { setSearch(''); setFilter('all'); setDateFrom(''); setDateTo(''); }}
                   className="mt-3 px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
                 >
                   Clear filters

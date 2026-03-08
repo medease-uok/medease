@@ -221,4 +221,72 @@ INSERT INTO audit_logs (user_id, action, resource_type, resource_id, ip_address,
   ('c0000000-0000-0000-0000-000000000003', 'LOGIN', 'session', NULL, '10.0.0.51', false),
   ('a0000000-0000-0000-0000-000000000001', 'UPDATE', 'user', 'd0000000-0000-0000-0000-000000000004', '192.168.1.10', true);
 
+-- ============================================
+-- NOTIFICATIONS (sample notifications for seeded users)
+-- ============================================
+
+INSERT INTO notifications (recipient_id, type, title, message, is_read, reference_id, reference_type, created_at) VALUES
+  -- Patient Sarah Fernando: appointment and medical record notifications
+  ('c0000000-0000-0000-0000-000000000001', 'appointment_scheduled', 'Appointment Scheduled', 'Your appointment with Dr. Kamal Perera has been scheduled.', true, NULL, 'appointment', NOW() - INTERVAL '31 days'),
+  ('c0000000-0000-0000-0000-000000000001', 'appointment_confirmed', 'Appointment Confirmed', 'Your appointment with Dr. Kamal Perera has been confirmed.', true, NULL, 'appointment', NOW() - INTERVAL '30 days'),
+  ('c0000000-0000-0000-0000-000000000001', 'medical_record_created', 'New Medical Record', 'Dr. Kamal Perera added a new record: Mild hypertension (Stage 1).', true, NULL, 'medical_record', NOW() - INTERVAL '29 days'),
+  ('c0000000-0000-0000-0000-000000000001', 'prescription_created', 'New Prescription', 'Dr. Kamal Perera prescribed Amlodipine 5mg.', true, NULL, 'prescription', NOW() - INTERVAL '29 days'),
+  ('c0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'Your Complete Blood Count (CBC) results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
+  ('c0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'Your Lipid Panel results are now available.', false, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
+  ('c0000000-0000-0000-0000-000000000001', 'appointment_scheduled', 'Appointment Scheduled', 'Your quarterly cardiac review with Dr. Kamal Perera has been scheduled.', false, NULL, 'appointment', NOW() - INTERVAL '2 days'),
+
+  -- Patient Dinesh Rajapaksa: neurology notifications
+  ('c0000000-0000-0000-0000-000000000002', 'appointment_confirmed', 'Appointment Confirmed', 'Your appointment with Dr. Sithara Silva has been confirmed.', true, NULL, 'appointment', NOW() - INTERVAL '26 days'),
+  ('c0000000-0000-0000-0000-000000000002', 'medical_record_created', 'New Medical Record', 'Dr. Sithara Silva added a new record: Tension-type headache.', true, NULL, 'medical_record', NOW() - INTERVAL '24 days'),
+  ('c0000000-0000-0000-0000-000000000002', 'lab_report_ready', 'Lab Report Ready', 'Your MRI Brain results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '22 days'),
+  ('c0000000-0000-0000-0000-000000000002', 'prescription_dispensed', 'Prescription Dispensed', 'Your Paracetamol 500mg prescription has been dispensed.', false, NULL, 'prescription', NOW() - INTERVAL '20 days'),
+  ('c0000000-0000-0000-0000-000000000002', 'appointment_scheduled', 'Appointment Scheduled', 'Your MRI results review with Dr. Sithara Silva has been scheduled.', false, NULL, 'appointment', NOW() - INTERVAL '3 days'),
+
+  -- Patient Kavindi Weerasinghe: orthopedics notifications
+  ('c0000000-0000-0000-0000-000000000003', 'lab_report_ready', 'Lab Report Ready', 'Your X-Ray Left Knee results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '18 days'),
+  ('c0000000-0000-0000-0000-000000000003', 'prescription_created', 'New Prescription', 'Dr. Ruwan Fernando prescribed Ibuprofen 400mg.', false, NULL, 'prescription', NOW() - INTERVAL '18 days'),
+
+  -- Patient Nuwan Jayasuriya: cardiac + neurology notifications
+  ('c0000000-0000-0000-0000-000000000004', 'medical_record_created', 'New Medical Record', 'Dr. Kamal Perera added a new record: Atrial fibrillation.', true, NULL, 'medical_record', NOW() - INTERVAL '14 days'),
+  ('c0000000-0000-0000-0000-000000000004', 'lab_report_ready', 'Lab Report Ready', 'Your ECG (12-Lead) results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '14 days'),
+  ('c0000000-0000-0000-0000-000000000004', 'prescription_created', 'New Prescription', 'Dr. Kamal Perera prescribed Warfarin 5mg.', true, NULL, 'prescription', NOW() - INTERVAL '13 days'),
+  ('c0000000-0000-0000-0000-000000000004', 'lab_report_ready', 'Lab Results Updated', 'Your INR (Prothrombin Time) results are now available.', false, NULL, 'lab_report', NOW() - INTERVAL '7 days'),
+  ('c0000000-0000-0000-0000-000000000004', 'prescription_created', 'New Prescription', 'Dr. Sithara Silva prescribed Gabapentin 300mg.', false, NULL, 'prescription', NOW() - INTERVAL '11 days'),
+
+  -- Patient Hasini Abeywickrama: anemia notifications
+  ('c0000000-0000-0000-0000-000000000005', 'lab_report_ready', 'Lab Report Ready', 'Your Complete Blood Count (CBC) results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '10 days'),
+  ('c0000000-0000-0000-0000-000000000005', 'lab_report_ready', 'Lab Report Ready', 'Your Serum Ferritin results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '9 days'),
+  ('c0000000-0000-0000-0000-000000000005', 'medical_record_created', 'New Medical Record', 'Dr. Anjali Dissanayake added a new record: Iron deficiency anemia.', false, NULL, 'medical_record', NOW() - INTERVAL '8 days'),
+  ('c0000000-0000-0000-0000-000000000005', 'prescription_created', 'New Prescription', 'Dr. Anjali Dissanayake prescribed Ferrous Sulfate 200mg.', false, NULL, 'prescription', NOW() - INTERVAL '8 days'),
+  ('c0000000-0000-0000-0000-000000000005', 'appointment_confirmed', 'Appointment Confirmed', 'Your appointment with Dr. Kamal Perera has been confirmed.', false, NULL, 'appointment', NOW() - INTERVAL '1 day'),
+  ('c0000000-0000-0000-0000-000000000005', 'appointment_cancelled', 'Appointment Cancelled', 'Your appointment with Dr. Anjali Dissanayake has been cancelled.', true, NULL, 'appointment', NOW() - INTERVAL '5 days'),
+
+  -- Patient Lahiru Gunasekara: sports injury notifications
+  ('c0000000-0000-0000-0000-000000000006', 'lab_report_ready', 'Lab Report Ready', 'Your MRI Left Knee results are now available.', false, NULL, 'lab_report', NOW() - INTERVAL '5 days'),
+  ('c0000000-0000-0000-0000-000000000006', 'medical_record_created', 'New Medical Record', 'Dr. Ruwan Fernando added a new record: ACL sprain (Grade 2).', false, NULL, 'medical_record', NOW() - INTERVAL '4 days'),
+  ('c0000000-0000-0000-0000-000000000006', 'appointment_confirmed', 'Appointment Confirmed', 'Your follow-up with Dr. Ruwan Fernando has been confirmed.', false, NULL, 'appointment', NOW() - INTERVAL '1 day'),
+
+  -- Doctor Kamal Perera: lab report notifications
+  ('d0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'CBC results for Sarah Fernando are available.', true, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
+  ('d0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'Lipid Panel results for Sarah Fernando are available.', true, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
+  ('d0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'ECG results for Nuwan Jayasuriya are available.', true, NULL, 'lab_report', NOW() - INTERVAL '14 days'),
+  ('d0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Results Updated', 'INR results for Nuwan Jayasuriya are available.', false, NULL, 'lab_report', NOW() - INTERVAL '7 days'),
+  ('d0000000-0000-0000-0000-000000000001', 'appointment_scheduled', 'New Appointment', 'Hasini Abeywickrama has scheduled an appointment.', false, NULL, 'appointment', NOW() - INTERVAL '3 days'),
+
+  -- Doctor Sithara Silva: notifications
+  ('d0000000-0000-0000-0000-000000000002', 'lab_report_ready', 'Lab Report Ready', 'MRI Brain results for Dinesh Rajapaksa are available.', true, NULL, 'lab_report', NOW() - INTERVAL '22 days'),
+  ('d0000000-0000-0000-0000-000000000002', 'lab_report_ready', 'Lab Report Ready', 'Nerve Conduction Study results for Nuwan Jayasuriya are available.', false, NULL, 'lab_report', NOW() - INTERVAL '12 days'),
+
+  -- Doctor Ruwan Fernando: notifications
+  ('d0000000-0000-0000-0000-000000000003', 'lab_report_ready', 'Lab Report Ready', 'X-Ray results for Kavindi Weerasinghe are available.', true, NULL, 'lab_report', NOW() - INTERVAL '18 days'),
+  ('d0000000-0000-0000-0000-000000000003', 'lab_report_ready', 'Lab Report Ready', 'MRI Left Knee results for Lahiru Gunasekara are available.', false, NULL, 'lab_report', NOW() - INTERVAL '5 days'),
+  ('d0000000-0000-0000-0000-000000000003', 'appointment_scheduled', 'New Appointment', 'Lahiru Gunasekara has scheduled a follow-up appointment.', false, NULL, 'appointment', NOW() - INTERVAL '2 days'),
+
+  -- Pharmacist Tharindu Gamage: system notification
+  ('b0000000-0000-0000-0000-000000000001', 'system', 'System Update', 'Pharmacy inventory module has been updated.', false, NULL, NULL, NOW() - INTERVAL '1 day'),
+
+  -- Admin: system notifications
+  ('a0000000-0000-0000-0000-000000000001', 'system', 'System Update', 'Database backup completed successfully.', true, NULL, NULL, NOW() - INTERVAL '2 days'),
+  ('a0000000-0000-0000-0000-000000000001', 'system', 'New User Registration', 'A new user has registered and is pending approval.', false, NULL, NULL, NOW() - INTERVAL '6 hours');
+
 COMMIT;
