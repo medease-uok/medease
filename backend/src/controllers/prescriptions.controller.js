@@ -3,6 +3,7 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
+const { isRefillEligible } = require('./refillRequests.controller');
 
 const mapPrescription = (row) => ({
   id: row.id,
@@ -16,6 +17,8 @@ const mapPrescription = (row) => ({
   duration: row.duration,
   status: row.status,
   createdAt: row.created_at,
+  refillEligible: row.refill_eligible ?? false,
+  pendingRefill: row.pending_refill ?? false,
 });
 
 const getAll = async (req, res, next) => {
@@ -40,7 +43,11 @@ const getAll = async (req, res, next) => {
       SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
              rx.frequency, rx.duration, rx.status, rx.created_at,
              pu.first_name || ' ' || pu.last_name AS patient_name,
-             'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
+             'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name,
+             EXISTS (
+               SELECT 1 FROM prescription_refill_requests rr
+               WHERE rr.prescription_id = rx.id AND rr.status = 'pending'
+             ) AS pending_refill
       FROM prescriptions rx
       JOIN patients p ON rx.patient_id = p.id
       JOIN users pu ON p.user_id = pu.id
@@ -51,9 +58,14 @@ const getAll = async (req, res, next) => {
 
     const result = await db.query(query, params);
 
+    const data = result.rows.map((row) => ({
+      ...mapPrescription(row),
+      refillEligible: ['active', 'expired'].includes(row.status) && isRefillEligible(row.created_at, row.duration),
+    }));
+
     await auditLog({ userId: req.user.id, action: 'VIEW_PRESCRIPTIONS', resourceType: 'prescription', ip: req.ip });
 
-    res.json({ status: 'success', data: result.rows.map(mapPrescription) });
+    res.json({ status: 'success', data });
   } catch (err) {
     return next(err);
   }

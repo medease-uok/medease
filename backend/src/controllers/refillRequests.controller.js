@@ -4,6 +4,33 @@ const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
 
+function parseDurationToDays(duration) {
+  if (!duration) return null;
+  const lower = duration.toLowerCase().trim();
+  if (lower === 'ongoing') return null;
+
+  const match = lower.match(/^(\d+)\s*(day|week|month|year)s?$/);
+  if (!match) return null;
+
+  const num = parseInt(match[1], 10);
+  switch (match[2]) {
+    case 'day': return num;
+    case 'week': return num * 7;
+    case 'month': return num * 30;
+    case 'year': return num * 365;
+    default: return null;
+  }
+}
+
+function isRefillEligible(createdAt, duration) {
+  const days = parseDurationToDays(duration);
+  if (days === null) return true;
+
+  const prescribed = new Date(createdAt).getTime();
+  const twoThirds = prescribed + (days * (2 / 3)) * 24 * 60 * 60 * 1000;
+  return Date.now() >= twoThirds;
+}
+
 const mapRefillRequest = (row) => ({
   id: row.id,
   prescriptionId: row.prescription_id,
@@ -75,6 +102,7 @@ const create = async (req, res, next) => {
 
     const rxResult = await db.query(
       `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage, rx.frequency,
+              rx.duration, rx.created_at,
               d.user_id AS doctor_user_id
        FROM prescriptions rx
        LEFT JOIN doctors d ON rx.doctor_id = d.id
@@ -86,6 +114,15 @@ const create = async (req, res, next) => {
     const rx = rxResult.rows[0];
     if (rx.patient_id !== patientId) {
       throw new AppError('You can only request refills for your own prescriptions.', 403);
+    }
+
+    if (!isRefillEligible(rx.created_at, rx.duration)) {
+      const days = parseDurationToDays(rx.duration);
+      const eligibleDays = Math.ceil(days * (2 / 3));
+      throw new AppError(
+        `Refill requests are available after ${eligibleDays} days of a ${rx.duration} prescription.`,
+        400
+      );
     }
 
     const pending = await db.query(
@@ -219,4 +256,4 @@ const respond = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, create, respond };
+module.exports = { getAll, create, respond, parseDurationToDays, isRefillEligible };
