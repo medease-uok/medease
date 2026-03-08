@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   Calendar, FileText, Pill, FlaskConical, AlertCircle,
-  ChevronLeft, ChevronRight, Clock, Stethoscope, Filter, Loader2,
+  ChevronLeft, ChevronRight, Clock, Stethoscope, Filter,
 } from 'lucide-react';
 import api from '../services/api';
-import { useAuth } from '../data/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 
 const EVENT_CONFIG = {
@@ -83,15 +82,16 @@ function StatusBadge({ status }) {
 function TimelineEvent({ event }) {
   const config = EVENT_CONFIG[event.type] || EVENT_CONFIG.visit;
   const Icon = config.icon;
+  const time = formatTime(event.eventDate);
 
   return (
-    <div className="relative flex gap-4 pb-8 last:pb-0 group">
+    <li className="relative flex gap-4 pb-8 last:pb-0 group">
       {/* Timeline line */}
-      <div className="absolute left-5 top-10 bottom-0 w-px bg-slate-200 group-last:hidden" />
+      <div className="absolute left-5 top-10 bottom-0 w-px bg-slate-200 group-last:hidden" aria-hidden="true" />
 
       {/* Timeline dot */}
       <div className={`relative z-10 flex-shrink-0 w-10 h-10 rounded-full ${config.color} flex items-center justify-center ring-4 ring-white`}>
-        <Icon className="w-5 h-5" />
+        <Icon className="w-5 h-5" aria-hidden="true" />
       </div>
 
       {/* Event card */}
@@ -103,11 +103,11 @@ function TimelineEvent({ event }) {
             </span>
           </div>
           <div className="flex items-center gap-1 text-xs text-slate-400 flex-shrink-0">
-            <Clock className="w-3 h-3" />
-            <span>{formatDate(event.eventDate)}</span>
-            {formatTime(event.eventDate) && (
-              <span className="ml-1">{formatTime(event.eventDate)}</span>
-            )}
+            <Clock className="w-3 h-3" aria-hidden="true" />
+            <time dateTime={event.eventDate}>
+              {formatDate(event.eventDate)}
+              {time && <span className="ml-1">{time}</span>}
+            </time>
           </div>
         </div>
 
@@ -167,7 +167,7 @@ function TimelineEvent({ event }) {
           )}
         </div>
       </div>
-    </div>
+    </li>
   );
 }
 
@@ -187,10 +187,11 @@ function Pagination({ page, totalPages, onPageChange }) {
   }
 
   return (
-    <div className="flex items-center justify-center gap-1 mt-6">
+    <nav className="flex items-center justify-center gap-1 mt-6" aria-label="Pagination">
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
+        aria-label="Previous page"
         className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
         <ChevronLeft className="w-4 h-4" />
@@ -198,13 +199,14 @@ function Pagination({ page, totalPages, onPageChange }) {
       {start > 1 && (
         <>
           <button onClick={() => onPageChange(1)} className="w-8 h-8 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors">1</button>
-          {start > 2 && <span className="text-slate-400 px-1">...</span>}
+          {start > 2 && <span className="text-slate-400 px-1" aria-hidden="true">...</span>}
         </>
       )}
       {pages.map((p) => (
         <button
           key={p}
           onClick={() => onPageChange(p)}
+          aria-current={p === page ? 'page' : undefined}
           className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
             p === page
               ? 'bg-primary text-white shadow-sm'
@@ -216,44 +218,44 @@ function Pagination({ page, totalPages, onPageChange }) {
       ))}
       {end < totalPages && (
         <>
-          {end < totalPages - 1 && <span className="text-slate-400 px-1">...</span>}
+          {end < totalPages - 1 && <span className="text-slate-400 px-1" aria-hidden="true">...</span>}
           <button onClick={() => onPageChange(totalPages)} className="w-8 h-8 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors">{totalPages}</button>
         </>
       )}
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
+        aria-label="Next page"
         className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
         <ChevronRight className="w-4 h-4" />
       </button>
+    </nav>
+  );
+}
+
+function TimelineSkeleton() {
+  return (
+    <div className="pl-1 space-y-0">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex gap-4 pb-8 animate-pulse">
+          <div className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0" />
+          <div className="flex-1 h-24 rounded-xl bg-slate-100" />
+        </div>
+      ))}
     </div>
   );
 }
 
 export default function MedicalHistory() {
-  const { currentUser } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [patientId, setPatientId] = useState(null);
   const [activeFilter, setActiveFilter] = useState(null);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
 
-  // Fetch patient profile to get the patient ID
   useEffect(() => {
-    if (currentUser?.role === 'patient') {
-      api.get('/patients/me')
-        .then((res) => setPatientId(res.data.id))
-        .catch(() => setError('Could not load patient profile.'));
-    }
-  }, [currentUser]);
-
-  // Fetch history once we have the patient ID
-  useEffect(() => {
-    if (!patientId) return;
-
     let mounted = true;
     setLoading(true);
     setError(null);
@@ -261,7 +263,7 @@ export default function MedicalHistory() {
     const params = new URLSearchParams({ page, limit: 15 });
     if (activeFilter) params.set('type', activeFilter);
 
-    api.get(`/patients/${patientId}/history?${params}`)
+    api.get(`/patients/me/history?${params}`)
       .then((res) => {
         if (!mounted) return;
         setEvents(res.data || []);
@@ -276,23 +278,12 @@ export default function MedicalHistory() {
       });
 
     return () => { mounted = false; };
-  }, [patientId, activeFilter, page]);
+  }, [activeFilter, page]);
 
   const handleFilterChange = (value) => {
     setActiveFilter(value);
     setPage(1);
   };
-
-  if (!patientId && !error) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-500">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -308,12 +299,13 @@ export default function MedicalHistory() {
       {/* Filter pills */}
       <Card>
         <CardContent className="py-4 pt-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="w-4 h-4 text-slate-400" />
+          <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Filter by event type">
+            <Filter className="w-4 h-4 text-slate-400" aria-hidden="true" />
             {FILTER_OPTIONS.map((opt) => (
               <button
                 key={opt.value || 'all'}
                 onClick={() => handleFilterChange(opt.value)}
+                aria-pressed={activeFilter === opt.value}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   activeFilter === opt.value
                     ? 'bg-primary text-white shadow-sm'
@@ -342,7 +334,7 @@ export default function MedicalHistory() {
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
           <p className="text-sm text-red-700">{error}</p>
           <button
@@ -354,25 +346,23 @@ export default function MedicalHistory() {
         </div>
       )}
 
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        </div>
-      )}
+      {/* Loading skeleton */}
+      {loading && <TimelineSkeleton />}
 
       {/* Timeline */}
       {!loading && !error && events.length > 0 && (
-        <div className="pl-1">
-          {events.map((event) => (
-            <TimelineEvent key={event.id} event={event} />
-          ))}
+        <>
+          <ol className="pl-1 list-none" aria-label="Medical history timeline">
+            {events.map((event) => (
+              <TimelineEvent key={event.id} event={event} />
+            ))}
+          </ol>
           <Pagination
             page={page}
             totalPages={pagination.totalPages}
             onPageChange={setPage}
           />
-        </div>
+        </>
       )}
 
       {/* Empty state */}
@@ -384,9 +374,17 @@ export default function MedicalHistory() {
               <p className="text-lg font-medium text-slate-700">No medical history found</p>
               <p className="text-sm text-slate-500 mt-1">
                 {activeFilter
-                  ? `No ${EVENT_CONFIG[activeFilter]?.label.toLowerCase() || activeFilter} records found. Try clearing the filter.`
+                  ? `No ${EVENT_CONFIG[activeFilter]?.label.toLowerCase() || activeFilter} records found.`
                   : 'Your medical timeline will appear here as records are added.'}
               </p>
+              {activeFilter && (
+                <button
+                  onClick={() => handleFilterChange(null)}
+                  className="mt-3 px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                >
+                  Clear filter
+                </button>
+              )}
             </div>
           </CardContent>
         </Card>

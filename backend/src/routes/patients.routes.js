@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAll, getById, getMe, getHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage } = require('../controllers/patients.controller');
+const { getAll, getById, getMe, getHistory, getMyHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage } = require('../controllers/patients.controller');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
 const { requirePermission } = require('../middleware/authorize');
@@ -17,6 +17,7 @@ router.use(resolveSubject);
 router.use('/:patientId/allergies', allergiesRoutes);
 
 router.get('/me', authorize('patient'), getMe);
+router.get('/me/history', authorize('patient'), getMyHistory);
 router.get('/', authorize('doctor', 'nurse', 'admin'), getAll);
 router.get('/:id', authorize('doctor', 'nurse', 'admin'), checkResourceAccess('patient'), getById);
 router.get('/:id/history', authorize('doctor', 'nurse', 'admin', 'patient'), checkResourceAccess('patient'), getHistory);
