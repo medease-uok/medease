@@ -2,6 +2,7 @@ const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
+const auditLog = require('../utils/auditLog');
 
 const mapAppointment = (row) => ({
   id: row.id,
@@ -44,6 +45,9 @@ const getAll = async (req, res, next) => {
       ORDER BY a.scheduled_at DESC`;
 
     const result = await db.query(query, params);
+
+    auditLog({ userId: req.user.id, action: 'VIEW_APPOINTMENTS', resourceType: 'appointment', ip: req.ip });
+
     res.json({ status: 'success', data: result.rows.map(mapAppointment) });
   } catch (err) {
     return next(err);
@@ -118,6 +122,8 @@ const create = async (req, res, next) => {
         referenceId: result.rows[0].id,
         referenceType: 'appointment',
       });
+
+      auditLog({ userId: req.user.id, action: 'CREATE_APPOINTMENT', resourceType: 'appointment', resourceId: result.rows[0].id, ip: req.ip, details: { patientId, doctorId } });
 
       res.status(201).json({ status: 'success', data: { id: result.rows[0].id } });
     } catch (txErr) {
@@ -221,6 +227,8 @@ const updateStatus = async (req, res, next) => {
         });
       }
     }
+
+    auditLog({ userId: req.user.id, action: 'UPDATE_APPOINTMENT_STATUS', resourceType: 'appointment', resourceId: id, ip: req.ip, details: { status, previousStatus: appt.status } });
 
     res.json({ status: 'success', data: { id: result.rows[0].id, status: result.rows[0].status } });
   } catch (err) {

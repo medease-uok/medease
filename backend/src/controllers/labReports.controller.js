@@ -2,6 +2,7 @@ const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
+const auditLog = require('../utils/auditLog');
 
 const mapReport = (row) => ({
   id: row.id,
@@ -43,6 +44,9 @@ const getAll = async (req, res, next) => {
       ORDER BY lr.report_date DESC`;
 
     const result = await db.query(query, params);
+
+    auditLog({ userId: req.user.id, action: 'VIEW_LAB_REPORTS', resourceType: 'lab_report', ip: req.ip });
+
     res.json({ status: 'success', data: result.rows.map(mapReport) });
   } catch (err) {
     return next(err);
@@ -106,6 +110,8 @@ const create = async (req, res, next) => {
       )
     ).catch((err) => console.error('Failed to notify doctors:', err.message));
 
+    auditLog({ userId: req.user.id, action: 'CREATE_LAB_REPORT', resourceType: 'lab_report', resourceId: insertResult.rows[0].id, ip: req.ip, details: { patientId, testName } });
+
     res.status(201).json({ status: 'success', data: { id: insertResult.rows[0].id } });
   } catch (err) {
     return next(err);
@@ -143,6 +149,8 @@ const update = async (req, res, next) => {
         }
       }).catch((err) => console.error('Failed to notify patient:', err.message));
     }
+
+    auditLog({ userId: req.user.id, action: 'UPDATE_LAB_REPORT', resourceType: 'lab_report', resourceId: id, ip: req.ip });
 
     res.json({ status: 'success', data: { id: report.id } });
   } catch (err) {

@@ -2,6 +2,7 @@ const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
+const auditLog = require('../utils/auditLog');
 
 const mapRecord = (row) => ({
   id: row.id,
@@ -44,6 +45,9 @@ const getAll = async (req, res, next) => {
       ORDER BY mr.created_at DESC`;
 
     const result = await db.query(query, params);
+
+    auditLog({ userId: req.user.id, action: 'VIEW_MEDICAL_RECORDS', resourceType: 'medical_record', ip: req.ip });
+
     res.json({ status: 'success', data: result.rows.map(mapRecord) });
   } catch (err) {
     return next(err);
@@ -94,6 +98,8 @@ const create = async (req, res, next) => {
       referenceId: result.rows[0].id,
       referenceType: 'medical_record',
     });
+
+    auditLog({ userId: req.user.id, action: 'CREATE_MEDICAL_RECORD', resourceType: 'medical_record', resourceId: result.rows[0].id, ip: req.ip, details: { patientId } });
 
     res.status(201).json({ status: 'success', data: { id: result.rows[0].id } });
   } catch (err) {

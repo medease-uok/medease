@@ -177,6 +177,7 @@ CREATE TABLE audit_logs (
   resource_id UUID,
   ip_address INET,
   success BOOLEAN DEFAULT true,
+  details JSONB,
   created_at TIMESTAMP DEFAULT NOW()
 );
 

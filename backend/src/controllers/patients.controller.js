@@ -1,6 +1,8 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
+const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
+const auditLog = require('../utils/auditLog');
 
 // Human-readable labels for profile change tracking
 const TRACK_FIELDS = {
@@ -39,7 +41,11 @@ const getAll = async (req, res, next) => {
     );
 
     const patients = await Promise.all(result.rows.map(mapPatient));
-    res.json({ status: 'success', data: patients });
+    const masked = maskSensitiveFields(patients, req.user.role, false);
+
+    auditLog({ userId: req.user.id, action: 'VIEW_PATIENTS_LIST', resourceType: 'patient', ip: req.ip });
+
+    res.json({ status: 'success', data: masked });
   } catch (err) {
     return next(err);
   }
@@ -61,6 +67,10 @@ const getById = async (req, res, next) => {
     }
 
     const patient = await mapPatient(patientResult.rows[0]);
+    const isOwner = req.user.id === patientResult.rows[0].user_id;
+    const maskedPatient = maskSensitiveFields(patient, req.user.role, isOwner);
+
+    auditLog({ userId: req.user.id, action: 'VIEW_PATIENT', resourceType: 'patient', resourceId: id, ip: req.ip });
 
     const [recordsResult, rxResult, labsResult, allergiesResult] = await Promise.all([
       db.query(
@@ -106,7 +116,7 @@ const getById = async (req, res, next) => {
     res.json({
       status: 'success',
       data: {
-        patient,
+        patient: maskedPatient,
         allergies: allergiesResult.rows.map(mapAllergy),
         medicalRecords: recordsResult.rows.map(mapRecord),
         prescriptions: rxResult.rows.map(mapPrescription),
@@ -221,7 +231,12 @@ const updateById = async (req, res, next) => {
 
     await client.query('COMMIT');
 
-    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+    const updated = await mapPatient(result.rows[0]);
+    const isOwner = req.user.id === result.rows[0].user_id;
+
+    auditLog({ userId: req.user.id, action: 'UPDATE_PATIENT', resourceType: 'patient', resourceId: id, ip: req.ip });
+
+    res.json({ status: 'success', data: maskSensitiveFields(updated, req.user.role, isOwner) });
   } catch (err) {
     await client.query('ROLLBACK');
     return next(err);
@@ -372,7 +387,9 @@ const uploadProfileImage = async (req, res, next) => {
       [id]
     );
 
-    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+    const mapped = await mapPatient(result.rows[0]);
+    const isOwner = req.user.id === result.rows[0].user_id;
+    res.json({ status: 'success', data: maskSensitiveFields(mapped, req.user.role, isOwner) });
   } catch (err) {
     return next(err);
   }
@@ -407,7 +424,9 @@ const deleteProfileImage = async (req, res, next) => {
       [id]
     );
 
-    res.json({ status: 'success', data: await mapPatient(result.rows[0]) });
+    const mapped2 = await mapPatient(result.rows[0]);
+    const isOwner2 = req.user.id === result.rows[0].user_id;
+    res.json({ status: 'success', data: maskSensitiveFields(mapped2, req.user.role, isOwner2) });
   } catch (err) {
     return next(err);
   }
@@ -457,6 +476,8 @@ const getPrescriptions = async (req, res, next) => {
     );
 
     const prescriptions = dataResult.rows.map(mapPrescription);
+
+    auditLog({ userId: req.user.id, action: 'VIEW_PATIENT_PRESCRIPTIONS', resourceType: 'patient', resourceId: id, ip: req.ip });
 
     res.json({
       status: 'success',
@@ -577,6 +598,8 @@ const getHistory = async (req, res, next) => {
       eventDate: row.event_date,
       ...row.details,
     }));
+
+    auditLog({ userId: req.user.id, action: 'VIEW_PATIENT_HISTORY', resourceType: 'patient', resourceId: id, ip: req.ip });
 
     res.json({
       status: 'success',
