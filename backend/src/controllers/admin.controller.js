@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/auditLog');
+const { createNotification } = require('./notifications.controller');
 
 const getUsers = async (req, res, next) => {
   try {
@@ -59,6 +60,14 @@ const approveUser = async (req, res, next) => {
       resourceType: 'user',
       resourceId: id,
       ip: req.ip,
+    });
+
+    const approved = result.rows[0];
+    await createNotification({
+      recipientId: id,
+      type: 'system',
+      title: 'Account Approved',
+      message: `Welcome to MedEase, ${approved.first_name}! Your account has been approved.`,
     });
 
     res.json({ status: 'success', message: 'User approved successfully.' });

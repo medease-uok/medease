@@ -12,6 +12,7 @@ const rolesRoutes = require('./roles.routes');
 const abacRoutes = require('./abac.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const profileRoutes = require('./profile.routes');
+const notificationRoutes = require('./notifications.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -33,5 +34,6 @@ router.use('/roles', rolesRoutes);
 router.use('/abac-policies', abacRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/profile', profileRoutes);
+router.use('/notifications', notificationRoutes);
 
 module.exports = router;
