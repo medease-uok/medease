@@ -17,6 +17,7 @@ import Prescriptions from './pages/Prescriptions';
 import LabReports from './pages/LabReports';
 import PermissionManagement from './pages/PermissionManagement';
 import PatientDashboard from './pages/PatientDashboard';
+import MedicalHistory from './pages/MedicalHistory';
 import './App.css';
 
 const R = ({ roles, children }) => <RoleGuard roles={roles}>{children}</RoleGuard>;
@@ -45,6 +46,7 @@ function App() {
             <Route path="doctors" element={<R roles={[ROLES.PATIENT, ROLES.ADMIN]}><Doctors /></R>} />
             <Route path="doctors/:id" element={<R roles={[ROLES.PATIENT, ROLES.ADMIN]}><DoctorDetail /></R>} />
             <Route path="appointments" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><Appointments /></R>} />
+            <Route path="medical-history" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><MedicalHistory /></R>} />
             <Route path="medical-records" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><MedicalRecords /></R>} />
             <Route path="prescriptions" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN]}><Prescriptions /></R>} />
             <Route path="lab-reports" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN]}><LabReports /></R>} />

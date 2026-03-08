@@ -588,4 +588,20 @@ const getHistory = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, getMe, getHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage };
+const getMyHistory = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      'SELECT id FROM patients WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (result.rows.length === 0) {
+      throw new AppError('Patient profile not found.', 404);
+    }
+    req.params.id = result.rows[0].id;
+    return getHistory(req, res, next);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, getMe, getHistory, getMyHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage };
