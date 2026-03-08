@@ -58,7 +58,6 @@ const create = async (req, res, next) => {
   try {
     const { doctorId, scheduledAt, notes } = req.body;
 
-    // Resolve patient ID: patients book for themselves, staff specify patientId
     let patientId = req.body.patientId;
     if (req.user.role === 'patient') {
       if (!req.user.patientId) throw new AppError('Patient profile not found.', 404);
@@ -70,7 +69,6 @@ const create = async (req, res, next) => {
       throw new AppError('patientId, doctorId, and scheduledAt are required.', 400);
     }
 
-    // Verify doctor and patient exist in parallel
     const [doctorCheck, patientCheck] = await Promise.all([
       db.query(
         `SELECT d.id, u.id AS user_id, u.first_name, u.last_name
@@ -88,7 +86,6 @@ const create = async (req, res, next) => {
     const doctor = doctorCheck.rows[0];
     const patient = patientCheck.rows[0];
 
-    // Use transaction for insert + notifications
     const client = await db.getClient();
     try {
       await client.query('BEGIN');
@@ -105,7 +102,6 @@ const create = async (req, res, next) => {
         month: 'short', day: 'numeric', year: 'numeric',
       });
 
-      // Fire-and-forget notifications (already swallows errors internally)
       createNotification({
         recipientId: patient.user_id,
         type: 'appointment_scheduled',
@@ -147,7 +143,6 @@ const updateStatus = async (req, res, next) => {
       throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400);
     }
 
-    // Fetch appointment first to verify ownership
     const existing = await db.query(
       `SELECT a.id, a.patient_id, a.doctor_id, a.status,
               p.user_id AS patient_user_id, d.user_id AS doctor_user_id
@@ -160,14 +155,12 @@ const updateStatus = async (req, res, next) => {
     if (existing.rows.length === 0) throw new AppError('Appointment not found.', 404);
     const appt = existing.rows[0];
 
-    // Ownership check: only the patient, doctor, or admin can update
     const userId = req.user.id;
     const isOwner = userId === appt.patient_user_id || userId === appt.doctor_user_id;
     if (!isOwner && req.user.role !== 'admin') {
       throw new AppError('You do not have permission to update this appointment.', 403);
     }
 
-    // Patients can only cancel their own appointments
     if (req.user.role === 'patient' && status !== 'cancelled') {
       throw new AppError('Patients can only cancel appointments.', 403);
     }
@@ -179,7 +172,6 @@ const updateStatus = async (req, res, next) => {
       [status, id]
     );
 
-    // Get names for notifications (parallel)
     const [patientInfo, doctorInfo] = await Promise.all([
       db.query(
         `SELECT u.id AS user_id, u.first_name FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,

@@ -3,8 +3,6 @@ const redis = require('../config/redis');
 
 const CACHE_TTL = 300; // 5 minutes
 
-// Fallback when RBAC tables don't exist yet.
-// Mirrors database/init/02-roles-permissions.sql assignments.
 const ROLE_PERMISSIONS_FALLBACK = {
   admin: [
     'view_patients', 'view_own_profile', 'edit_own_profile', 'edit_patient',

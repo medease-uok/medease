@@ -65,7 +65,6 @@ const create = async (req, res, next) => {
     const doctorId = req.user.doctorId;
     if (!doctorId) throw new AppError('Only doctors can create medical records.', 403);
 
-    // Verify patient and get doctor name in parallel
     const [patientCheck, doctorInfo] = await Promise.all([
       db.query(
         `SELECT p.id, u.id AS user_id, u.first_name, u.last_name
@@ -89,7 +88,6 @@ const create = async (req, res, next) => {
       [patientId, doctorId, diagnosis, treatment || null, notes || null]
     );
 
-    // Fire-and-forget notification
     createNotification({
       recipientId: patient.user_id,
       type: 'medical_record_created',

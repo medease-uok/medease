@@ -77,7 +77,6 @@ const create = async (req, res, next) => {
       [patientId, technicianId, testName, testResult || null, notes || null]
     );
 
-    // Fire-and-forget: notify patient
     createNotification({
       recipientId: patient.user_id,
       type: 'lab_report_ready',
@@ -87,7 +86,6 @@ const create = async (req, res, next) => {
       referenceType: 'lab_report',
     });
 
-    // Notify the patient's doctors in parallel (fire-and-forget)
     db.query(
       `SELECT DISTINCT u.id AS user_id
        FROM appointments a
@@ -131,7 +129,6 @@ const update = async (req, res, next) => {
     if (result.rows.length === 0) throw new AppError('Lab report not found.', 404);
     const report = result.rows[0];
 
-    // Fire-and-forget: notify patient that results were updated
     if (testResult) {
       db.query(
         `SELECT u.id AS user_id FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,

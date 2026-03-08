@@ -14,7 +14,7 @@ const getAll = async (req, res, next) => {
     );
 
     const doctors = result.rows.map(mapDoctor);
-    const isOwner = false; // list view is never self
+    const isOwner = false;
     res.json({ status: 'success', data: maskSensitiveFields(doctors, req.user.role, isOwner) });
   } catch (err) {
     return next(err);

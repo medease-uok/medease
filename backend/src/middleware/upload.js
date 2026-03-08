@@ -10,6 +10,12 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const PRESIGNED_URL_EXPIRY = 3600;
 
+const S3_REQUIRED = ['bucket', 'region', 'accessKeyId', 'secretAccessKey'];
+const missingS3 = S3_REQUIRED.filter((k) => !config.s3[k]);
+if (missingS3.length > 0 && process.env.NODE_ENV !== 'test') {
+  console.warn(`Warning: Missing S3 config (${missingS3.join(', ')}). Profile image uploads will fail.`);
+}
+
 const s3 = new S3Client({
   region: config.s3.region,
   credentials: {

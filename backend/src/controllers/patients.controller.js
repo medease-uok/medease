@@ -4,7 +4,6 @@ const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middlewar
 const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
 const auditLog = require('../utils/auditLog');
 
-// Human-readable labels for profile change tracking
 const TRACK_FIELDS = {
   first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
   date_of_birth: 'Date of Birth', gender: 'Gender', blood_type: 'Blood Type',
@@ -16,7 +15,6 @@ const TRACK_FIELDS = {
   insurance_expiry_date: 'Insurance Expiry',
 };
 
-/** Safely convert a DB value to a comparable string. */
 function toStr(val) {
   if (val === null || val === undefined) return '';
   if (Array.isArray(val)) return [...val].sort().join(', ');
@@ -55,8 +53,6 @@ const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // req.resource is set by checkResourceAccess('patient') middleware
-    // which already verified ABAC access — just fetch full details
     const patientResult = await db.query(
       `${PATIENT_SELECT} WHERE p.id = $1`,
       [id]
@@ -183,7 +179,6 @@ const updateById = async (req, res, next) => {
 
     await client.query('BEGIN');
 
-    // Snapshot old values before update
     const oldResult = await client.query(
       `${PATIENT_SELECT} WHERE p.id = $1 FOR UPDATE`,
       [id]
@@ -216,7 +211,6 @@ const updateById = async (req, res, next) => {
     );
     const newRow = result.rows[0];
 
-    // Log changed fields to profile_change_history
     for (const [col, label] of Object.entries(TRACK_FIELDS)) {
       const oldStr = toStr(oldRow[col]);
       const newStr = toStr(newRow[col]);
@@ -362,7 +356,6 @@ const uploadProfileImage = async (req, res, next) => {
       return next(new AppError('No image file provided.', 400));
     }
 
-    // Get current image URL for cleanup
     const current = await db.query(
       'SELECT profile_image_url FROM patients WHERE id = $1',
       [id]
@@ -379,7 +372,6 @@ const uploadProfileImage = async (req, res, next) => {
       [newKey, id]
     );
 
-    // Clean up old image (best-effort)
     deleteFromS3(oldKey);
 
     const result = await db.query(
@@ -440,7 +432,6 @@ const getPrescriptions = async (req, res, next) => {
     const offset = (page - 1) * limit;
     const status = req.query.status;
 
-    // Verify patient exists
     const patientCheck = await db.query('SELECT id FROM patients WHERE id = $1', [id]);
     if (patientCheck.rows.length === 0) {
       throw new AppError('Patient not found.', 404);
@@ -454,8 +445,6 @@ const getPrescriptions = async (req, res, next) => {
       whereClause += ` AND rx.status = $${params.length}`;
     }
 
-    // NOTE: whereClause is shared between countQuery and dataQuery.
-    // Any changes to filters must be reflected in both.
     const countResult = await db.query(
       `SELECT COUNT(*) FROM prescriptions rx ${whereClause}`,
       params
@@ -495,15 +484,13 @@ const getHistory = async (req, res, next) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 20), 100);
     const offset = (page - 1) * limit;
-    const type = req.query.type; // optional filter: 'visit', 'diagnosis', 'prescription', 'lab'
+    const type = req.query.type;
 
-    // Verify patient exists
     const patientCheck = await db.query('SELECT id FROM patients WHERE id = $1', [id]);
     if (patientCheck.rows.length === 0) {
       throw new AppError('Patient not found.', 404);
     }
 
-    // Build a UNION ALL of all history event types, each tagged with its type
     const typeClauses = [];
     const typeParams = [id];
 
@@ -577,14 +564,12 @@ const getHistory = async (req, res, next) => {
 
     const unionQuery = typeClauses.join(' UNION ALL ');
 
-    // Get total count
     const countResult = await db.query(
       `SELECT COUNT(*) FROM (${unionQuery}) AS history`,
       typeParams
     );
     const total = parseInt(countResult.rows[0].count);
 
-    // Get paginated results
     const dataResult = await db.query(
       `SELECT * FROM (${unionQuery}) AS history
        ORDER BY event_date DESC
