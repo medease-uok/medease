@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   Pill, AlertCircle, Search, Clock, User, Stethoscope,
 } from 'lucide-react';
@@ -15,15 +15,25 @@ const STATUS_STYLES = {
   cancelled: { variant: 'destructive', label: 'Cancelled' },
 };
 
+const SKELETON_COUNT = 6;
+
 const formatDate = (iso) => {
   if (!iso) return '-';
-  return new Date(iso).toLocaleDateString('en-US', {
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
 };
 
+const matchesSearch = (rx, query) => {
+  const q = query.toLowerCase();
+  return ['medication', 'doctorName', 'patientName', 'dosage']
+    .some((field) => rx[field]?.toLowerCase().includes(q));
+};
+
 function PrescriptionCard({ rx, showPatient }) {
-  const style = STATUS_STYLES[rx.status] || STATUS_STYLES.active;
+  const style = STATUS_STYLES[rx.status] ?? { variant: 'outline', label: rx.status ?? 'Unknown' };
 
   return (
     <div className="group relative rounded-xl border border-slate-200 bg-white p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200">
@@ -72,7 +82,7 @@ function PrescriptionCard({ rx, showPatient }) {
 function ListSkeleton() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
         <div key={i} className="rounded-xl border border-slate-200 p-5 animate-pulse">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-slate-200" />
@@ -99,32 +109,42 @@ export default function Prescriptions() {
   const [error, setError] = useState(null);
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
+  const deferredSearch = useDeferredValue(search);
 
-  useEffect(() => {
+  const fetchPrescriptions = useCallback(() => {
+    setLoading(true);
+    setError(null);
     api.get('/prescriptions')
       .then((res) => setPrescriptions(res.data || []))
       .catch(() => setError('Failed to load prescriptions.'))
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = prescriptions.filter((rx) => {
-    if (filter !== 'all' && rx.status !== filter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        rx.medication?.toLowerCase().includes(q) ||
-        rx.doctorName?.toLowerCase().includes(q) ||
-        rx.patientName?.toLowerCase().includes(q) ||
-        rx.dosage?.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.get('/prescriptions')
+      .then((res) => { if (!cancelled) setPrescriptions(res.data || []); })
+      .catch(() => { if (!cancelled) setError('Failed to load prescriptions.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
-  const statusCounts = prescriptions.reduce((acc, rx) => {
-    acc[rx.status] = (acc[rx.status] || 0) + 1;
-    return acc;
-  }, {});
+  const filtered = useMemo(
+    () => prescriptions.filter((rx) =>
+      (filter === 'all' || rx.status === filter) &&
+      (!deferredSearch || matchesSearch(rx, deferredSearch))
+    ),
+    [prescriptions, filter, deferredSearch],
+  );
+
+  const statusCounts = useMemo(
+    () => prescriptions.reduce((acc, rx) => {
+      acc[rx.status] = (acc[rx.status] || 0) + 1;
+      return acc;
+    }, {}),
+    [prescriptions],
+  );
 
   return (
     <div className="space-y-6">
@@ -141,12 +161,14 @@ export default function Prescriptions() {
 
       {/* Filters and search */}
       <Card>
-        <CardContent className="py-4 pt-4">
+        <CardContent className="py-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+              <label htmlFor="rx-search" className="sr-only">Search prescriptions</label>
               <input
-                type="text"
+                id="rx-search"
+                type="search"
                 placeholder="Search medications, doctors..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -157,7 +179,7 @@ export default function Prescriptions() {
               <button
                 onClick={() => setFilter('all')}
                 aria-pressed={filter === 'all'}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   filter === 'all'
                     ? 'bg-primary text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -172,7 +194,7 @@ export default function Prescriptions() {
                     key={s}
                     onClick={() => setFilter(s)}
                     aria-pressed={filter === s}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                       filter === s
                         ? 'bg-primary text-white shadow-sm'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -193,7 +215,7 @@ export default function Prescriptions() {
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
           <p className="text-sm text-red-700">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={fetchPrescriptions}
             className="ml-auto px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
           >
             Retry
@@ -202,15 +224,15 @@ export default function Prescriptions() {
       )}
 
       {/* Loading */}
-      {loading && <ListSkeleton />}
+      {loading && !error && <ListSkeleton />}
 
       {/* Results count */}
       {!loading && !error && (
-        <p className="text-sm text-slate-500">
+        <output aria-live="polite" className="block text-sm text-slate-500">
           {filtered.length} {filtered.length === 1 ? 'prescription' : 'prescriptions'}
           {filter !== 'all' && ` (${STATUS_STYLES[filter]?.label || filter})`}
           {search && ` matching "${search}"`}
-        </p>
+        </output>
       )}
 
       {/* Prescription cards */}
