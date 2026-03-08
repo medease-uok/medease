@@ -192,6 +192,7 @@ GET /patients/{id}/prescriptions?page=1&limit=20&status=active
 }
 ```
 
+
 ---
 
 # 4️⃣ Doctor Service 👨‍⚕️

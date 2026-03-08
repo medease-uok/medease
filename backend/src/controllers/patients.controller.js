@@ -466,6 +466,7 @@ const getPrescriptions = async (req, res, next) => {
   }
 };
 
+
 const getHistory = async (req, res, next) => {
   try {
     const { id } = req.params;
