@@ -10,13 +10,15 @@ import {
   Pill,
   FlaskConical,
   Activity,
-  Shield
+  Shield,
+  ClipboardList,
 } from 'lucide-react';
 
 
 const navConfig = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ROLE_GROUPS.STAFF },
   { path: '/my-health', label: 'My Health', icon: Activity, roles: ROLE_GROUPS.PATIENT_ONLY },
+  { path: '/medical-history', label: 'Medical History', icon: ClipboardList, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/patients', label: 'Patients', icon: Users, roles: ROLE_GROUPS.CLINICAL },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: [ROLES.PATIENT, ROLES.ADMIN] },
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.PATIENT_CARE },

@@ -8,6 +8,7 @@ const pageTitles = {
   '/patients': 'Patients',
   '/doctors': 'Doctors',
   '/appointments': 'Appointments',
+  '/medical-history': 'Medical History',
   '/medical-records': 'Medical Records',
   '/prescriptions': 'Prescriptions',
   '/lab-reports': 'Lab Reports',
