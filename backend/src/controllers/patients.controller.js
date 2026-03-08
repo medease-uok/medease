@@ -41,7 +41,7 @@ const getAll = async (req, res, next) => {
     const patients = await Promise.all(result.rows.map(mapPatient));
     const masked = maskSensitiveFields(patients, req.user.role, false);
 
-    auditLog({ userId: req.user.id, action: 'VIEW_PATIENTS_LIST', resourceType: 'patient', ip: req.ip });
+    await auditLog({ userId: req.user.id, action: 'VIEW_PATIENTS_LIST', resourceType: 'patient', ip: req.ip });
 
     res.json({ status: 'success', data: masked });
   } catch (err) {
@@ -66,7 +66,7 @@ const getById = async (req, res, next) => {
     const isOwner = req.user.id === patientResult.rows[0].user_id;
     const maskedPatient = maskSensitiveFields(patient, req.user.role, isOwner);
 
-    auditLog({ userId: req.user.id, action: 'VIEW_PATIENT', resourceType: 'patient', resourceId: id, ip: req.ip });
+    await auditLog({ userId: req.user.id, action: 'VIEW_PATIENT', resourceType: 'patient', resourceId: id, ip: req.ip });
 
     const [recordsResult, rxResult, labsResult, allergiesResult] = await Promise.all([
       db.query(
@@ -228,7 +228,7 @@ const updateById = async (req, res, next) => {
     const updated = await mapPatient(result.rows[0]);
     const isOwner = req.user.id === result.rows[0].user_id;
 
-    auditLog({ userId: req.user.id, action: 'UPDATE_PATIENT', resourceType: 'patient', resourceId: id, ip: req.ip });
+    await auditLog({ userId: req.user.id, action: 'UPDATE_PATIENT', resourceType: 'patient', resourceId: id, ip: req.ip });
 
     res.json({ status: 'success', data: maskSensitiveFields(updated, req.user.role, isOwner) });
   } catch (err) {
@@ -466,7 +466,7 @@ const getPrescriptions = async (req, res, next) => {
 
     const prescriptions = dataResult.rows.map(mapPrescription);
 
-    auditLog({ userId: req.user.id, action: 'VIEW_PATIENT_PRESCRIPTIONS', resourceType: 'patient', resourceId: id, ip: req.ip });
+    await auditLog({ userId: req.user.id, action: 'VIEW_PATIENT_PRESCRIPTIONS', resourceType: 'patient', resourceId: id, ip: req.ip });
 
     res.json({
       status: 'success',
@@ -584,7 +584,7 @@ const getHistory = async (req, res, next) => {
       ...row.details,
     }));
 
-    auditLog({ userId: req.user.id, action: 'VIEW_PATIENT_HISTORY', resourceType: 'patient', resourceId: id, ip: req.ip });
+    await auditLog({ userId: req.user.id, action: 'VIEW_PATIENT_HISTORY', resourceType: 'patient', resourceId: id, ip: req.ip });
 
     res.json({
       status: 'success',

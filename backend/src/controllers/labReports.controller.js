@@ -45,7 +45,7 @@ const getAll = async (req, res, next) => {
 
     const result = await db.query(query, params);
 
-    auditLog({ userId: req.user.id, action: 'VIEW_LAB_REPORTS', resourceType: 'lab_report', ip: req.ip });
+    await auditLog({ userId: req.user.id, action: 'VIEW_LAB_REPORTS', resourceType: 'lab_report', ip: req.ip });
 
     res.json({ status: 'success', data: result.rows.map(mapReport) });
   } catch (err) {
@@ -108,7 +108,7 @@ const create = async (req, res, next) => {
       )
     ).catch((err) => console.error('Failed to notify doctors:', err.message));
 
-    auditLog({ userId: req.user.id, action: 'CREATE_LAB_REPORT', resourceType: 'lab_report', resourceId: insertResult.rows[0].id, ip: req.ip, details: { patientId, testName } });
+    await auditLog({ userId: req.user.id, action: 'CREATE_LAB_REPORT', resourceType: 'lab_report', resourceId: insertResult.rows[0].id, ip: req.ip, details: { patientId, testName } });
 
     res.status(201).json({ status: 'success', data: { id: insertResult.rows[0].id } });
   } catch (err) {
@@ -147,7 +147,7 @@ const update = async (req, res, next) => {
       }).catch((err) => console.error('Failed to notify patient:', err.message));
     }
 
-    auditLog({ userId: req.user.id, action: 'UPDATE_LAB_REPORT', resourceType: 'lab_report', resourceId: id, ip: req.ip });
+    await auditLog({ userId: req.user.id, action: 'UPDATE_LAB_REPORT', resourceType: 'lab_report', resourceId: id, ip: req.ip });
 
     res.json({ status: 'success', data: { id: report.id } });
   } catch (err) {

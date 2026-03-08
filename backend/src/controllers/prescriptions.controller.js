@@ -51,7 +51,7 @@ const getAll = async (req, res, next) => {
 
     const result = await db.query(query, params);
 
-    auditLog({ userId: req.user.id, action: 'VIEW_PRESCRIPTIONS', resourceType: 'prescription', ip: req.ip });
+    await auditLog({ userId: req.user.id, action: 'VIEW_PRESCRIPTIONS', resourceType: 'prescription', ip: req.ip });
 
     res.json({ status: 'success', data: result.rows.map(mapPrescription) });
   } catch (err) {
@@ -102,7 +102,7 @@ const create = async (req, res, next) => {
       referenceType: 'prescription',
     });
 
-    auditLog({ userId: req.user.id, action: 'CREATE_PRESCRIPTION', resourceType: 'prescription', resourceId: result.rows[0].id, ip: req.ip, details: { patientId, medication } });
+    await auditLog({ userId: req.user.id, action: 'CREATE_PRESCRIPTION', resourceType: 'prescription', resourceId: result.rows[0].id, ip: req.ip, details: { patientId, medication } });
 
     res.status(201).json({ status: 'success', data: { id: result.rows[0].id } });
   } catch (err) {
@@ -162,7 +162,7 @@ const updateStatus = async (req, res, next) => {
       });
     }
 
-    auditLog({ userId: req.user.id, action: 'UPDATE_PRESCRIPTION_STATUS', resourceType: 'prescription', resourceId: id, ip: req.ip, details: { status, medication: rx.medication } });
+    await auditLog({ userId: req.user.id, action: 'UPDATE_PRESCRIPTION_STATUS', resourceType: 'prescription', resourceId: id, ip: req.ip, details: { status, medication: rx.medication } });
 
     res.json({ status: 'success', data: { id: result.rows[0].id, status: result.rows[0].status } });
   } catch (err) {

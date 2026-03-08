@@ -46,7 +46,7 @@ const getAll = async (req, res, next) => {
 
     const result = await db.query(query, params);
 
-    auditLog({ userId: req.user.id, action: 'VIEW_MEDICAL_RECORDS', resourceType: 'medical_record', ip: req.ip });
+    await auditLog({ userId: req.user.id, action: 'VIEW_MEDICAL_RECORDS', resourceType: 'medical_record', ip: req.ip });
 
     res.json({ status: 'success', data: result.rows.map(mapRecord) });
   } catch (err) {
@@ -97,7 +97,7 @@ const create = async (req, res, next) => {
       referenceType: 'medical_record',
     });
 
-    auditLog({ userId: req.user.id, action: 'CREATE_MEDICAL_RECORD', resourceType: 'medical_record', resourceId: result.rows[0].id, ip: req.ip, details: { patientId } });
+    await auditLog({ userId: req.user.id, action: 'CREATE_MEDICAL_RECORD', resourceType: 'medical_record', resourceId: result.rows[0].id, ip: req.ip, details: { patientId } });
 
     res.status(201).json({ status: 'success', data: { id: result.rows[0].id } });
   } catch (err) {
