@@ -153,6 +153,7 @@ export default function DashboardEnhanced() {
   const [auditLogs, setAuditLogs] = useState([]);
   const [profileChanges, setProfileChanges] = useState([]);
   const [adminLoading, setAdminLoading] = useState(true);
+  const [adminError, setAdminError] = useState('');
   const [adminSearch, setAdminSearch] = useState('');
 
   useEffect(() => {
@@ -202,7 +203,10 @@ export default function DashboardEnhanced() {
         setAuditLogs(logsRes.data);
         setProfileChanges(changesRes.data);
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        setAdminError('Failed to load admin data. Please refresh the page.');
+      })
       .finally(() => setAdminLoading(false));
   }, [isAdmin]);
 
@@ -377,6 +381,10 @@ export default function DashboardEnhanced() {
             {adminLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : adminError ? (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {adminError}
               </div>
             ) : (
               <div className="space-y-6">
@@ -555,7 +563,7 @@ export default function DashboardEnhanced() {
                       <TableBody>
                         {filteredChanges.length > 0 ? (
                           filteredChanges.map((change, idx) => (
-                            <TableRow key={change.id || idx}>
+                            <TableRow key={change.id}>
                               <TableCell className="font-medium">{change.patientName}</TableCell>
                               <TableCell>
                                 <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded font-medium">

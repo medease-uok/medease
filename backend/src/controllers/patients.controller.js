@@ -2,6 +2,26 @@ const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
 
+// Human-readable labels for profile change tracking
+const TRACK_FIELDS = {
+  first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
+  date_of_birth: 'Date of Birth', gender: 'Gender', blood_type: 'Blood Type',
+  organ_donor: 'Organ Donor', organ_donor_card_no: 'Donor Card No.',
+  organs_to_donate: 'Organs to Donate', address: 'Address',
+  emergency_contact: 'Emergency Contact', emergency_relationship: 'Emergency Relationship',
+  emergency_phone: 'Emergency Phone', insurance_provider: 'Insurance Provider',
+  insurance_policy_number: 'Policy Number', insurance_plan_type: 'Plan Type',
+  insurance_expiry_date: 'Insurance Expiry',
+};
+
+/** Safely convert a DB value to a comparable string. */
+function toStr(val) {
+  if (val === null || val === undefined) return '';
+  if (Array.isArray(val)) return [...val].sort().join(', ');
+  if (val instanceof Date) return val.toISOString().slice(0, 10);
+  return String(val);
+}
+
 const PATIENT_SELECT = `
   SELECT p.id, p.user_id, u.first_name, u.last_name, u.email, u.phone,
          p.date_of_birth, p.gender, p.blood_type, p.organ_donor, p.organ_donor_card_no, p.organs_to_donate, p.address, p.profile_image_url,
@@ -187,22 +207,9 @@ const updateById = async (req, res, next) => {
     const newRow = result.rows[0];
 
     // Log changed fields to profile_change_history
-    const trackFields = {
-      first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
-      date_of_birth: 'Date of Birth', gender: 'Gender', blood_type: 'Blood Type',
-      organ_donor: 'Organ Donor', organ_donor_card_no: 'Donor Card No.',
-      organs_to_donate: 'Organs to Donate', address: 'Address',
-      emergency_contact: 'Emergency Contact', emergency_relationship: 'Emergency Relationship',
-      emergency_phone: 'Emergency Phone', insurance_provider: 'Insurance Provider',
-      insurance_policy_number: 'Policy Number', insurance_plan_type: 'Plan Type',
-      insurance_expiry_date: 'Insurance Expiry',
-    };
-
-    for (const [col, label] of Object.entries(trackFields)) {
-      const oldVal = oldRow[col];
-      const newVal = newRow[col];
-      const oldStr = Array.isArray(oldVal) ? oldVal.join(', ') : String(oldVal ?? '');
-      const newStr = Array.isArray(newVal) ? newVal.join(', ') : String(newVal ?? '');
+    for (const [col, label] of Object.entries(TRACK_FIELDS)) {
+      const oldStr = toStr(oldRow[col]);
+      const newStr = toStr(newRow[col]);
       if (oldStr !== newStr) {
         await client.query(
           `INSERT INTO profile_change_history (patient_id, changed_by, field_name, old_value, new_value)
