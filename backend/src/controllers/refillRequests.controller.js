@@ -3,33 +3,10 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
+const { parseDurationToDays, isRefillEligible, REFILL_ELIGIBILITY_THRESHOLD } = require('../utils/refillEligibility');
 
-function parseDurationToDays(duration) {
-  if (!duration) return null;
-  const lower = duration.toLowerCase().trim();
-  if (lower === 'ongoing') return null;
-
-  const match = lower.match(/^(\d+)\s*(day|week|month|year)s?$/);
-  if (!match) return null;
-
-  const num = parseInt(match[1], 10);
-  switch (match[2]) {
-    case 'day': return num;
-    case 'week': return num * 7;
-    case 'month': return num * 30;
-    case 'year': return num * 365;
-    default: return null;
-  }
-}
-
-function isRefillEligible(createdAt, duration) {
-  const days = parseDurationToDays(duration);
-  if (days === null) return true;
-
-  const prescribed = new Date(createdAt).getTime();
-  const twoThirds = prescribed + (days * (2 / 3)) * 24 * 60 * 60 * 1000;
-  return Date.now() >= twoThirds;
-}
+const MAX_REASON_LENGTH = 500;
+const MAX_NOTE_LENGTH = 500;
 
 const mapRefillRequest = (row) => ({
   id: row.id,
@@ -97,6 +74,10 @@ const create = async (req, res, next) => {
       throw new AppError('prescriptionId is required.', 400);
     }
 
+    if (reason && reason.length > MAX_REASON_LENGTH) {
+      throw new AppError(`Reason must be ${MAX_REASON_LENGTH} characters or fewer.`, 400);
+    }
+
     const patientId = req.user.patientId;
     if (!patientId) throw new AppError('Only patients can request refills.', 403);
 
@@ -118,7 +99,7 @@ const create = async (req, res, next) => {
 
     if (!isRefillEligible(rx.created_at, rx.duration)) {
       const days = parseDurationToDays(rx.duration);
-      const eligibleDays = Math.ceil(days * (2 / 3));
+      const eligibleDays = Math.ceil(days * REFILL_ELIGIBILITY_THRESHOLD);
       throw new AppError(
         `Refill requests are available after ${eligibleDays} days of a ${rx.duration} prescription.`,
         400
@@ -184,6 +165,10 @@ const respond = async (req, res, next) => {
       throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400);
     }
 
+    if (doctorNote && doctorNote.length > MAX_NOTE_LENGTH) {
+      throw new AppError(`Note must be ${MAX_NOTE_LENGTH} characters or fewer.`, 400);
+    }
+
     const existing = await db.query(
       `SELECT rr.id, rr.prescription_id, rr.patient_id, rr.doctor_id, rr.status,
               rx.medication, rx.dosage, rx.frequency, rx.duration,
@@ -207,20 +192,45 @@ const respond = async (req, res, next) => {
       throw new AppError('Only the prescribing doctor or an admin can respond to this request.', 403);
     }
 
-    await db.query(
-      `UPDATE prescription_refill_requests SET status = $1, doctor_note = $2, responded_at = NOW() WHERE id = $3`,
-      [status, doctorNote || null, id]
-    );
-
+    const client = await db.pool.connect();
     let newPrescriptionId = null;
-    if (status === 'approved') {
-      const doctorId = req.user.doctorId || rr.doctor_id;
-      const newRx = await db.query(
-        `INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [rr.patient_id, doctorId, rr.medication, rr.dosage, rr.frequency, rr.duration]
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE prescription_refill_requests SET status = $1, doctor_note = $2, responded_at = NOW() WHERE id = $3`,
+        [status, doctorNote || null, id]
       );
-      newPrescriptionId = newRx.rows[0].id;
+
+      if (status === 'approved') {
+        await client.query(
+          `UPDATE prescriptions SET status = 'expired' WHERE id = $1 AND status = 'active'`,
+          [rr.prescription_id]
+        );
+
+        const newRx = await client.query(
+          `INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+          [rr.patient_id, rr.doctor_id, rr.medication, rr.dosage, rr.frequency, rr.duration]
+        );
+        newPrescriptionId = newRx.rows[0].id;
+      }
+
+      await auditLog({
+        userId: req.user.id,
+        action: 'RESPOND_REFILL_REQUEST',
+        resourceType: 'refill_request',
+        resourceId: id,
+        ip: req.ip,
+        details: { status, medication: rr.medication },
+      });
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
 
     const patient = await db.query(
@@ -261,19 +271,10 @@ const respond = async (req, res, next) => {
       }
     }
 
-    await auditLog({
-      userId: req.user.id,
-      action: 'RESPOND_REFILL_REQUEST',
-      resourceType: 'refill_request',
-      resourceId: id,
-      ip: req.ip,
-      details: { status, medication: rr.medication },
-    });
-
     res.json({ status: 'success', data: { id, status } });
   } catch (err) {
     return next(err);
   }
 };
 
-module.exports = { getAll, create, respond, parseDurationToDays, isRefillEligible };
+module.exports = { getAll, create, respond };

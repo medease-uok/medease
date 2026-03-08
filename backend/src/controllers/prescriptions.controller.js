@@ -3,7 +3,7 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
-const { isRefillEligible } = require('./refillRequests.controller');
+const { isRefillEligible } = require('../utils/refillEligibility');
 
 const mapPrescription = (row) => ({
   id: row.id,
@@ -17,7 +17,6 @@ const mapPrescription = (row) => ({
   duration: row.duration,
   status: row.status,
   createdAt: row.created_at,
-  refillEligible: row.refill_eligible ?? false,
   pendingRefill: row.pending_refill ?? false,
 });
 

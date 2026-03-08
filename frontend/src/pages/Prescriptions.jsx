@@ -107,10 +107,12 @@ function RefillModal({ rx, onClose, onSuccess }) {
             onChange={(e) => setReason(e.target.value)}
             placeholder="e.g. Running low on medication..."
             rows={3}
+            maxLength={500}
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors resize-none"
           />
+          <p className="text-xs text-slate-400 mt-1 text-right">{reason.length}/500</p>
 
-          <div className="flex justify-end gap-2 mt-4">
+          <div className="flex justify-end gap-2 mt-3">
             <button
               type="button"
               onClick={onClose}
@@ -197,10 +199,12 @@ function RespondModal({ request: rr, onClose, onSuccess }) {
             onChange={(e) => setDoctorNote(e.target.value)}
             placeholder="Add a note for the patient..."
             rows={3}
+            maxLength={500}
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors resize-none"
           />
+          <p className="text-xs text-slate-400 mt-1 text-right">{doctorNote.length}/500</p>
 
-          <div className="flex justify-end gap-2 mt-4">
+          <div className="flex justify-end gap-2 mt-3">
             <button
               type="button"
               onClick={onClose}
