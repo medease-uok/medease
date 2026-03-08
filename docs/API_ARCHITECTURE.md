@@ -78,8 +78,7 @@ Manages patient profiles and medical history.
 | PUT | /patients/{id} | Full update | Patient |
 | PATCH | /patients/{id} | Partial update | Patient |
 | GET | /patients | List patients | Admin |
-| GET | /patients/{id}/medical-history | View history | Patient/Doctor |
-| POST | /patients/{id}/medical-history | Add medical record | Doctor |
+| GET | /patients/{id}/history | Unified medical history timeline | Patient/Doctor/Nurse/Admin |
 
 ### Example – Update Profile
 
@@ -90,6 +89,65 @@ PATCH /patients/pat_1001
   "phone": "+94771234567"
 }
 ```
+
+### Example – Fetch Medical History
+
+```
+GET /patients/{id}/history?page=1&limit=20&type=diagnosis
+```
+
+**Query Parameters:**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| page | 1 | Page number |
+| limit | 20 | Items per page (max 100) |
+| type | (all) | Filter by: `visit`, `diagnosis`, `prescription`, `lab` |
+
+**Response**
+```json
+200 OK
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "type": "diagnosis",
+      "eventDate": "2026-03-05T10:30:00.000Z",
+      "diagnosis": "Hypertension Stage 1",
+      "treatment": "Lifestyle changes, Amlodipine 5mg",
+      "notes": "Follow up in 4 weeks",
+      "doctorName": "Dr. Nimal Perera"
+    },
+    {
+      "id": "uuid",
+      "type": "prescription",
+      "eventDate": "2026-03-05T10:30:00.000Z",
+      "medication": "Amlodipine",
+      "dosage": "5mg",
+      "frequency": "Once daily",
+      "duration": "30 days",
+      "status": "active",
+      "doctorName": "Dr. Nimal Perera"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 42,
+    "totalPages": 3
+  }
+}
+```
+
+**Event types returned:**
+
+| Type | Source Table | Key Fields |
+|------|-------------|------------|
+| `visit` | appointments | status, notes, doctorName |
+| `diagnosis` | medical_records | diagnosis, treatment, notes, doctorName |
+| `prescription` | prescriptions | medication, dosage, frequency, duration, status, doctorName |
+| `lab` | lab_reports | testName, result, notes, technicianName |
 
 ---
 

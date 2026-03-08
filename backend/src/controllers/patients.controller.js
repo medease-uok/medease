@@ -413,4 +413,124 @@ const deleteProfileImage = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, getMe, updateById, uploadProfileImage, deleteProfileImage };
+const getHistory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 20), 100);
+    const offset = (page - 1) * limit;
+    const type = req.query.type; // optional filter: 'visit', 'diagnosis', 'prescription', 'lab'
+
+    // Verify patient exists
+    const patientCheck = await db.query('SELECT id FROM patients WHERE id = $1', [id]);
+    if (patientCheck.rows.length === 0) {
+      throw new AppError('Patient not found.', 404);
+    }
+
+    // Build a UNION ALL of all history event types, each tagged with its type
+    const typeClauses = [];
+    const typeParams = [id];
+
+    if (!type || type === 'visit') {
+      typeClauses.push(`
+        SELECT a.id, 'visit' AS type, a.scheduled_at AS event_date,
+               json_build_object(
+                 'status', a.status,
+                 'notes', a.notes,
+                 'doctorName', 'Dr. ' || u.first_name || ' ' || u.last_name
+               ) AS details
+        FROM appointments a
+        LEFT JOIN doctors d ON a.doctor_id = d.id
+        LEFT JOIN users u ON d.user_id = u.id
+        WHERE a.patient_id = $1
+      `);
+    }
+
+    if (!type || type === 'diagnosis') {
+      typeClauses.push(`
+        SELECT mr.id, 'diagnosis' AS type, mr.created_at AS event_date,
+               json_build_object(
+                 'diagnosis', mr.diagnosis,
+                 'treatment', mr.treatment,
+                 'notes', mr.notes,
+                 'doctorName', 'Dr. ' || u.first_name || ' ' || u.last_name
+               ) AS details
+        FROM medical_records mr
+        LEFT JOIN doctors d ON mr.doctor_id = d.id
+        LEFT JOIN users u ON d.user_id = u.id
+        WHERE mr.patient_id = $1
+      `);
+    }
+
+    if (!type || type === 'prescription') {
+      typeClauses.push(`
+        SELECT rx.id, 'prescription' AS type, rx.created_at AS event_date,
+               json_build_object(
+                 'medication', rx.medication,
+                 'dosage', rx.dosage,
+                 'frequency', rx.frequency,
+                 'duration', rx.duration,
+                 'status', rx.status,
+                 'doctorName', 'Dr. ' || u.first_name || ' ' || u.last_name
+               ) AS details
+        FROM prescriptions rx
+        LEFT JOIN doctors d ON rx.doctor_id = d.id
+        LEFT JOIN users u ON d.user_id = u.id
+        WHERE rx.patient_id = $1
+      `);
+    }
+
+    if (!type || type === 'lab') {
+      typeClauses.push(`
+        SELECT lr.id, 'lab' AS type, lr.report_date AS event_date,
+               json_build_object(
+                 'testName', lr.test_name,
+                 'result', lr.result,
+                 'notes', lr.notes,
+                 'technicianName', u.first_name || ' ' || u.last_name
+               ) AS details
+        FROM lab_reports lr
+        LEFT JOIN users u ON lr.technician_id = u.id
+        WHERE lr.patient_id = $1
+      `);
+    }
+
+    if (typeClauses.length === 0) {
+      return res.json({ status: 'success', data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
+    }
+
+    const unionQuery = typeClauses.join(' UNION ALL ');
+
+    // Get total count
+    const countResult = await db.query(
+      `SELECT COUNT(*) FROM (${unionQuery}) AS history`,
+      typeParams
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    // Get paginated results
+    const dataResult = await db.query(
+      `SELECT * FROM (${unionQuery}) AS history
+       ORDER BY event_date DESC
+       LIMIT $2 OFFSET $3`,
+      [id, limit, offset]
+    );
+
+    const history = dataResult.rows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      eventDate: row.event_date,
+      ...row.details,
+    }));
+
+    res.json({
+      status: 'success',
+      data: history,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, getMe, getHistory, updateById, uploadProfileImage, deleteProfileImage };
