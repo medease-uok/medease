@@ -80,6 +80,7 @@ v2  -- next version (introduced only when breaking changes are required)
   /patients
     GET    /
     GET    /:id
+    GET    /:id/history
 
   /doctors
     GET    /
