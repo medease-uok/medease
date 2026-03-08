@@ -154,6 +154,17 @@ CREATE TABLE patient_allergies (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Profile change history table
+CREATE TABLE profile_change_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+  changed_by UUID REFERENCES users(id),
+  field_name VARCHAR(50) NOT NULL,
+  old_value TEXT,
+  new_value TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Audit logs table
 CREATE TABLE audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -181,6 +192,8 @@ CREATE INDEX idx_patient_allergies_patient ON patient_allergies(patient_id);
 CREATE INDEX idx_nurses_user ON nurses(user_id);
 CREATE INDEX idx_nurses_department ON nurses(department);
 CREATE INDEX idx_pharmacists_user ON pharmacists(user_id);
+CREATE INDEX idx_profile_change_history_patient ON profile_change_history(patient_id);
+CREATE INDEX idx_profile_change_history_created ON profile_change_history(created_at);
 CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_created ON audit_logs(created_at);
 
@@ -192,6 +205,7 @@ ALTER TABLE lab_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE patient_allergies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nurses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pharmacists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profile_change_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Grant table permissions to app role

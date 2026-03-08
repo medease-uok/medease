@@ -150,14 +150,16 @@ const updateById = async (req, res, next) => {
 
     await client.query('BEGIN');
 
-    const patientResult = await client.query(
-      'SELECT user_id FROM patients WHERE id = $1 FOR UPDATE',
+    // Snapshot old values before update
+    const oldResult = await client.query(
+      `${PATIENT_SELECT} WHERE p.id = $1 FOR UPDATE`,
       [id]
     );
-    if (patientResult.rows.length === 0) {
+    if (oldResult.rows.length === 0) {
       throw new AppError('Resource not found.', 404);
     }
-    const userId = patientResult.rows[0].user_id;
+    const oldRow = oldResult.rows[0];
+    const userId = oldRow.user_id;
 
     if (userUpdate.setClauses.length > 0) {
       userUpdate.params.push(userId);
@@ -179,6 +181,33 @@ const updateById = async (req, res, next) => {
       `${PATIENT_SELECT} WHERE p.id = $1`,
       [id]
     );
+    const newRow = result.rows[0];
+
+    // Log changed fields to profile_change_history
+    const trackFields = {
+      first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
+      date_of_birth: 'Date of Birth', gender: 'Gender', blood_type: 'Blood Type',
+      organ_donor: 'Organ Donor', organ_donor_card_no: 'Donor Card No.',
+      organs_to_donate: 'Organs to Donate', address: 'Address',
+      emergency_contact: 'Emergency Contact', emergency_relationship: 'Emergency Relationship',
+      emergency_phone: 'Emergency Phone', insurance_provider: 'Insurance Provider',
+      insurance_policy_number: 'Policy Number', insurance_plan_type: 'Plan Type',
+      insurance_expiry_date: 'Insurance Expiry',
+    };
+
+    for (const [col, label] of Object.entries(trackFields)) {
+      const oldVal = oldRow[col];
+      const newVal = newRow[col];
+      const oldStr = Array.isArray(oldVal) ? oldVal.join(', ') : String(oldVal ?? '');
+      const newStr = Array.isArray(newVal) ? newVal.join(', ') : String(newVal ?? '');
+      if (oldStr !== newStr) {
+        await client.query(
+          `INSERT INTO profile_change_history (patient_id, changed_by, field_name, old_value, new_value)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [id, req.user.id, label, oldStr || null, newStr || null]
+        );
+      }
+    }
 
     await client.query('COMMIT');
 
