@@ -419,7 +419,7 @@ const getPrescriptions = async (req, res, next) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 20), 100);
     const offset = (page - 1) * limit;
-    const status = req.query.status; // optional filter: 'active', 'dispensed', 'expired', 'cancelled'
+    const status = req.query.status;
 
     // Verify patient exists
     const patientCheck = await db.query('SELECT id FROM patients WHERE id = $1', [id]);
@@ -435,6 +435,8 @@ const getPrescriptions = async (req, res, next) => {
       whereClause += ` AND rx.status = $${params.length}`;
     }
 
+    // NOTE: whereClause is shared between countQuery and dataQuery.
+    // Any changes to filters must be reflected in both.
     const countResult = await db.query(
       `SELECT COUNT(*) FROM prescriptions rx ${whereClause}`,
       params
@@ -465,7 +467,6 @@ const getPrescriptions = async (req, res, next) => {
     return next(err);
   }
 };
-
 
 const getHistory = async (req, res, next) => {
   try {

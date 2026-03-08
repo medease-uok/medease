@@ -1,4 +1,4 @@
-const { body } = require('express-validator');
+const { body, param, query } = require('express-validator');
 
 const updatePatientValidation = [
   body('firstName')
@@ -89,4 +89,20 @@ const updatePatientValidation = [
   }),
 ];
 
-module.exports = { updatePatientValidation };
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const getPrescriptionsValidation = [
+  param('id')
+    .matches(UUID_REGEX).withMessage('Invalid patient ID format.'),
+  query('page')
+    .optional()
+    .isInt({ min: 1 }).withMessage('page must be a positive integer.'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 }).withMessage('limit must be an integer between 1 and 100.'),
+  query('status')
+    .optional()
+    .isIn(['active', 'dispensed', 'expired', 'cancelled']).withMessage('status must be one of: active, dispensed, expired, cancelled.'),
+];
+
+module.exports = { updatePatientValidation, getPrescriptionsValidation };
