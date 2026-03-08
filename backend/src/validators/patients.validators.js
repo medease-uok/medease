@@ -32,6 +32,20 @@ const updatePatientValidation = [
     .optional({ values: 'falsy' })
     .trim()
     .isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']).withMessage('Invalid blood type.'),
+  body('organDonor')
+    .optional()
+    .isBoolean().withMessage('Organ donor must be true or false.'),
+  body('organDonorCardNo')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 50 }).withMessage('Donor card number must not exceed 50 characters.'),
+  body('organsToDonate')
+    .optional()
+    .isArray().withMessage('Organs to donate must be an array.'),
+  body('organsToDonate.*')
+    .trim()
+    .isIn(['Eyes', 'Kidneys', 'Liver', 'Heart', 'Lungs', 'Pancreas', 'Skin', 'Bone/Tissue'])
+    .withMessage('Invalid organ selection.'),
   body('address')
     .optional({ values: 'falsy' })
     .trim(),

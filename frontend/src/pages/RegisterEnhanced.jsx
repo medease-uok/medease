@@ -445,7 +445,6 @@ export default function RegisterEnhanced() {
                           </div>
                           <InputField label="Address" name="address" icon={MapPin} value={form.address} onChange={handleChange} disabled={loading} placeholder="Your address" />
                         </div>
-
                         {/* Emergency Contact */}
                         <div className="border-t border-slate-200 pt-4 mt-2">
                           <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">

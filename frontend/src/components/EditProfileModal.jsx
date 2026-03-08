@@ -98,6 +98,9 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
     dateOfBirth: profile.dateOfBirth ? profile.dateOfBirth.split('T')[0] : '',
     gender: profile.gender || '',
     bloodType: profile.bloodType || '',
+    organDonor: profile.organDonor || false,
+    organDonorCardNo: profile.organDonorCardNo || '',
+    organsToDonate: profile.organsToDonate || [],
     address: profile.address || '',
     emergencyContact: profile.emergencyContact || '',
     emergencyRelationship: profile.emergencyRelationship || '',
@@ -181,12 +184,23 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
       const payload = {};
       const phoneFields = ['phone', 'emergencyPhone'];
       for (const [key, value] of Object.entries(submitted)) {
-        const original = profile[key] ?? '';
+        const original = profile[key];
+        if (Array.isArray(value)) {
+          const orig = original || [];
+          if (value.length !== orig.length || value.some((v, i) => v !== orig[i])) {
+            payload[key] = value;
+          }
+          continue;
+        }
+        if (typeof value === 'boolean') {
+          if (value !== (original || false)) payload[key] = value;
+          continue;
+        }
         let normalised;
         if ((key === 'dateOfBirth' || key === 'insuranceExpiryDate') && original) {
           normalised = original.split('T')[0];
         } else if (phoneFields.includes(key)) {
-          normalised = original.replace(/^\+94\s?/, '').replace(/^/, COUNTRY_CODE);
+          normalised = (original || '').replace(/^\+94\s?/, '').replace(/^/, COUNTRY_CODE);
         } else {
           normalised = original || '';
         }
@@ -350,6 +364,51 @@ export default function EditProfileModal({ profile, onClose, onSaved, onImageUpd
                 <input type="text" name="address" value={form.address} onChange={handleChange} maxLength={ADDRESS_MAX_LENGTH} className={inputClass(errors.address)} />
                 {errors.address && <p className="mt-1 text-sm text-red-600">{errors.address}</p>}
               </div>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">Organ Donation (NTP Sri Lanka)</h3>
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={form.organDonor}
+                  onChange={(e) => setForm((prev) => ({ ...prev, organDonor: e.target.checked, ...(!e.target.checked && { organDonorCardNo: '', organsToDonate: [] }) }))}
+                  className="w-5 h-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-sm text-slate-700 group-hover:text-slate-900">I am a registered organ donor</span>
+              </label>
+              {form.organDonor && (
+                <div className="ml-8 space-y-4 p-4 bg-emerald-50/50 border border-emerald-200 rounded-lg">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">NTP Donor Card No.</label>
+                    <input type="text" name="organDonorCardNo" value={form.organDonorCardNo} onChange={handleChange} maxLength={50} placeholder="e.g. NTP-2024-12345" className={inputClass(errors.organDonorCardNo)} />
+                    {errors.organDonorCardNo && <p className="mt-1 text-sm text-red-600">{errors.organDonorCardNo}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Organs Willing to Donate</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {['Eyes', 'Kidneys', 'Liver', 'Heart', 'Lungs', 'Pancreas', 'Skin', 'Bone/Tissue'].map((organ) => (
+                        <label key={organ} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={form.organsToDonate.includes(organ)}
+                            onChange={(e) => {
+                              const updated = e.target.checked
+                                ? [...form.organsToDonate, organ]
+                                : form.organsToDonate.filter((o) => o !== organ);
+                              setForm((prev) => ({ ...prev, organsToDonate: updated }));
+                            }}
+                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span className="text-sm text-slate-700">{organ}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

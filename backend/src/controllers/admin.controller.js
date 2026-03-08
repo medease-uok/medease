@@ -172,7 +172,7 @@ function mapUser(row) {
 
 async function getProfileData(userId, role) {
   const profileQueries = {
-    patient: `SELECT date_of_birth, gender, blood_type, address, emergency_contact, emergency_relationship, emergency_phone FROM patients WHERE user_id = $1`,
+    patient: `SELECT date_of_birth, gender, blood_type, organ_donor, organ_donor_card_no, organs_to_donate, address, emergency_contact, emergency_relationship, emergency_phone FROM patients WHERE user_id = $1`,
     doctor: `SELECT specialization, license_number, department FROM doctors WHERE user_id = $1`,
     nurse: `SELECT license_number, department FROM nurses WHERE user_id = $1`,
     pharmacist: `SELECT license_number FROM pharmacists WHERE user_id = $1`,
@@ -191,6 +191,9 @@ async function getProfileData(userId, role) {
     date_of_birth: 'dateOfBirth',
     gender: 'gender',
     blood_type: 'bloodType',
+    organ_donor: 'organDonor',
+    organ_donor_card_no: 'organDonorCardNo',
+    organs_to_donate: 'organsToDonate',
     address: 'address',
     emergency_contact: 'emergencyContact',
     emergency_relationship: 'emergencyRelationship',
