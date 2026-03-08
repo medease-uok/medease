@@ -212,17 +212,20 @@ const respond = async (req, res, next) => {
       [status, doctorNote || null, id]
     );
 
+    let newPrescriptionId = null;
     if (status === 'approved') {
       const doctorId = req.user.doctorId || rr.doctor_id;
-      await db.query(
+      const newRx = await db.query(
         `INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
         [rr.patient_id, doctorId, rr.medication, rr.dosage, rr.frequency, rr.duration]
       );
+      newPrescriptionId = newRx.rows[0].id;
     }
 
     const patient = await db.query(
-      `SELECT u.id AS user_id FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
+      `SELECT u.id AS user_id, u.first_name, u.last_name
+       FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
       [rr.patient_id]
     );
 
@@ -239,6 +242,23 @@ const respond = async (req, res, next) => {
         referenceId: id,
         referenceType: 'refill_request',
       });
+
+      if (status === 'approved') {
+        const patientName = `${patient.rows[0].first_name} ${patient.rows[0].last_name}`;
+        const pharmacists = await db.query(
+          `SELECT u.id FROM users u WHERE u.role = 'pharmacist' AND u.is_active = true`
+        );
+        for (const ph of pharmacists.rows) {
+          createNotification({
+            recipientId: ph.id,
+            type: 'prescription_created',
+            title: 'New Prescription (Refill)',
+            message: `Refill approved for ${patientName}: ${rr.medication} (${rr.dosage}).`,
+            referenceId: newPrescriptionId,
+            referenceType: 'prescription',
+          });
+        }
+      }
     }
 
     await auditLog({
