@@ -9,6 +9,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_appointments', 'view_own_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status',
     'view_medical_records', 'view_own_medical_records', 'create_medical_record', 'edit_medical_record',
     'view_prescriptions', 'view_own_prescriptions', 'create_prescription', 'dispense_prescription', 'cancel_prescription',
+    'request_refill', 'view_refill_requests', 'view_own_refill_requests', 'respond_refill_request',
     'view_lab_reports', 'view_own_lab_reports', 'create_lab_report', 'edit_lab_report',
     'manage_users', 'manage_roles', 'view_audit_logs', 'view_dashboard',
   ],
@@ -17,6 +18,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status',
     'view_medical_records', 'create_medical_record', 'edit_medical_record',
     'view_prescriptions', 'create_prescription', 'cancel_prescription',
+    'view_refill_requests', 'respond_refill_request',
     'view_lab_reports',
   ],
   nurse: [
@@ -24,6 +26,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_appointments', 'update_appointment_status',
     'view_medical_records',
     'view_prescriptions',
+    'view_refill_requests',
     'view_lab_reports',
   ],
   patient: [
@@ -31,6 +34,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_own_appointments', 'create_appointment', 'cancel_appointment',
     'view_own_medical_records',
     'view_own_prescriptions',
+    'request_refill', 'view_own_refill_requests',
     'view_own_lab_reports',
   ],
   lab_technician: [
@@ -40,6 +44,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
   pharmacist: [
     'view_patients',
     'view_prescriptions', 'dispense_prescription',
+    'view_refill_requests',
   ],
 };
 

@@ -183,6 +183,44 @@ INSERT INTO patient_allergies (patient_id, allergen, severity, reaction, noted_a
   ('ce000000-0000-0000-0000-000000000006', 'Codeine', 'mild', 'Nausea and mild itching', '2023-05-30');
 
 -- ============================================
+-- PRESCRIPTION REFILL REQUESTS
+-- ============================================
+
+INSERT INTO prescription_refill_requests (prescription_id, patient_id, doctor_id, status, reason, doctor_note, responded_at, created_at)
+SELECT rx.id, rx.patient_id, rx.doctor_id, 'approved',
+       'Running low on medication, need a refill.',
+       'Approved. Continue same dosage.',
+       NOW() - INTERVAL '2 days', NOW() - INTERVAL '5 days'
+FROM prescriptions rx
+WHERE rx.medication = 'Amlodipine' AND rx.status = 'active'
+LIMIT 1;
+
+INSERT INTO prescription_refill_requests (prescription_id, patient_id, doctor_id, status, reason, doctor_note, responded_at, created_at)
+SELECT rx.id, rx.patient_id, rx.doctor_id, 'denied',
+       'Would like to continue this medication.',
+       'Denied. Please schedule an appointment for re-evaluation.',
+       NOW() - INTERVAL '1 day', NOW() - INTERVAL '3 days'
+FROM prescriptions rx
+WHERE rx.medication = 'Ibuprofen' AND rx.status = 'active'
+LIMIT 1;
+
+INSERT INTO prescription_refill_requests (prescription_id, patient_id, doctor_id, status, reason, created_at)
+SELECT rx.id, rx.patient_id, rx.doctor_id, 'pending',
+       'Almost out of medication. Please refill.',
+       NOW() - INTERVAL '12 hours'
+FROM prescriptions rx
+WHERE rx.medication = 'Warfarin' AND rx.status = 'active'
+LIMIT 1;
+
+INSERT INTO prescription_refill_requests (prescription_id, patient_id, doctor_id, status, reason, created_at)
+SELECT rx.id, rx.patient_id, rx.doctor_id, 'pending',
+       'Need to continue iron supplementation as recommended.',
+       NOW() - INTERVAL '6 hours'
+FROM prescriptions rx
+WHERE rx.medication = 'Ferrous Sulfate' AND rx.status = 'active'
+LIMIT 1;
+
+-- ============================================
 -- Mark all seeded users as email-verified (they are test accounts)
 -- ============================================
 

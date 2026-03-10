@@ -13,6 +13,7 @@ const abacRoutes = require('./abac.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const profileRoutes = require('./profile.routes');
 const notificationRoutes = require('./notifications.routes');
+const refillRequestRoutes = require('./refillRequests.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -35,5 +36,6 @@ router.use('/abac-policies', abacRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/profile', profileRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/refill-requests', refillRequestRoutes);
 
 module.exports = router;
