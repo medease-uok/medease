@@ -58,12 +58,11 @@ SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'lab_technician' AND p.name IN ('upload_document', 'view_documents');
 
 -- ABAC policies for medical documents
+-- Note: Doctor, nurse, and lab_technician access is filtered to their own patients
+-- via relationship subqueries in the controller (too complex for ABAC conditions).
 INSERT INTO abac_policies (name, description, resource_type, conditions, effect, priority) VALUES
   ('document_admin_access', 'Admins can view all medical documents', 'medical_document',
    '{"any": [{"subject.role": {"in": ["admin"]}}]}',
-   'allow', 10),
-  ('document_clinical_access', 'Clinical staff can view all medical documents', 'medical_document',
-   '{"any": [{"subject.role": {"in": ["doctor", "nurse", "lab_technician"]}}]}',
    'allow', 10),
   ('document_patient_own', 'Patients can view their own medical documents', 'medical_document',
    '{"all": [{"subject.role": {"equals": "patient"}}, {"resource.patient_id": {"equals_ref": "subject.patientId"}}]}',

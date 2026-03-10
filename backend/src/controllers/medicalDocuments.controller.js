@@ -1,6 +1,5 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
-const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
 const { uploadDocumentToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
@@ -28,20 +27,104 @@ const mapDocument = (row) => ({
   createdAt: row.created_at,
 });
 
+/**
+ * Build a WHERE clause that restricts documents to the user's own patients.
+ *  - Admin: all documents
+ *  - Patient: own documents only
+ *  - Doctor: patients they have medical records, prescriptions, or appointments with
+ *  - Lab tech: patients they have lab reports for, or documents they uploaded
+ *  - Nurse: patients treated by doctors in the same department
+ */
+function buildDocumentAccessFilter(user) {
+  const role = user.role;
+
+  if (role === 'admin') {
+    return { clause: 'TRUE', params: [] };
+  }
+
+  if (role === 'patient') {
+    return { clause: 'md.patient_id = $1', params: [user.patientId] };
+  }
+
+  if (role === 'doctor') {
+    return {
+      clause: `md.patient_id IN (
+        SELECT mr.patient_id FROM medical_records mr WHERE mr.doctor_id = $1
+        UNION SELECT rx.patient_id FROM prescriptions rx WHERE rx.doctor_id = $1
+        UNION SELECT a.patient_id FROM appointments a WHERE a.doctor_id = $1
+      )`,
+      params: [user.doctorId],
+    };
+  }
+
+  if (role === 'lab_technician') {
+    return {
+      clause: `(md.uploaded_by = $1 OR md.patient_id IN (
+        SELECT lr.patient_id FROM lab_reports lr WHERE lr.technician_id = $1
+      ))`,
+      params: [user.id],
+    };
+  }
+
+  if (role === 'nurse') {
+    return {
+      clause: `md.patient_id IN (
+        SELECT DISTINCT a.patient_id FROM appointments a
+        JOIN doctors d ON a.doctor_id = d.id
+        WHERE d.department = (SELECT n.department FROM nurses n WHERE n.user_id = $1)
+      )`,
+      params: [user.id],
+    };
+  }
+
+  return { clause: 'FALSE', params: [] };
+}
+
+/**
+ * Check whether the requesting user is allowed to access a specific patient's documents.
+ */
+async function canAccessPatientDocuments(user, patientId, docUploadedBy) {
+  if (user.role === 'admin') return true;
+  if (user.role === 'patient') return patientId === user.patientId;
+
+  if (user.role === 'doctor') {
+    const rel = await db.query(
+      `SELECT 1 FROM medical_records WHERE doctor_id = $1 AND patient_id = $2
+       UNION SELECT 1 FROM prescriptions WHERE doctor_id = $1 AND patient_id = $2
+       UNION SELECT 1 FROM appointments WHERE doctor_id = $1 AND patient_id = $2
+       LIMIT 1`,
+      [user.doctorId, patientId]
+    );
+    return rel.rows.length > 0;
+  }
+
+  if (user.role === 'lab_technician') {
+    if (docUploadedBy === user.id) return true;
+    const rel = await db.query(
+      `SELECT 1 FROM lab_reports WHERE technician_id = $1 AND patient_id = $2 LIMIT 1`,
+      [user.id, patientId]
+    );
+    return rel.rows.length > 0;
+  }
+
+  if (user.role === 'nurse') {
+    const rel = await db.query(
+      `SELECT 1 FROM appointments a
+       JOIN doctors d ON a.doctor_id = d.id
+       WHERE a.patient_id = $1
+         AND d.department = (SELECT n.department FROM nurses n WHERE n.user_id = $2)
+       LIMIT 1`,
+      [patientId, user.id]
+    );
+    return rel.rows.length > 0;
+  }
+
+  return false;
+}
+
 const getAll = async (req, res, next) => {
   try {
-    const subject = {
-      id: req.user.id,
-      role: req.user.role,
-      patientId: req.user.patientId,
-      doctorId: req.user.doctorId,
-    };
-
-    const columnMap = {
-      patient_id: 'md.patient_id',
-    };
-
-    const { clause, params } = await buildAccessFilter('medical_document', subject, columnMap);
+    const { clause, params } = buildDocumentAccessFilter(req.user);
 
     const query = `
       SELECT md.id, md.patient_id, md.uploaded_by, md.category,
@@ -88,9 +171,9 @@ const getById = async (req, res, next) => {
 
     const doc = result.rows[0];
 
-    // Access check: patient can only view own, staff can view all
-    if (req.user.role === 'patient' && doc.patient_id !== req.user.patientId) {
-      throw new AppError('You can only view your own documents.', 403);
+    const allowed = await canAccessPatientDocuments(req.user, doc.patient_id, doc.uploaded_by);
+    if (!allowed) {
+      throw new AppError('You do not have access to this patient\'s documents.', 403);
     }
 
     const url = await getPresignedImageUrl(doc.file_key);
