@@ -11,6 +11,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_prescriptions', 'view_own_prescriptions', 'create_prescription', 'dispense_prescription', 'cancel_prescription',
     'request_refill', 'view_refill_requests', 'view_own_refill_requests', 'respond_refill_request',
     'view_lab_reports', 'view_own_lab_reports', 'create_lab_report', 'edit_lab_report',
+    'upload_document', 'view_documents', 'view_own_documents', 'delete_document',
     'manage_users', 'manage_roles', 'view_audit_logs', 'view_dashboard',
   ],
   doctor: [
@@ -20,6 +21,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_prescriptions', 'create_prescription', 'cancel_prescription',
     'view_refill_requests', 'respond_refill_request',
     'view_lab_reports',
+    'upload_document', 'view_documents',
   ],
   nurse: [
     'view_patients',
@@ -28,6 +30,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_prescriptions',
     'view_refill_requests',
     'view_lab_reports',
+    'upload_document', 'view_documents',
   ],
   patient: [
     'view_own_profile', 'edit_own_profile',
@@ -36,10 +39,12 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_own_prescriptions',
     'request_refill', 'view_own_refill_requests',
     'view_own_lab_reports',
+    'upload_document', 'view_own_documents',
   ],
   lab_technician: [
     'view_patients',
     'view_lab_reports', 'create_lab_report', 'edit_lab_report',
+    'upload_document', 'view_documents',
   ],
   pharmacist: [
     'view_patients',

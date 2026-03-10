@@ -327,4 +327,54 @@ INSERT INTO notifications (recipient_id, type, title, message, is_read, referenc
   ('a0000000-0000-0000-0000-000000000001', 'system', 'System Update', 'Database backup completed successfully.', true, NULL, NULL, NOW() - INTERVAL '2 days'),
   ('a0000000-0000-0000-0000-000000000001', 'system', 'New User Registration', 'A new user has registered and is pending approval.', false, NULL, NULL, NOW() - INTERVAL '6 hours');
 
+-- ============================================
+-- MEDICAL DOCUMENTS (sample records)
+-- ============================================
+-- Note: file_key values are placeholders. Actual S3 keys would be generated on upload.
+INSERT INTO medical_documents (patient_id, uploaded_by, category, title, description, file_key, file_name, file_size, mime_type, created_at) VALUES
+  -- Sarah Fernando's documents
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'lab_report',
+   'Complete Blood Count - Feb 2026', 'Routine CBC test results showing normal ranges.',
+   'medical-documents/ce000000-0000-0000-0000-000000000001/seed-cbc-report.pdf',
+   'CBC_Report_Feb2026.pdf', 245760, 'application/pdf', NOW() - INTERVAL '30 days'),
+
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'imaging',
+   'Chest X-Ray', 'Follow-up chest X-ray. No abnormalities detected.',
+   'medical-documents/ce000000-0000-0000-0000-000000000001/seed-chest-xray.jpg',
+   'Chest_XRay_Jan2026.jpg', 1048576, 'image/jpeg', NOW() - INTERVAL '45 days'),
+
+  -- Dinesh Rajapaksa's documents
+  ('ce000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'clinical_note',
+   'Neurology Consultation Notes', 'Initial consultation notes for recurring headaches.',
+   'medical-documents/ce000000-0000-0000-0000-000000000002/seed-neuro-notes.pdf',
+   'Neurology_Consultation.pdf', 153600, 'application/pdf', NOW() - INTERVAL '25 days'),
+
+  ('ce000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'lab_report',
+   'MRI Brain Scan Report', 'MRI results with radiologist findings.',
+   'medical-documents/ce000000-0000-0000-0000-000000000002/seed-mri-brain.pdf',
+   'MRI_Brain_Report.pdf', 512000, 'application/pdf', NOW() - INTERVAL '20 days'),
+
+  -- Kavindi Weerasinghe's documents
+  ('ce000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000003', 'discharge_summary',
+   'Discharge Summary - Knee Surgery', 'Post-operative discharge summary and recovery instructions.',
+   'medical-documents/ce000000-0000-0000-0000-000000000003/seed-discharge.pdf',
+   'Discharge_Summary_KneeSurgery.pdf', 307200, 'application/pdf', NOW() - INTERVAL '15 days'),
+
+  ('ce000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', 'insurance',
+   'Insurance Claim Form', 'Health insurance claim for knee surgery.',
+   'medical-documents/ce000000-0000-0000-0000-000000000003/seed-insurance-claim.pdf',
+   'Insurance_Claim_2026.pdf', 204800, 'application/pdf', NOW() - INTERVAL '10 days'),
+
+  -- Nuwan Jayasuriya's documents
+  ('ce000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000002', 'lab_report',
+   'ECG Report', 'Electrocardiogram results from routine cardiac checkup.',
+   'medical-documents/ce000000-0000-0000-0000-000000000004/seed-ecg-report.pdf',
+   'ECG_Report_Mar2026.pdf', 184320, 'application/pdf', NOW() - INTERVAL '8 days'),
+
+  -- Hasini Abeywickrama's documents
+  ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000001', 'referral',
+   'Dermatology Referral', 'Referral letter for dermatology consultation.',
+   'medical-documents/ce000000-0000-0000-0000-000000000005/seed-derm-referral.pdf',
+   'Dermatology_Referral.pdf', 102400, 'application/pdf', NOW() - INTERVAL '5 days');
+
 COMMIT;
