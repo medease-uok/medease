@@ -10,6 +10,15 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const PRESIGNED_URL_EXPIRY = 3600;
 
+const DOCUMENT_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg', 'image/png', 'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+];
+const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024; // 20 MB
+
 const S3_REQUIRED = ['bucket', 'region', 'accessKeyId', 'secretAccessKey'];
 const missingS3 = S3_REQUIRED.filter((k) => !config.s3[k]);
 if (missingS3.length > 0 && process.env.NODE_ENV !== 'test') {
@@ -74,4 +83,31 @@ async function deleteFromS3(key) {
   }
 }
 
-module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl };
+const documentUpload = multer({
+  storage,
+  limits: { fileSize: MAX_DOCUMENT_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (DOCUMENT_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new AppError('Unsupported file type. Allowed: PDF, JPEG, PNG, WebP, DOC, DOCX, TXT.', 400));
+    }
+  },
+});
+
+async function uploadDocumentToS3(file, patientId) {
+  const ext = path.extname(file.originalname).toLowerCase() || '.pdf';
+  const hash = crypto.randomBytes(16).toString('hex');
+  const key = `medical-documents/${patientId}/${hash}${ext}`;
+
+  await s3.send(new PutObjectCommand({
+    Bucket: config.s3.bucket,
+    Key: key,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  }));
+
+  return key;
+}
+
+module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl, documentUpload, uploadDocumentToS3 };
