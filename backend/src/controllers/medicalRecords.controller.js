@@ -56,7 +56,7 @@ const getAll = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const { patientId, diagnosis, treatment, notes } = req.body;
+    const { patientId, diagnosis, treatment, notes, chronicConditionId } = req.body;
 
     if (!patientId || !diagnosis) {
       throw new AppError('patientId and diagnosis are required.', 400);
@@ -83,9 +83,9 @@ const create = async (req, res, next) => {
       : 'Your doctor';
 
     const result = await db.query(
-      `INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [patientId, doctorId, diagnosis, treatment || null, notes || null]
+      `INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes, chronic_condition_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [patientId, doctorId, diagnosis, treatment || null, notes || null, chronicConditionId || null]
     );
 
     createNotification({

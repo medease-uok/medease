@@ -434,4 +434,102 @@ INSERT INTO chronic_conditions (patient_id, diagnosed_by, condition_name, severi
   -- Lahiru Gunasekara
   ('ce000000-0000-0000-0000-000000000006', 'd0000000-0000-0000-0000-000000000003', 'Exercise-Induced Asthma', 'mild', '2024-01-15', NULL, 'Pre-exercise inhaler use', 'Salbutamol 100mcg inhaler (2 puffs before exercise)', 'managed', 'Well controlled. No limitations on sports activities with pre-treatment.', NOW() - INTERVAL '120 days');
 
+-- ============================================
+-- LINK PRESCRIPTIONS TO CHRONIC CONDITIONS
+-- Match prescriptions to their related chronic conditions by patient + medication overlap
+-- ============================================
+
+-- Sarah: Amlodipine → Hypertension (medical record for "Mild hypertension" exists)
+-- Patient 1 has Asthma and Seasonal Allergic Rhinitis as chronic conditions
+-- No direct prescription match for Sarah's chronic conditions in seed data
+
+-- Dinesh (patient 2): Has Type 2 Diabetes, Essential Hypertension, Hyperlipidemia
+-- But Dinesh's prescriptions are Paracetamol (headache) and Amitriptyline (headache) — not linked
+
+-- Kavindi (patient 3): Has Iron Deficiency Anemia
+-- Kavindi's prescriptions are Ibuprofen and Tramadol (ortho) — not from anemia
+
+-- Nuwan (patient 4): Has Chronic Low Back Pain, GERD
+-- Nuwan's prescriptions: Warfarin (AF), Gabapentin (neuropathy), Vitamin B12 (neuropathy)
+
+-- Hasini (patient 5): Has Migraine without Aura
+-- Hasini's prescription: Ferrous Sulfate (for anemia, not migraine)
+
+-- Lahiru (patient 6): Has Exercise-Induced Asthma
+-- Lahiru's prescription: Diclofenac Gel (ACL sprain, expired)
+
+-- The seed data doesn't have good prescription-to-condition matches.
+-- Let's add new prescriptions that actually link to chronic conditions.
+
+INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration, status, chronic_condition_id) VALUES
+  -- Sarah: Salbutamol for Asthma
+  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', 'Salbutamol Inhaler', '100mcg', '2 puffs PRN', 'Ongoing', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000001' AND condition_name = 'Asthma')),
+  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', 'Fluticasone Inhaler', '250mcg', 'Twice daily', '6 months', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000001' AND condition_name = 'Asthma')),
+
+  -- Dinesh: Metformin for Type 2 Diabetes
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', 'Metformin', '500mg', 'Twice daily', 'Ongoing', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000002' AND condition_name = 'Type 2 Diabetes Mellitus')),
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', 'Gliclazide', '80mg', 'Once daily', 'Ongoing', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000002' AND condition_name = 'Type 2 Diabetes Mellitus')),
+
+  -- Dinesh: Amlodipine + Losartan for Essential Hypertension
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', 'Amlodipine', '5mg', 'Once daily', 'Ongoing', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000002' AND condition_name = 'Essential Hypertension')),
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', 'Losartan', '50mg', 'Once daily', 'Ongoing', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000002' AND condition_name = 'Essential Hypertension')),
+
+  -- Dinesh: Atorvastatin for Hyperlipidemia
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', 'Atorvastatin', '20mg', 'Once daily (bedtime)', 'Ongoing', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000002' AND condition_name = 'Hyperlipidemia')),
+
+  -- Nuwan: Naproxen + Omeprazole for Chronic Low Back Pain
+  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001', 'Naproxen', '500mg', 'Twice daily PRN', '3 months', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000004' AND condition_name = 'Chronic Low Back Pain')),
+  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001', 'Omeprazole', '20mg', 'Once daily', '3 months', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000004' AND condition_name = 'Chronic Low Back Pain')),
+
+  -- Hasini: Sumatriptan + Propranolol for Migraine
+  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004', 'Sumatriptan', '50mg', 'As needed (max 2/day)', 'Ongoing', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000005' AND condition_name = 'Migraine without Aura')),
+  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004', 'Propranolol', '40mg', 'Twice daily', '6 months', 'active',
+    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000005' AND condition_name = 'Migraine without Aura'));
+
+-- ============================================
+-- LINK MEDICAL RECORDS TO CHRONIC CONDITIONS
+-- Create diagnosis records for chronic conditions
+-- ============================================
+
+INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes, chronic_condition_id) VALUES
+  -- Sarah: Asthma diagnosis
+  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001',
+   'Bronchial Asthma (moderate persistent)', 'Inhaler therapy: Salbutamol PRN + Fluticasone BD. Trigger avoidance counseling.',
+   'Spirometry: FEV1 78% predicted. Reversibility test positive. Peak flow diary initiated.',
+   (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000001' AND condition_name = 'Asthma')),
+
+  -- Dinesh: Type 2 Diabetes diagnosis
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002',
+   'Type 2 Diabetes Mellitus', 'Started Metformin 500mg BD, Gliclazide 80mg OD. Diabetic diet plan provided.',
+   'FBS 186 mg/dL. HbA1c 8.1%. Referred for diabetic eye screening and foot assessment.',
+   (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000002' AND condition_name = 'Type 2 Diabetes Mellitus')),
+
+  -- Dinesh: Essential Hypertension diagnosis
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002',
+   'Essential Hypertension (Stage 2)', 'Started Amlodipine 5mg + Losartan 50mg. Lifestyle modifications: low-salt diet, regular exercise.',
+   'BP 158/96 on 3 separate readings. Renal function normal. ECG shows no LVH.',
+   (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000002' AND condition_name = 'Essential Hypertension')),
+
+  -- Nuwan: Chronic Low Back Pain diagnosis
+  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001',
+   'Chronic Low Back Pain (L4-L5 disc protrusion)', 'Physiotherapy referral. NSAIDs for pain. PPI cover for gastroprotection.',
+   'MRI lumbar spine: L4-L5 posterolateral disc protrusion with mild nerve root compression. No cauda equina symptoms.',
+   (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000004' AND condition_name = 'Chronic Low Back Pain')),
+
+  -- Hasini: Migraine diagnosis
+  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004',
+   'Migraine without Aura (episodic)', 'Abortive: Sumatriptan 50mg PRN. Prophylaxis: Propranolol 40mg BD. Trigger diary initiated.',
+   'Headache frequency 4/month, duration 8-12 hours. CT brain normal. Meets ICHD-3 criteria for migraine without aura.',
+   (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000005' AND condition_name = 'Migraine without Aura'));
+
 COMMIT;

@@ -46,15 +46,71 @@ const getByPatientId = async (req, res, next) => {
 
     await assertPatientAccess(req.user, patientId);
 
-    const result = await db.query(
-      `${conditionSelect()}
-       WHERE c.patient_id = $1
-       ORDER BY CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
-                c.diagnosed_date DESC NULLS LAST, c.created_at DESC`,
-      [patientId]
-    );
+    const [conditionsResult, prescriptionsResult, recordsResult] = await Promise.all([
+      db.query(
+        `${conditionSelect()}
+         WHERE c.patient_id = $1
+         ORDER BY CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
+                  c.diagnosed_date DESC NULLS LAST, c.created_at DESC`,
+        [patientId]
+      ),
+      db.query(
+        `SELECT rx.id, rx.chronic_condition_id, rx.medication, rx.dosage,
+                rx.frequency, rx.duration, rx.status, rx.created_at
+         FROM prescriptions rx
+         WHERE rx.patient_id = $1 AND rx.chronic_condition_id IS NOT NULL
+         ORDER BY rx.created_at DESC`,
+        [patientId]
+      ),
+      db.query(
+        `SELECT mr.id, mr.chronic_condition_id, mr.diagnosis, mr.treatment,
+                mr.notes, mr.created_at,
+                'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
+         FROM medical_records mr
+         LEFT JOIN doctors d ON mr.doctor_id = d.id
+         LEFT JOIN users du ON d.user_id = du.id
+         WHERE mr.patient_id = $1 AND mr.chronic_condition_id IS NOT NULL
+         ORDER BY mr.created_at DESC`,
+        [patientId]
+      ),
+    ]);
 
-    res.json({ status: 'success', data: result.rows.map(mapCondition) });
+    const rxByCondition = {};
+    for (const rx of prescriptionsResult.rows) {
+      const cid = rx.chronic_condition_id;
+      if (!rxByCondition[cid]) rxByCondition[cid] = [];
+      rxByCondition[cid].push({
+        id: rx.id,
+        medication: rx.medication,
+        dosage: rx.dosage,
+        frequency: rx.frequency,
+        duration: rx.duration,
+        status: rx.status,
+        createdAt: rx.created_at,
+      });
+    }
+
+    const mrByCondition = {};
+    for (const mr of recordsResult.rows) {
+      const cid = mr.chronic_condition_id;
+      if (!mrByCondition[cid]) mrByCondition[cid] = [];
+      mrByCondition[cid].push({
+        id: mr.id,
+        diagnosis: mr.diagnosis,
+        treatment: mr.treatment,
+        notes: mr.notes,
+        doctorName: mr.doctor_name,
+        createdAt: mr.created_at,
+      });
+    }
+
+    const data = conditionsResult.rows.map((row) => ({
+      ...mapCondition(row),
+      relatedPrescriptions: rxByCondition[row.id] || [],
+      relatedRecords: mrByCondition[row.id] || [],
+    }));
+
+    res.json({ status: 'success', data });
   } catch (err) {
     return next(err);
   }
