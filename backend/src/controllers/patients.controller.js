@@ -3,6 +3,7 @@ const AppError = require('../utils/AppError');
 const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
 const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
 const auditLog = require('../utils/auditLog');
+const generateMedicalPdf = require('../utils/generateMedicalPdf');
 
 const TRACK_FIELDS = {
   first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
@@ -628,6 +629,8 @@ const exportMedicalPdf = async (req, res, next) => {
 
     const patient = await mapPatient(patientResult.rows[0]);
 
+    const EXPORT_RECORD_LIMIT = 200;
+
     const [allergiesResult, recordsResult, rxResult, labsResult] = await Promise.all([
       db.query(
         `SELECT id, patient_id, allergen, severity, reaction, noted_at, created_at
@@ -642,8 +645,9 @@ const exportMedicalPdf = async (req, res, next) => {
          LEFT JOIN doctors d ON mr.doctor_id = d.id
          LEFT JOIN users u ON d.user_id = u.id
          WHERE mr.patient_id = $1
-         ORDER BY mr.created_at DESC`,
-        [id]
+         ORDER BY mr.created_at DESC
+         LIMIT $2`,
+        [id, EXPORT_RECORD_LIMIT]
       ),
       db.query(
         `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
@@ -653,8 +657,9 @@ const exportMedicalPdf = async (req, res, next) => {
          LEFT JOIN doctors d ON rx.doctor_id = d.id
          LEFT JOIN users u ON d.user_id = u.id
          WHERE rx.patient_id = $1
-         ORDER BY rx.created_at DESC`,
-        [id]
+         ORDER BY rx.created_at DESC
+         LIMIT $2`,
+        [id, EXPORT_RECORD_LIMIT]
       ),
       db.query(
         `SELECT lr.id, lr.patient_id, lr.technician_id, lr.test_name, lr.result,
@@ -663,12 +668,12 @@ const exportMedicalPdf = async (req, res, next) => {
          FROM lab_reports lr
          LEFT JOIN users u ON lr.technician_id = u.id
          WHERE lr.patient_id = $1
-         ORDER BY lr.report_date DESC`,
-        [id]
+         ORDER BY lr.report_date DESC
+         LIMIT $2`,
+        [id, EXPORT_RECORD_LIMIT]
       ),
     ]);
 
-    const generateMedicalPdf = require('../utils/generateMedicalPdf');
     const pdfBuffer = await generateMedicalPdf({
       patient,
       allergies: allergiesResult.rows.map(mapAllergy),
@@ -677,7 +682,8 @@ const exportMedicalPdf = async (req, res, next) => {
       labReports: labsResult.rows.map(mapLabReport),
     });
 
-    const fileName = `Medical_Record_${patient.firstName}_${patient.lastName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    const safeName = `${patient.firstName}_${patient.lastName}`.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const fileName = `Medical_Record_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`;
 
     await auditLog({
       userId: req.user.id,
@@ -690,6 +696,8 @@ const exportMedicalPdf = async (req, res, next) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     res.send(pdfBuffer);
   } catch (err) {
     return next(err);
