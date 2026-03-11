@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useDeferredValue } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue, useCallback } from 'react';
 import {
   Calendar, FileText, Pill, FlaskConical, AlertCircle,
   ChevronLeft, ChevronRight, Clock, Stethoscope, Filter,
-  Search, CalendarDays, X,
+  Search, CalendarDays, X, Download,
 } from 'lucide-react';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
@@ -266,6 +266,7 @@ export default function MedicalHistory() {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 0 });
+  const [exporting, setExporting] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   useEffect(() => {
@@ -313,6 +314,34 @@ export default function MedicalHistory() {
     setPage(1);
   };
 
+  const handleExportPdf = useCallback(async () => {
+    setExporting(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+      const token = localStorage.getItem('medease_token');
+      const res = await fetch(`${API_URL}/api/patients/me/export-pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        throw new Error('Export failed');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1]
+        || `Medical_Record_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Failed to export medical history. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  }, []);
+
   const hasFilters = activeFilter || search || dateFrom || dateTo;
 
   const clearAllFilters = () => {
@@ -325,13 +354,31 @@ export default function MedicalHistory() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-          Medical History
-        </h1>
-        <p className="text-slate-500 mt-1">
-          A unified timeline of your visits, diagnoses, prescriptions, and lab reports.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
+            Medical History
+          </h1>
+          <p className="text-slate-500 mt-1">
+            A unified timeline of your visits, diagnoses, prescriptions, and lab reports.
+          </p>
+        </div>
+        <button
+          onClick={handleExportPdf}
+          disabled={exporting}
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm flex-shrink-0"
+        >
+          {exporting ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Exporting...
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" /> Export PDF
+            </>
+          )}
+        </button>
       </div>
 
       {/* Filters and search */}
