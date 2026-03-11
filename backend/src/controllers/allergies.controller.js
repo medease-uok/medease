@@ -1,6 +1,6 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
-const { canAccessPatient } = require('../utils/patientAccess');
+const { canAccessPatient, assertPatientAccess } = require('../utils/patientAccess');
 
 const getByPatientId = async (req, res, next) => {
   try {
@@ -28,14 +28,8 @@ const create = async (req, res, next) => {
     const { patientId } = req.params;
     const { allergen, severity, reaction, notedAt } = req.body;
 
-    const patient = await db.query('SELECT id FROM patients WHERE id = $1', [patientId]);
-    if (patient.rows.length === 0) {
-      throw new AppError('Patient not found.', 404);
-    }
-
-    if (!(await canAccessPatient(req.user, patientId))) {
-      throw new AppError('You do not have access to this patient\'s allergies.', 403);
-    }
+    // Auth checked before existence to prevent patient ID enumeration
+    await assertPatientAccess(req.user, patientId);
 
     const result = await db.query(
       `INSERT INTO patient_allergies (patient_id, allergen, severity, reaction, noted_at)

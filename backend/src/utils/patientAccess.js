@@ -1,4 +1,5 @@
-const db = require('../config/database')
+const db = require('../config/database');
+const AppError = require('./AppError');
 
 /**
  * Check whether the requesting user is allowed to access a specific patient's data.
@@ -86,4 +87,24 @@ function buildPatientAccessFilter(user) {
   return { clause: 'FALSE', params: [] }
 }
 
-module.exports = { canAccessPatient, buildPatientAccessFilter }
+/**
+ * Assert that the patient exists AND the user has access.
+ * Checks access first to prevent patient ID enumeration (always returns 403 for
+ * unauthorized users regardless of whether the patient exists).
+ *
+ * @param {object} user - req.user
+ * @param {string} patientId - UUID
+ * @throws {AppError} 403 if no access, 404 if patient not found
+ */
+async function assertPatientAccess(user, patientId) {
+  if (!(await canAccessPatient(user, patientId))) {
+    throw new AppError('You do not have access to this patient.', 403);
+  }
+
+  const result = await db.query('SELECT id FROM patients WHERE id = $1', [patientId]);
+  if (result.rows.length === 0) {
+    throw new AppError('Patient not found.', 404);
+  }
+}
+
+module.exports = { canAccessPatient, buildPatientAccessFilter, assertPatientAccess };

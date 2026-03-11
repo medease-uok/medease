@@ -4,7 +4,7 @@ const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middlewar
 const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
 const auditLog = require('../utils/auditLog');
 const generateMedicalPdf = require('../utils/generateMedicalPdf');
-const { canAccessPatient, buildPatientAccessFilter } = require('../utils/patientAccess');
+const { buildPatientAccessFilter, assertPatientAccess } = require('../utils/patientAccess');
 
 const TRACK_FIELDS = {
   first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
@@ -58,18 +58,13 @@ const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
+    // Auth checked before existence to prevent patient ID enumeration
+    await assertPatientAccess(req.user, id);
+
     const patientResult = await db.query(
       `${PATIENT_SELECT} WHERE p.id = $1`,
       [id]
     );
-
-    if (patientResult.rows.length === 0) {
-      throw new AppError('Patient not found.', 404);
-    }
-
-    if (!(await canAccessPatient(req.user, id))) {
-      throw new AppError('You do not have access to this patient.', 403);
-    }
 
     const patient = await mapPatient(patientResult.rows[0]);
     const isOwner = req.user.id === patientResult.rows[0].user_id;
@@ -441,14 +436,7 @@ const getPrescriptions = async (req, res, next) => {
     const offset = (page - 1) * limit;
     const status = req.query.status;
 
-    const patientCheck = await db.query('SELECT id FROM patients WHERE id = $1', [id]);
-    if (patientCheck.rows.length === 0) {
-      throw new AppError('Patient not found.', 404);
-    }
-
-    if (!(await canAccessPatient(req.user, id))) {
-      throw new AppError('You do not have access to this patient\'s prescriptions.', 403);
-    }
+    await assertPatientAccess(req.user, id);
 
     const params = [id];
     let whereClause = 'WHERE rx.patient_id = $1';
@@ -499,14 +487,7 @@ const getHistory = async (req, res, next) => {
     const offset = (page - 1) * limit;
     const type = req.query.type;
 
-    const patientCheck = await db.query('SELECT id FROM patients WHERE id = $1', [id]);
-    if (patientCheck.rows.length === 0) {
-      throw new AppError('Patient not found.', 404);
-    }
-
-    if (!(await canAccessPatient(req.user, id))) {
-      throw new AppError('You do not have access to this patient\'s history.', 403);
-    }
+    await assertPatientAccess(req.user, id);
 
     const typeClauses = [];
     const typeParams = [id];
@@ -633,15 +614,9 @@ const exportMedicalPdf = async (req, res, next) => {
   try {
     const { id } = req.params;
 
+    await assertPatientAccess(req.user, id);
+
     const patientResult = await db.query(`${PATIENT_SELECT} WHERE p.id = $1`, [id]);
-    if (patientResult.rows.length === 0) {
-      throw new AppError('Patient not found.', 404);
-    }
-
-    if (!(await canAccessPatient(req.user, id))) {
-      throw new AppError('You do not have access to this patient\'s records.', 403);
-    }
-
     const patient = await mapPatient(patientResult.rows[0]);
 
     const EXPORT_RECORD_LIMIT = 200;
