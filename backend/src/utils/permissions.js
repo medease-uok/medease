@@ -13,6 +13,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_lab_reports', 'view_own_lab_reports', 'create_lab_report', 'edit_lab_report',
     'upload_document', 'view_documents', 'view_own_documents', 'delete_document',
     'view_vaccinations', 'view_own_vaccinations', 'create_vaccination', 'edit_vaccination', 'delete_vaccination',
+    'view_chronic_conditions', 'view_own_chronic_conditions', 'create_chronic_condition', 'edit_chronic_condition', 'delete_chronic_condition',
     'manage_users', 'manage_roles', 'view_audit_logs', 'view_dashboard',
   ],
   doctor: [
@@ -24,6 +25,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_lab_reports',
     'upload_document', 'view_documents',
     'view_vaccinations', 'create_vaccination', 'edit_vaccination',
+    'view_chronic_conditions', 'create_chronic_condition', 'edit_chronic_condition',
   ],
   nurse: [
     'view_patients',
@@ -34,6 +36,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_lab_reports',
     'upload_document', 'view_documents',
     'view_vaccinations', 'create_vaccination', 'edit_vaccination',
+    'view_chronic_conditions',
   ],
   patient: [
     'view_own_profile', 'edit_own_profile',
@@ -44,6 +47,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'view_own_lab_reports',
     'upload_document', 'view_own_documents',
     'view_own_vaccinations',
+    'view_own_chronic_conditions',
   ],
   lab_technician: [
     'view_patients',

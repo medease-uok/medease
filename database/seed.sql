@@ -408,4 +408,30 @@ INSERT INTO vaccinations (patient_id, administered_by, vaccine_name, dose_number
   -- Lahiru Gunasekara
   ('ce000000-0000-0000-0000-000000000006', 'e0000000-0000-0000-0000-000000000003', 'Tetanus (Td)', 1, 'TD2026-01', 'Sanofi', 'Right deltoid', '2026-02-15', '2026-02-15', NULL, 'completed', 'Booster after sports injury.', NOW() - INTERVAL '24 days');
 
+-- ============================================
+-- CHRONIC CONDITIONS
+-- ============================================
+INSERT INTO chronic_conditions (patient_id, diagnosed_by, condition_name, severity, diagnosed_date, resolved_date, treatment, medications, status, notes, created_at) VALUES
+  -- Sarah Fernando
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'Asthma', 'moderate', '2018-03-15', NULL, 'Inhaler therapy, avoid triggers', 'Salbutamol 100mcg inhaler PRN, Fluticasone 250mcg BD', 'managed', 'Well controlled with current medications. Annual review recommended.', NOW() - INTERVAL '200 days'),
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'Seasonal Allergic Rhinitis', 'mild', '2020-06-10', NULL, 'Antihistamines during pollen season', 'Cetirizine 10mg OD (seasonal)', 'monitoring', 'Symptoms mainly March-May. Consider immunotherapy if worsening.', NOW() - INTERVAL '150 days'),
+
+  -- Dinesh Rajapaksa
+  ('ce000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'Type 2 Diabetes Mellitus', 'moderate', '2019-07-22', NULL, 'Diet control, exercise, oral hypoglycemics', 'Metformin 500mg BD, Gliclazide 80mg OD', 'active', 'HbA1c 7.2% at last check. Target <7%. Quarterly monitoring.', NOW() - INTERVAL '300 days'),
+  ('ce000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'Essential Hypertension', 'moderate', '2020-01-10', NULL, 'Lifestyle modifications, antihypertensives', 'Amlodipine 5mg OD, Losartan 50mg OD', 'active', 'BP well controlled at 130/80. Continue current regimen.', NOW() - INTERVAL '280 days'),
+  ('ce000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'Hyperlipidemia', 'mild', '2020-03-15', NULL, 'Dietary modifications, statin therapy', 'Atorvastatin 20mg nocte', 'managed', 'LDL reduced to 2.5 mmol/L. Continue statin.', NOW() - INTERVAL '250 days'),
+
+  -- Kavindi Weerasinghe
+  ('ce000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000003', 'Iron Deficiency Anemia', 'mild', '2025-08-01', NULL, 'Iron supplementation, dietary changes', 'Ferrous sulfate 200mg TDS', 'active', 'Hb improving from 9.5 to 10.8 g/dL. Recheck in 3 months.', NOW() - INTERVAL '100 days'),
+
+  -- Nuwan Jayasuriya
+  ('ce000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000001', 'Chronic Low Back Pain', 'moderate', '2022-04-10', NULL, 'Physiotherapy, pain management', 'Naproxen 500mg BD PRN, Omeprazole 20mg OD', 'active', 'MRI shows L4-L5 disc protrusion. Physio sessions twice weekly.', NOW() - INTERVAL '350 days'),
+  ('ce000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000001', 'Gastroesophageal Reflux Disease', 'mild', '2023-09-15', '2025-06-01', 'PPI therapy, dietary modifications', 'Omeprazole 20mg OD (already prescribed)', 'resolved', 'Symptoms resolved after 6 months of PPI. Discontinued specific GERD treatment.', NOW() - INTERVAL '200 days'),
+
+  -- Hasini Abeywickrama
+  ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000004', 'Migraine without Aura', 'moderate', '2021-11-20', NULL, 'Trigger avoidance, abortive therapy', 'Sumatriptan 50mg PRN, Propranolol 40mg BD (prophylaxis)', 'active', 'Frequency reduced from 4/month to 1/month with prophylaxis.', NOW() - INTERVAL '180 days'),
+
+  -- Lahiru Gunasekara
+  ('ce000000-0000-0000-0000-000000000006', 'd0000000-0000-0000-0000-000000000003', 'Exercise-Induced Asthma', 'mild', '2024-01-15', NULL, 'Pre-exercise inhaler use', 'Salbutamol 100mcg inhaler (2 puffs before exercise)', 'managed', 'Well controlled. No limitations on sports activities with pre-treatment.', NOW() - INTERVAL '120 days');
+
 COMMIT;
