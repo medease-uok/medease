@@ -27,6 +27,10 @@ MedEase is a web-based hospital management system that streamlines patient care,
 - **Organ Donor Management** - Track organ donor status, card number, and organs to donate
 - **Insurance Management** - Patient insurance details including provider, policy number, plan type, and expiry
 - **Profile Change History** - Track all patient profile modifications with pagination and audit trail
+- **Vaccination Records** - Full immunization history tracking with dose scheduling, lot numbers, and status management
+- **Medical Document Management** - S3-backed document uploads (lab reports, imaging, discharge summaries, referrals, insurance, consent forms) with presigned URLs
+- **Prescription Refill Requests** - Patients request refills, doctors approve/deny with notes, eligibility checks
+- **PDF Generation** - Generate downloadable PDFs for medical records and prescriptions
 - **Role-Based Access Control (RBAC)** - Granular permissions system with 26 permissions across 6 categories
 - **Attribute-Based Access Control (ABAC)** - Fine-grained, policy-driven access filtering on resources (appointments, records, prescriptions, lab reports)
 - **Email Verification** - OTP-based email verification on registration with resend and cooldown
@@ -62,7 +66,8 @@ Permissions are stored in the database and can be modified at runtime by admins 
 - **Cache**: Redis 8 (refresh tokens, permission caching, ABAC policy caching)
 - **Auth**: JWT access tokens (15m) + Redis-backed refresh tokens (7d rotation) + email OTP verification
 - **Email**: Nodemailer (registration verification, login OTP, password reset)
-- **Storage**: AWS S3 (profile images with presigned URLs)
+- **Storage**: AWS S3 (profile images, medical documents with presigned URLs)
+- **PDF**: PDFKit (medical record and prescription exports)
 - **CAPTCHA**: Cloudflare Turnstile
 - **Containerization**: Docker & Docker Compose
 - **Cloud**: AWS (Fargate, S3, CloudFront, API Gateway)
@@ -85,7 +90,11 @@ medease/
 │   ├── init/
 │   │   ├── 01-init.sql         # Core schema: users, patients, doctors, nurses, etc.
 │   │   ├── 02-roles-permissions.sql  # RBAC: roles, permissions, role_permissions, user_roles
-│   │   └── 03-abac-policies.sql     # ABAC: policy-based access control rules
+│   │   ├── 03-abac-policies.sql     # ABAC: policy-based access control rules
+│   │   ├── 04-notifications.sql     # Notifications table and enum
+│   │   ├── 05-refill-requests.sql   # Prescription refill requests
+│   │   ├── 06-medical-documents.sql # Medical document uploads
+│   │   └── 07-vaccinations.sql      # Vaccination/immunization records
 │   └── seed.sql                # Sample data for all tables
 ├── scripts/
 │   ├── lib/vault.js            # AES-256 crypto utility (OpenSSL-compatible)
@@ -111,6 +120,9 @@ medease/
 │       │   ├── labReports.controller.js
 │       │   ├── allergies.controller.js   # Patient allergy CRUD
 │       │   ├── notifications.controller.js  # In-app notifications
+│       │   ├── refillRequests.controller.js # Prescription refill request CRUD
+│       │   ├── medicalDocuments.controller.js # Medical document upload/download
+│       │   ├── vaccinations.controller.js   # Vaccination record CRUD
 │       │   └── dashboard.controller.js
 │       ├── middleware/
 │       │   ├── authenticate.js   # JWT verification
@@ -127,11 +139,14 @@ medease/
 │       ├── utils/
 │       │   ├── abac.js           # ABAC policy engine (evaluate, build SQL filters)
 │       │   ├── maskSensitiveFields.js # Role-based PII/PHI field masking
+│       │   ├── generateMedicalPdf.js  # PDF generation for records/prescriptions
+│       │   ├── refillEligibility.js   # Prescription refill eligibility logic
+│       │   ├── patientAccess.js       # Patient relationship filtering
 │       │   ├── emailService.js   # Nodemailer (verification, OTP, password reset)
 │       │   ├── permissions.js    # Permission checks with Redis caching
 │       │   ├── auditLog.js       # Audit logging with JSONB details
 │       │   └── AppError.js       # Custom error class
-│       ├── validators/           # Input validation schemas (auth, patients, allergies)
+│       ├── validators/           # Input validation schemas (auth, patients, allergies, vaccinations)
 │       └── index.js              # Express server entry point
 ├── frontend/
 │   └── src/
@@ -167,8 +182,11 @@ medease/
 │       │   ├── Doctors.jsx / DoctorDetail.jsx
 │       │   ├── Appointments.jsx
 │       │   ├── MedicalRecords.jsx
-│       │   ├── Prescriptions.jsx
+│       │   ├── MedicalHistory.jsx  # Patient medical history view
+│       │   ├── MedicalDocuments.jsx # Medical document upload/download
+│       │   ├── Prescriptions.jsx   # With refill request integration
 │       │   ├── LabReports.jsx
+│       │   ├── Vaccinations.jsx    # Immunization records
 │       │   └── PermissionManagement.jsx  # Role & permission management (admin)
 │       ├── data/
 │       │   ├── AuthContext.jsx # Auth state, login/logout/register
@@ -310,6 +328,9 @@ When seeding, the following sample data is created:
 | Prescriptions | 11 | Active, dispensed, expired, cancelled |
 | Lab Reports | 10 | CBC, MRI, ECG, X-Ray, and more |
 | Patient Allergies | 9 | Penicillin, Shellfish, Aspirin, Latex, Pollen, and more |
+| Refill Requests | 4 | Approved, denied, and pending prescription refills |
+| Medical Documents | 8 | Lab reports, imaging, discharge summaries, referrals, insurance claims |
+| Vaccinations | 16 | Hepatitis B, COVID-19, Influenza, HPV, Tetanus, and more |
 | Notifications | 42 | Appointments, prescriptions, lab reports, system alerts (mix of read/unread) |
 | Audit Logs | 15 | Login, view, create, update actions |
 
@@ -447,13 +468,35 @@ abac_policies                       patient_allergies
 ├── is_active                       └── created_at
 └── created_at
 
-profile_change_history
+profile_change_history              notifications
+├── id                              ├── id
+├── patient_id → patients.id        ├── recipient_id → users.id
+├── changed_by → users.id           ├── type (notification_type enum)
+├── field_name                      ├── title
+├── old_value                       ├── message
+├── new_value                       ├── is_read
+└── created_at                      ├── reference_id, reference_type
+                                    └── created_at
+
+prescription_refill_requests        medical_documents
+├── id                              ├── id
+├── prescription_id → prescriptions ├── patient_id → patients.id
+├── patient_id → patients.id        ├── uploaded_by → users.id
+├── doctor_id → doctors.id          ├── category (document_category enum)
+├── status (pending/approved/denied)├── title, description
+├── reason, doctor_note             ├── file_key, file_name, file_size, mime_type
+├── responded_at                    └── created_at
+└── created_at
+
+vaccinations
 ├── id
 ├── patient_id → patients.id
-├── changed_by → users.id
-├── field_name
-├── old_value
-├── new_value
+├── administered_by → users.id
+├── vaccine_name, dose_number
+├── lot_number, manufacturer, site
+├── scheduled_date, administered_date, next_dose_date
+├── status (scheduled/completed/missed/cancelled)
+├── notes
 └── created_at
 ```
 
