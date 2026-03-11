@@ -1,5 +1,6 @@
 const db = require('../config/database')
 const AppError = require('../utils/AppError')
+const { canAccessPatient } = require('../utils/patientAccess')
 
 function mapVaccination(row) {
   return {
@@ -20,46 +21,6 @@ function mapVaccination(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
-}
-
-/**
- * Check whether the requesting user is allowed to access a specific patient's vaccinations.
- *  - Admin: all patients
- *  - Patient: own records only
- *  - Doctor: patients they have medical records, prescriptions, or appointments with
- *  - Nurse: patients treated by doctors in the same department
- */
-async function canAccessPatient(user, patientId) {
-  if (user.role === 'admin') return true
-
-  if (user.role === 'patient') {
-    return patientId === user.patientId
-  }
-
-  if (user.role === 'doctor') {
-    const rel = await db.query(
-      `SELECT 1 FROM medical_records WHERE doctor_id = $1 AND patient_id = $2
-       UNION SELECT 1 FROM prescriptions WHERE doctor_id = $1 AND patient_id = $2
-       UNION SELECT 1 FROM appointments WHERE doctor_id = $1 AND patient_id = $2
-       LIMIT 1`,
-      [user.doctorId, patientId]
-    )
-    return rel.rows.length > 0
-  }
-
-  if (user.role === 'nurse') {
-    const rel = await db.query(
-      `SELECT 1 FROM appointments a
-       JOIN doctors d ON a.doctor_id = d.id
-       WHERE a.patient_id = $1
-         AND d.department = (SELECT n.department FROM nurses n WHERE n.user_id = $2)
-       LIMIT 1`,
-      [patientId, user.id]
-    )
-    return rel.rows.length > 0
-  }
-
-  return false
 }
 
 const getByPatientId = async (req, res, next) => {
