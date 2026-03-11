@@ -377,4 +377,35 @@ INSERT INTO medical_documents (patient_id, uploaded_by, category, title, descrip
    'medical-documents/ce000000-0000-0000-0000-000000000005/seed-derm-referral.pdf',
    'Dermatology_Referral.pdf', 102400, 'application/pdf', NOW() - INTERVAL '5 days');
 
+-- ============================================
+-- VACCINATIONS (immunization history)
+-- ============================================
+INSERT INTO vaccinations (patient_id, administered_by, vaccine_name, dose_number, lot_number, manufacturer, site, scheduled_date, administered_date, next_dose_date, status, notes, created_at) VALUES
+  -- Sarah Fernando
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'Hepatitis B', 1, 'HB2025-A1', 'GSK', 'Left deltoid', '2025-06-10', '2025-06-10', '2025-07-10', 'completed', 'First dose administered without adverse effects.', NOW() - INTERVAL '270 days'),
+  ('ce000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000001', 'Hepatitis B', 2, 'HB2025-A2', 'GSK', 'Left deltoid', '2025-07-10', '2025-07-12', '2025-12-10', 'completed', 'Second dose. Mild soreness at injection site.', NOW() - INTERVAL '240 days'),
+  ('ce000000-0000-0000-0000-000000000001', NULL, 'Hepatitis B', 3, NULL, 'GSK', NULL, '2025-12-10', NULL, NULL, 'missed', 'Patient did not attend scheduled appointment.', NOW() - INTERVAL '90 days'),
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'Influenza (Seasonal)', 1, 'FLU2026-01', 'Seqirus', 'Right deltoid', '2026-01-15', '2026-01-15', NULL, 'completed', 'Annual flu shot.', NOW() - INTERVAL '55 days'),
+
+  -- Dinesh Rajapaksa
+  ('ce000000-0000-0000-0000-000000000002', 'e0000000-0000-0000-0000-000000000002', 'COVID-19 (Pfizer)', 1, 'PF2025-C1', 'Pfizer-BioNTech', 'Left deltoid', '2025-08-01', '2025-08-01', '2025-08-22', 'completed', 'No adverse reactions.', NOW() - INTERVAL '220 days'),
+  ('ce000000-0000-0000-0000-000000000002', 'e0000000-0000-0000-0000-000000000002', 'COVID-19 (Pfizer)', 2, 'PF2025-C2', 'Pfizer-BioNTech', 'Left deltoid', '2025-08-22', '2025-08-22', NULL, 'completed', 'Mild fatigue for 24 hours.', NOW() - INTERVAL '200 days'),
+  ('ce000000-0000-0000-0000-000000000002', NULL, 'Tetanus Booster', 1, NULL, NULL, NULL, '2026-04-01', NULL, NULL, 'scheduled', 'Due for decennial tetanus booster.', NOW() - INTERVAL '5 days'),
+
+  -- Kavindi Weerasinghe
+  ('ce000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000003', 'Influenza (Seasonal)', 1, 'FLU2026-02', 'Seqirus', 'Right deltoid', '2026-02-01', '2026-02-01', NULL, 'completed', 'Annual flu vaccination.', NOW() - INTERVAL '38 days'),
+  ('ce000000-0000-0000-0000-000000000003', NULL, 'Pneumococcal (PCV13)', 1, NULL, 'Pfizer', NULL, '2026-03-20', NULL, NULL, 'scheduled', 'Recommended due to surgical history.', NOW() - INTERVAL '2 days'),
+
+  -- Nuwan Jayasuriya
+  ('ce000000-0000-0000-0000-000000000004', 'e0000000-0000-0000-0000-000000000001', 'COVID-19 (AstraZeneca)', 1, 'AZ2025-01', 'AstraZeneca', 'Left deltoid', '2025-05-10', '2025-05-10', '2025-07-10', 'completed', 'First dose.', NOW() - INTERVAL '300 days'),
+  ('ce000000-0000-0000-0000-000000000004', 'e0000000-0000-0000-0000-000000000001', 'COVID-19 (AstraZeneca)', 2, 'AZ2025-02', 'AstraZeneca', 'Left deltoid', '2025-07-10', '2025-07-10', NULL, 'completed', 'Second dose. Mild fever for 48 hours.', NOW() - INTERVAL '240 days'),
+
+  -- Hasini Abeywickrama
+  ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000004', 'HPV (Gardasil 9)', 1, 'HPV2025-G1', 'Merck', 'Left deltoid', '2025-09-01', '2025-09-01', '2025-11-01', 'completed', 'First dose of 3-dose series.', NOW() - INTERVAL '190 days'),
+  ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000004', 'HPV (Gardasil 9)', 2, 'HPV2025-G2', 'Merck', 'Left deltoid', '2025-11-01', '2025-11-03', '2026-03-01', 'completed', 'Second dose. Slight swelling at site.', NOW() - INTERVAL '128 days'),
+  ('ce000000-0000-0000-0000-000000000005', NULL, 'HPV (Gardasil 9)', 3, NULL, 'Merck', NULL, '2026-03-01', NULL, NULL, 'scheduled', 'Third and final dose pending.', NOW() - INTERVAL '10 days'),
+
+  -- Lahiru Gunasekara
+  ('ce000000-0000-0000-0000-000000000006', 'e0000000-0000-0000-0000-000000000003', 'Tetanus (Td)', 1, 'TD2026-01', 'Sanofi', 'Right deltoid', '2026-02-15', '2026-02-15', NULL, 'completed', 'Booster after sports injury.', NOW() - INTERVAL '24 days');
+
 COMMIT;

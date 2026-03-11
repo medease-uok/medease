@@ -10,12 +10,14 @@ const validate = require('../middleware/validate');
 const { updatePatientValidation, getPrescriptionsValidation } = require('../validators/patients.validators');
 const { upload } = require('../middleware/upload');
 const allergiesRoutes = require('./allergies.routes');
+const vaccinationsRoutes = require('./vaccinations.routes');
 const { sensitiveDataLimiter, exportLimiter } = require('../middleware/rateLimit');
 
 router.use(authenticate);
 router.use(resolveSubject);
 
 router.use('/:patientId/allergies', allergiesRoutes);
+router.use('/:patientId/vaccinations', vaccinationsRoutes);
 
 router.get('/me', authorize('patient'), getMe);
 router.get('/me/history', authorize('patient'), getMyHistory);
