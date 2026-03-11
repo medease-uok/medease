@@ -436,30 +436,7 @@ INSERT INTO chronic_conditions (patient_id, diagnosed_by, condition_name, severi
 
 -- ============================================
 -- LINK PRESCRIPTIONS TO CHRONIC CONDITIONS
--- Match prescriptions to their related chronic conditions by patient + medication overlap
 -- ============================================
-
--- Sarah: Amlodipine → Hypertension (medical record for "Mild hypertension" exists)
--- Patient 1 has Asthma and Seasonal Allergic Rhinitis as chronic conditions
--- No direct prescription match for Sarah's chronic conditions in seed data
-
--- Dinesh (patient 2): Has Type 2 Diabetes, Essential Hypertension, Hyperlipidemia
--- But Dinesh's prescriptions are Paracetamol (headache) and Amitriptyline (headache) — not linked
-
--- Kavindi (patient 3): Has Iron Deficiency Anemia
--- Kavindi's prescriptions are Ibuprofen and Tramadol (ortho) — not from anemia
-
--- Nuwan (patient 4): Has Chronic Low Back Pain, GERD
--- Nuwan's prescriptions: Warfarin (AF), Gabapentin (neuropathy), Vitamin B12 (neuropathy)
-
--- Hasini (patient 5): Has Migraine without Aura
--- Hasini's prescription: Ferrous Sulfate (for anemia, not migraine)
-
--- Lahiru (patient 6): Has Exercise-Induced Asthma
--- Lahiru's prescription: Diclofenac Gel (ACL sprain, expired)
-
--- The seed data doesn't have good prescription-to-condition matches.
--- Let's add new prescriptions that actually link to chronic conditions.
 
 INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration, status, chronic_condition_id) VALUES
   -- Sarah: Salbutamol for Asthma

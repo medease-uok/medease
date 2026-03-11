@@ -4,6 +4,8 @@ const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const mapRecord = (row) => ({
   id: row.id,
   patientId: row.patient_id,
@@ -82,10 +84,25 @@ const create = async (req, res, next) => {
       ? `Dr. ${doctorInfo.rows[0].first_name} ${doctorInfo.rows[0].last_name}`
       : 'Your doctor';
 
+    let validConditionId = null;
+    if (chronicConditionId) {
+      if (!UUID_RE.test(chronicConditionId)) {
+        throw new AppError('chronicConditionId must be a valid UUID.', 400);
+      }
+      const ccCheck = await db.query(
+        'SELECT id FROM chronic_conditions WHERE id = $1 AND patient_id = $2',
+        [chronicConditionId, patientId]
+      );
+      if (ccCheck.rowCount === 0) {
+        throw new AppError('Chronic condition not found for this patient.', 400);
+      }
+      validConditionId = chronicConditionId;
+    }
+
     const result = await db.query(
       `INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes, chronic_condition_id)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [patientId, doctorId, diagnosis, treatment || null, notes || null, chronicConditionId || null]
+      [patientId, doctorId, diagnosis, treatment || null, notes || null, validConditionId]
     );
 
     createNotification({
