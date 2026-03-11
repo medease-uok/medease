@@ -12,6 +12,7 @@ const pageTitles = {
   '/medical-records': 'Medical Records',
   '/prescriptions': 'Prescriptions',
   '/lab-reports': 'Lab Reports',
+  '/vaccinations': 'Vaccinations',
   '/documents': 'Medical Documents',
   '/admin': 'Admin Panel',
 };

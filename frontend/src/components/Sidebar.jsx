@@ -13,6 +13,7 @@ import {
   Shield,
   ClipboardList,
   FolderOpen,
+  Syringe,
 } from 'lucide-react';
 
 
@@ -26,6 +27,7 @@ const navConfig = [
   { path: '/medical-records', label: 'Medical Records', icon: FileText, roles: ROLE_GROUPS.PATIENT_CARE },
   { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN] },
   { path: '/lab-reports', label: 'Lab Reports', icon: FlaskConical, roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN] },
+  { path: '/vaccinations', label: 'Vaccinations', icon: Syringe, roles: ROLE_GROUPS.PATIENT_CARE },
   { path: '/documents', label: 'Documents', icon: FolderOpen, roles: [...ROLE_GROUPS.PATIENT_CARE, ROLES.LAB_TECHNICIAN] },
   { path: '/permissions', label: 'Permissions', icon: Shield, roles: [ROLES.ADMIN] },
 ];

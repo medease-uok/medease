@@ -1,0 +1,618 @@
+import { useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react'
+import {
+  Syringe, AlertCircle, Search, Clock, User, Calendar, X,
+  Plus, ChevronDown, CheckCircle2, AlertTriangle, XCircle, CalendarClock,
+  Edit2, Trash2, Building2, Hash, FileText,
+} from 'lucide-react'
+import { useAuth } from '../data/AuthContext'
+import api from '../services/api'
+import { Card, CardContent } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+
+const SKELETON_COUNT = 6
+const STATUSES = ['scheduled', 'completed', 'missed', 'cancelled']
+
+const STATUS_CONFIG = {
+  scheduled: { label: 'Scheduled', variant: 'default', icon: CalendarClock, color: 'text-blue-600 bg-blue-100' },
+  completed: { label: 'Completed', variant: 'success', icon: CheckCircle2, color: 'text-green-600 bg-green-100' },
+  missed: { label: 'Missed', variant: 'warning', icon: AlertTriangle, color: 'text-amber-600 bg-amber-100' },
+  cancelled: { label: 'Cancelled', variant: 'destructive', icon: XCircle, color: 'text-red-600 bg-red-100' },
+}
+
+const formatDate = (iso) => {
+  if (!iso) return '-'
+  const date = new Date(iso)
+  if (isNaN(date.getTime())) return '-'
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const matchesSearch = (v, query) => {
+  const q = query.toLowerCase()
+  return ['vaccineName', 'manufacturer', 'lotNumber', 'site', 'notes', 'administeredByName']
+    .some((f) => v[f]?.toLowerCase().includes(q))
+}
+
+function StatusBadge({ status }) {
+  const cfg = STATUS_CONFIG[status]
+  if (!cfg) return null
+  return <Badge variant={cfg.variant}>{cfg.label}</Badge>
+}
+
+function VaccinationCard({ vaccination, showPatient, canEdit, canDelete, onEdit, onDelete }) {
+  const cfg = STATUS_CONFIG[vaccination.status] || STATUS_CONFIG.scheduled
+  const StatusIcon = cfg.icon
+
+  return (
+    <div className="group relative rounded-xl border border-slate-200 bg-white p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-full ${cfg.color} flex items-center justify-center flex-shrink-0`}>
+            <StatusIcon className="w-5 h-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900">{vaccination.vaccineName}</h3>
+            <p className="text-sm text-slate-500">Dose {vaccination.doseNumber}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <StatusBadge status={vaccination.status} />
+          {(canEdit || canDelete) && (
+            <div className="ml-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {canEdit && (
+                <button onClick={() => onEdit(vaccination)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600" title="Edit">
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
+              {canDelete && (
+                <button onClick={() => onDelete(vaccination)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600" title="Delete">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2 text-sm">
+        {showPatient && vaccination.patientName && (
+          <div className="flex items-center gap-2 text-slate-600">
+            <User className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+            <span>{vaccination.patientName}</span>
+          </div>
+        )}
+        {vaccination.manufacturer && (
+          <div className="flex items-center gap-2 text-slate-600">
+            <Building2 className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+            <span>{vaccination.manufacturer}</span>
+          </div>
+        )}
+        {vaccination.lotNumber && (
+          <div className="flex items-center gap-2 text-slate-600">
+            <Hash className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+            <span>Lot: {vaccination.lotNumber}</span>
+          </div>
+        )}
+        {vaccination.site && (
+          <div className="flex items-center gap-2 text-slate-600">
+            <Syringe className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+            <span>{vaccination.site}</span>
+          </div>
+        )}
+        {vaccination.administeredByName && (
+          <div className="flex items-center gap-2 text-slate-600">
+            <User className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+            <span>By {vaccination.administeredByName}</span>
+          </div>
+        )}
+        {vaccination.notes && (
+          <div className="flex items-start gap-2 text-slate-500">
+            <FileText className="w-3.5 h-3.5 mt-0.5 text-slate-400" aria-hidden="true" />
+            <span className="line-clamp-2">{vaccination.notes}</span>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-slate-400">
+          {vaccination.administeredDate && (
+            <div className="flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>Given {formatDate(vaccination.administeredDate)}</span>
+            </div>
+          )}
+          {vaccination.scheduledDate && vaccination.status === 'scheduled' && (
+            <div className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              <span>Scheduled {formatDate(vaccination.scheduledDate)}</span>
+            </div>
+          )}
+          {vaccination.nextDoseDate && (
+            <div className="flex items-center gap-1">
+              <CalendarClock className="w-3 h-3" />
+              <span>Next dose {formatDate(vaccination.nextDoseDate)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ListSkeleton() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+        <div key={i} className="rounded-xl border border-slate-200 p-5 animate-pulse">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-slate-200" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 bg-slate-200 rounded w-3/4" />
+              <div className="h-3 bg-slate-100 rounded w-1/2" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-3 bg-slate-100 rounded" />
+            <div className="h-3 bg-slate-100 rounded w-2/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function VaccinationModal({ vaccination, patients, onClose, onSave, saving }) {
+  const [form, setForm] = useState({
+    patientId: vaccination?.patientId || '',
+    vaccineName: vaccination?.vaccineName || '',
+    doseNumber: vaccination?.doseNumber || 1,
+    lotNumber: vaccination?.lotNumber || '',
+    manufacturer: vaccination?.manufacturer || '',
+    site: vaccination?.site || '',
+    scheduledDate: vaccination?.scheduledDate?.slice(0, 10) || '',
+    administeredDate: vaccination?.administeredDate?.slice(0, 10) || '',
+    nextDoseDate: vaccination?.nextDoseDate?.slice(0, 10) || '',
+    status: vaccination?.status || 'scheduled',
+    notes: vaccination?.notes || '',
+  })
+
+  const isEdit = !!vaccination
+  const handleChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSave(form)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-6 border-b border-slate-200">
+          <h2 className="text-lg font-semibold text-slate-900">
+            {isEdit ? 'Edit Vaccination' : 'Add Vaccination'}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {!isEdit && patients && patients.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Patient</label>
+              <select value={form.patientId} onChange={handleChange('patientId')} required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Select patient...</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Vaccine Name *</label>
+            <input type="text" value={form.vaccineName} onChange={handleChange('vaccineName')} required maxLength={255}
+              placeholder="e.g. COVID-19 (Pfizer), Hepatitis B, Influenza"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Dose Number *</label>
+              <input type="number" value={form.doseNumber} onChange={handleChange('doseNumber')} required min={1} max={20}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+              <select value={form.status} onChange={handleChange('status')} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Manufacturer</label>
+              <input type="text" value={form.manufacturer} onChange={handleChange('manufacturer')} maxLength={200}
+                placeholder="e.g. Pfizer, Moderna"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Lot Number</label>
+              <input type="text" value={form.lotNumber} onChange={handleChange('lotNumber')} maxLength={100}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Injection Site</label>
+            <input type="text" value={form.site} onChange={handleChange('site')} maxLength={100}
+              placeholder="e.g. Left deltoid, Right thigh"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Scheduled</label>
+              <input type="date" value={form.scheduledDate} onChange={handleChange('scheduledDate')}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Administered</label>
+              <input type="date" value={form.administeredDate} onChange={handleChange('administeredDate')}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Next Dose</label>
+              <input type="date" value={form.nextDoseDate} onChange={handleChange('nextDoseDate')}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+            <textarea value={form.notes} onChange={handleChange('notes')} maxLength={1000} rows={3}
+              placeholder="Any additional notes..."
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" />
+            <p className="text-xs text-slate-400 mt-1">{form.notes.length}/1000</p>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {saving ? 'Saving...' : isEdit ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function DeleteConfirmModal({ vaccination, onClose, onConfirm, deleting }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm m-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+            <Trash2 className="w-5 h-5 text-red-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900">Delete Vaccination</h3>
+        </div>
+        <p className="text-sm text-slate-600 mb-6">
+          Are you sure you want to delete the record for <span className="font-medium">{vaccination.vaccineName} (Dose {vaccination.doseNumber})</span>? This action cannot be undone.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={deleting} className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50">
+            {deleting ? 'Deleting...' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function Vaccinations() {
+  const { currentUser } = useAuth()
+  const role = currentUser?.role
+  const isPatient = role === 'patient'
+  const isStaff = ['doctor', 'nurse', 'admin'].includes(role)
+  const canCreate = ['doctor', 'nurse', 'admin'].includes(role)
+  const canEdit = ['doctor', 'nurse', 'admin'].includes(role)
+  const canDelete = role === 'admin'
+
+  const [vaccinations, setVaccinations] = useState([])
+  const [patients, setPatients] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search)
+  const [statusFilter, setStatusFilter] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [selectedPatient, setSelectedPatient] = useState('')
+
+  const fetchVaccinations = useCallback(async () => {
+    try {
+      setError(null)
+      if (isPatient) {
+        const meRes = await api.get('/patients/me')
+        const patientId = meRes.data.id
+        const res = await api.get(`/patients/${patientId}/vaccinations`)
+        setVaccinations(res.data)
+      } else if (isStaff) {
+        // Staff sees vaccinations for a selected patient or all via patients list
+        if (selectedPatient) {
+          const res = await api.get(`/patients/${selectedPatient}/vaccinations`)
+          setVaccinations(res.data)
+        } else {
+          setVaccinations([])
+        }
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to load vaccination records.')
+    } finally {
+      setLoading(false)
+    }
+  }, [isPatient, isStaff, selectedPatient])
+
+  const fetchPatients = useCallback(async () => {
+    if (!isStaff) return
+    try {
+      const res = await api.get('/patients')
+      setPatients(res.data)
+      if (res.data.length > 0 && !selectedPatient) {
+        setSelectedPatient(res.data[0].id)
+      }
+    } catch {
+      // Patients list failed - non-critical
+    }
+  }, [isStaff, selectedPatient])
+
+  useEffect(() => { fetchPatients() }, [fetchPatients])
+  useEffect(() => { fetchVaccinations() }, [fetchVaccinations])
+
+  const handleSave = async (form) => {
+    setSaving(true)
+    try {
+      const patientId = isPatient ? vaccinations[0]?.patientId || (await api.get('/patients/me')).data.id : form.patientId || selectedPatient
+      const body = {
+        vaccineName: form.vaccineName,
+        doseNumber: parseInt(form.doseNumber, 10),
+        lotNumber: form.lotNumber || undefined,
+        manufacturer: form.manufacturer || undefined,
+        site: form.site || undefined,
+        scheduledDate: form.scheduledDate || undefined,
+        administeredDate: form.administeredDate || undefined,
+        nextDoseDate: form.nextDoseDate || undefined,
+        status: form.status,
+        notes: form.notes || undefined,
+      }
+
+      if (editTarget) {
+        await api.patch(`/patients/${patientId}/vaccinations/${editTarget.id}`, body)
+      } else {
+        await api.post(`/patients/${patientId}/vaccinations`, body)
+      }
+
+      setShowModal(false)
+      setEditTarget(null)
+      await fetchVaccinations()
+    } catch (err) {
+      alert(err.message || 'Failed to save vaccination record.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`/patients/${deleteTarget.patientId}/vaccinations/${deleteTarget.id}`)
+      setDeleteTarget(null)
+      await fetchVaccinations()
+    } catch (err) {
+      alert(err.message || 'Failed to delete vaccination record.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const filtered = useMemo(() => {
+    let items = vaccinations
+    if (deferredSearch) items = items.filter((v) => matchesSearch(v, deferredSearch))
+    if (statusFilter) items = items.filter((v) => v.status === statusFilter)
+    return items
+  }, [vaccinations, deferredSearch, statusFilter])
+
+  const stats = useMemo(() => ({
+    total: vaccinations.length,
+    completed: vaccinations.filter((v) => v.status === 'completed').length,
+    scheduled: vaccinations.filter((v) => v.status === 'scheduled').length,
+    missed: vaccinations.filter((v) => v.status === 'missed').length,
+  }), [vaccinations])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div><div className="h-7 bg-slate-200 rounded w-48 animate-pulse" /></div>
+        </div>
+        <ListSkeleton />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold font-heading text-slate-900">Vaccination History</h1>
+          <p className="text-sm text-slate-500 mt-1">Track and manage immunization records</p>
+        </div>
+        {canCreate && (
+          <button
+            onClick={() => { setEditTarget(null); setShowModal(true) }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add Vaccination
+          </button>
+        )}
+      </div>
+
+      {/* Patient selector for staff */}
+      {isStaff && patients.length > 0 && (
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-slate-700">Patient:</label>
+          <select
+            value={selectedPatient}
+            onChange={(e) => { setSelectedPatient(e.target.value); setLoading(true) }}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            {patients.map((p) => (
+              <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Stats */}
+      {vaccinations.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Total', value: stats.total, color: 'bg-slate-100 text-slate-700' },
+            { label: 'Completed', value: stats.completed, color: 'bg-green-100 text-green-700' },
+            { label: 'Scheduled', value: stats.scheduled, color: 'bg-blue-100 text-blue-700' },
+            { label: 'Missed', value: stats.missed, color: 'bg-amber-100 text-amber-700' },
+          ].map((s) => (
+            <Card key={s.label}>
+              <CardContent className="p-4">
+                <p className="text-xs font-medium text-slate-500">{s.label}</p>
+                <p className={`text-2xl font-bold mt-1 ${s.color.split(' ')[1]}`}>{s.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <p>{error}</p>
+          <button onClick={() => { setLoading(true); fetchVaccinations() }} className="ml-auto text-red-600 font-medium hover:underline">Retry</button>
+        </div>
+      )}
+
+      {/* Search & Filter */}
+      {vaccinations.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search vaccines, manufacturer, notes..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-4 h-4 text-slate-400 hover:text-slate-600" />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setStatusFilter(null)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${!statusFilter ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            >
+              All
+            </button>
+            {STATUSES.map((s) => {
+              const cfg = STATUS_CONFIG[s]
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(statusFilter === s ? null : s)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${statusFilter === s ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  {cfg.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      {vaccinations.length === 0 && !error ? (
+        <div className="text-center py-16">
+          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <Syringe className="w-8 h-8 text-slate-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 mb-1">No vaccination records</h3>
+          <p className="text-sm text-slate-500 mb-4">
+            {isPatient ? 'Your vaccination history will appear here.' : 'Select a patient to view their vaccination history.'}
+          </p>
+          {canCreate && selectedPatient && (
+            <button
+              onClick={() => { setEditTarget(null); setShowModal(true) }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add First Vaccination
+            </button>
+          )}
+        </div>
+      ) : filtered.length === 0 && vaccinations.length > 0 ? (
+        <div className="text-center py-12">
+          <Search className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-sm text-slate-500">No vaccinations match your search or filters.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((v) => (
+            <VaccinationCard
+              key={v.id}
+              vaccination={v}
+              showPatient={false}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              onEdit={(vax) => { setEditTarget(vax); setShowModal(true) }}
+              onDelete={setDeleteTarget}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Modals */}
+      {showModal && (
+        <VaccinationModal
+          vaccination={editTarget}
+          patients={isStaff ? patients : null}
+          onClose={() => { setShowModal(false); setEditTarget(null) }}
+          onSave={handleSave}
+          saving={saving}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          vaccination={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+          deleting={deleting}
+        />
+      )}
+    </div>
+  )
+}

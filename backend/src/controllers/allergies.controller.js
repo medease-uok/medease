@@ -1,9 +1,15 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
+const { canAccessPatient, assertPatientAccess } = require('../utils/patientAccess');
 
 const getByPatientId = async (req, res, next) => {
   try {
     const { patientId } = req.params;
+
+    if (!(await canAccessPatient(req.user, patientId))) {
+      throw new AppError('You do not have access to this patient\'s allergies.', 403);
+    }
+
     const result = await db.query(
       `SELECT id, patient_id, allergen, severity, reaction, noted_at, created_at
        FROM patient_allergies
@@ -22,10 +28,7 @@ const create = async (req, res, next) => {
     const { patientId } = req.params;
     const { allergen, severity, reaction, notedAt } = req.body;
 
-    const patient = await db.query('SELECT id FROM patients WHERE id = $1', [patientId]);
-    if (patient.rows.length === 0) {
-      throw new AppError('Patient not found.', 404);
-    }
+    await assertPatientAccess(req.user, patientId);
 
     const result = await db.query(
       `INSERT INTO patient_allergies (patient_id, allergen, severity, reaction, noted_at)
@@ -44,6 +47,10 @@ const update = async (req, res, next) => {
   try {
     const { patientId, id } = req.params;
     const { allergen, severity, reaction, notedAt } = req.body;
+
+    if (!(await canAccessPatient(req.user, patientId))) {
+      throw new AppError('You do not have access to this patient\'s allergies.', 403);
+    }
 
     const result = await db.query(
       `UPDATE patient_allergies
@@ -69,6 +76,10 @@ const update = async (req, res, next) => {
 const remove = async (req, res, next) => {
   try {
     const { patientId, id } = req.params;
+
+    if (!(await canAccessPatient(req.user, patientId))) {
+      throw new AppError('You do not have access to this patient\'s allergies.', 403);
+    }
 
     const result = await db.query(
       'DELETE FROM patient_allergies WHERE id = $1 AND patient_id = $2 RETURNING id',
