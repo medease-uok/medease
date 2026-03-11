@@ -30,6 +30,7 @@ MedEase is a web-based hospital management system that streamlines patient care,
 - **Vaccination Records** - Full immunization history tracking with dose scheduling, lot numbers, and status management
 - **Medical Document Management** - S3-backed document uploads (lab reports, imaging, discharge summaries, referrals, insurance, consent forms) with presigned URLs
 - **Prescription Refill Requests** - Patients request refills, doctors approve/deny with notes, eligibility checks
+- **Chronic Condition Tracking** - Manage ongoing conditions with severity, treatment plans, medications, and resolution tracking
 - **PDF Generation** - Generate downloadable PDFs for medical records and prescriptions
 - **Role-Based Access Control (RBAC)** - Granular permissions system with 26 permissions across 6 categories
 - **Attribute-Based Access Control (ABAC)** - Fine-grained, policy-driven access filtering on resources (appointments, records, prescriptions, lab reports)
@@ -94,7 +95,8 @@ medease/
 │   │   ├── 04-notifications.sql     # Notifications table and enum
 │   │   ├── 05-refill-requests.sql   # Prescription refill requests
 │   │   ├── 06-medical-documents.sql # Medical document uploads
-│   │   └── 07-vaccinations.sql      # Vaccination/immunization records
+│   │   ├── 07-vaccinations.sql      # Vaccination/immunization records
+│   │   └── 08-chronic-conditions.sql # Chronic condition tracking
 │   └── seed.sql                # Sample data for all tables
 ├── scripts/
 │   ├── lib/vault.js            # AES-256 crypto utility (OpenSSL-compatible)
@@ -123,6 +125,7 @@ medease/
 │       │   ├── refillRequests.controller.js # Prescription refill request CRUD
 │       │   ├── medicalDocuments.controller.js # Medical document upload/download
 │       │   ├── vaccinations.controller.js   # Vaccination record CRUD
+│       │   ├── chronicConditions.controller.js # Chronic condition management
 │       │   └── dashboard.controller.js
 │       ├── middleware/
 │       │   ├── authenticate.js   # JWT verification
@@ -146,7 +149,7 @@ medease/
 │       │   ├── permissions.js    # Permission checks with Redis caching
 │       │   ├── auditLog.js       # Audit logging with JSONB details
 │       │   └── AppError.js       # Custom error class
-│       ├── validators/           # Input validation schemas (auth, patients, allergies, vaccinations)
+│       ├── validators/           # Input validation schemas (auth, patients, allergies, vaccinations, chronic conditions)
 │       └── index.js              # Express server entry point
 ├── frontend/
 │   └── src/
@@ -187,6 +190,7 @@ medease/
 │       │   ├── Prescriptions.jsx   # With refill request integration
 │       │   ├── LabReports.jsx
 │       │   ├── Vaccinations.jsx    # Immunization records
+│       │   ├── ChronicConditions.jsx # Chronic condition management
 │       │   └── PermissionManagement.jsx  # Role & permission management (admin)
 │       ├── data/
 │       │   ├── AuthContext.jsx # Auth state, login/logout/register
@@ -331,6 +335,7 @@ When seeding, the following sample data is created:
 | Refill Requests | 4 | Approved, denied, and pending prescription refills |
 | Medical Documents | 8 | Lab reports, imaging, discharge summaries, referrals, insurance claims |
 | Vaccinations | 16 | Hepatitis B, COVID-19, Influenza, HPV, Tetanus, and more |
+| Chronic Conditions | 10 | Asthma, Diabetes, Hypertension, Migraine, and more (active, managed, resolved) |
 | Notifications | 42 | Appointments, prescriptions, lab reports, system alerts (mix of read/unread) |
 | Audit Logs | 15 | Login, view, create, update actions |
 
@@ -488,14 +493,17 @@ prescription_refill_requests        medical_documents
 ├── responded_at                    └── created_at
 └── created_at
 
-vaccinations
-├── id
-├── patient_id → patients.id
-├── administered_by → users.id
-├── vaccine_name, dose_number
-├── lot_number, manufacturer, site
-├── scheduled_date, administered_date, next_dose_date
-├── status (scheduled/completed/missed/cancelled)
+vaccinations                        chronic_conditions
+├── id                              ├── id
+├── patient_id → patients.id        ├── patient_id → patients.id
+├── administered_by → users.id      ├── diagnosed_by → users.id
+├── vaccine_name, dose_number       ├── condition_name
+├── lot_number, manufacturer, site  ├── severity (mild/moderate/severe/critical)
+├── scheduled_date,                 ├── diagnosed_date, resolved_date
+│   administered_date,              ├── treatment, medications
+│   next_dose_date                  ├── status (active/managed/resolved/monitoring)
+├── status (scheduled/completed/    ├── notes
+│   missed/cancelled)               └── created_at, updated_at
 ├── notes
 └── created_at
 ```

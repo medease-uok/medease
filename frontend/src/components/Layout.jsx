@@ -13,6 +13,7 @@ const pageTitles = {
   '/prescriptions': 'Prescriptions',
   '/lab-reports': 'Lab Reports',
   '/vaccinations': 'Vaccinations',
+  '/chronic-conditions': 'Chronic Conditions',
   '/documents': 'Medical Documents',
   '/admin': 'Admin Panel',
 };
