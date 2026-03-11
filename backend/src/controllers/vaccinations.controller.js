@@ -22,9 +22,53 @@ function mapVaccination(row) {
   }
 }
 
+/**
+ * Check whether the requesting user is allowed to access a specific patient's vaccinations.
+ *  - Admin: all patients
+ *  - Patient: own records only
+ *  - Doctor: patients they have medical records, prescriptions, or appointments with
+ *  - Nurse: patients treated by doctors in the same department
+ */
+async function canAccessPatient(user, patientId) {
+  if (user.role === 'admin') return true
+
+  if (user.role === 'patient') {
+    return patientId === user.patientId
+  }
+
+  if (user.role === 'doctor') {
+    const rel = await db.query(
+      `SELECT 1 FROM medical_records WHERE doctor_id = $1 AND patient_id = $2
+       UNION SELECT 1 FROM prescriptions WHERE doctor_id = $1 AND patient_id = $2
+       UNION SELECT 1 FROM appointments WHERE doctor_id = $1 AND patient_id = $2
+       LIMIT 1`,
+      [user.doctorId, patientId]
+    )
+    return rel.rows.length > 0
+  }
+
+  if (user.role === 'nurse') {
+    const rel = await db.query(
+      `SELECT 1 FROM appointments a
+       JOIN doctors d ON a.doctor_id = d.id
+       WHERE a.patient_id = $1
+         AND d.department = (SELECT n.department FROM nurses n WHERE n.user_id = $2)
+       LIMIT 1`,
+      [patientId, user.id]
+    )
+    return rel.rows.length > 0
+  }
+
+  return false
+}
+
 const getByPatientId = async (req, res, next) => {
   try {
     const { patientId } = req.params
+
+    if (!(await canAccessPatient(req.user, patientId))) {
+      throw new AppError('You do not have access to this patient\'s vaccination records.', 403)
+    }
 
     const result = await db.query(
       `SELECT v.*,
@@ -45,6 +89,10 @@ const getByPatientId = async (req, res, next) => {
 const getById = async (req, res, next) => {
   try {
     const { patientId, id } = req.params
+
+    if (!(await canAccessPatient(req.user, patientId))) {
+      throw new AppError('You do not have access to this patient\'s vaccination records.', 403)
+    }
 
     const result = await db.query(
       `SELECT v.*,
@@ -78,6 +126,10 @@ const create = async (req, res, next) => {
       throw new AppError('Patient not found.', 404)
     }
 
+    if (!(await canAccessPatient(req.user, patientId))) {
+      throw new AppError('You do not have access to this patient\'s vaccination records.', 403)
+    }
+
     const administeredBy = req.user.role !== 'patient' ? req.user.id : null
 
     const result = await db.query(
@@ -107,6 +159,10 @@ const update = async (req, res, next) => {
       vaccineName, doseNumber, lotNumber, manufacturer, site,
       scheduledDate, administeredDate, nextDoseDate, status, notes,
     } = req.body
+
+    if (!(await canAccessPatient(req.user, patientId))) {
+      throw new AppError('You do not have access to this patient\'s vaccination records.', 403)
+    }
 
     const result = await db.query(
       `UPDATE vaccinations
@@ -143,6 +199,10 @@ const update = async (req, res, next) => {
 const remove = async (req, res, next) => {
   try {
     const { patientId, id } = req.params
+
+    if (!(await canAccessPatient(req.user, patientId))) {
+      throw new AppError('You do not have access to this patient\'s vaccination records.', 403)
+    }
 
     const result = await db.query(
       'DELETE FROM vaccinations WHERE id = $1 AND patient_id = $2 RETURNING id',

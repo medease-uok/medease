@@ -55,7 +55,10 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'patient' AND p.name IN ('view_own_vaccinations');
 
--- ABAC policies
+-- ABAC policies (admin + patient own records)
+-- Clinical staff (doctor, nurse) access is enforced in the controller via relationship-based
+-- SQL checks: doctors see only their own patients (via medical_records/prescriptions/appointments),
+-- nurses see only patients in their department (via department → doctors → appointments).
 INSERT INTO abac_policies (name, description, resource_type, conditions, effect, priority) VALUES
   ('vaccination_admin_access', 'Admins can manage all vaccination records', 'vaccination',
    '{"any": [{"subject.role": {"in": ["admin"]}}]}',
