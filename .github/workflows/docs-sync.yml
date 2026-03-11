@@ -1,0 +1,389 @@
+name: Auto-Sync Documentation
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/workflows/**'
+      - 'config/**'
+      - 'diagrams/**'
+      - 'terraform/**'
+      - '*.enc'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-docs:
+    name: Analyze changes and sync documentation
+    runs-on: ubuntu-latest
+
+    # Skip if the commit was made by this workflow (prevent loops)
+    if: "!contains(github.event.head_commit.message, '[docs-sync]')"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Get changed files and diff
+        id: changes
+        run: |
+          # Get the diff for the push
+          DIFF=$(git diff HEAD~1 HEAD -- . ':!.github' ':!config' ':!diagrams' ':!terraform' ':!*.enc' ':!*.lock' ':!package-lock.json' | head -c 30000)
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+
+          # Save to files (avoid shell escaping issues)
+          echo "$DIFF" > /tmp/code_diff.txt
+          echo "$CHANGED_FILES" > /tmp/changed_files.txt
+
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Check if any meaningful code files changed
+          if echo "$CHANGED_FILES" | grep -qE '\.(js|jsx|ts|tsx|sql|json)$'; then
+            echo "has_code_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_code_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip if no code changes
+        if: steps.changes.outputs.has_code_changes == 'false'
+        run: echo "No code changes detected, skipping docs sync"
+
+      - name: Read current README
+        if: steps.changes.outputs.has_code_changes == 'true'
+        run: cat README.md > /tmp/current_readme.txt
+
+      - name: Analyze changes with Claude
+        if: steps.changes.outputs.has_code_changes == 'true'
+        id: analysis
+        uses: actions/github-script@v7
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            const diff = fs.readFileSync('/tmp/code_diff.txt', 'utf8');
+            const changedFiles = fs.readFileSync('/tmp/changed_files.txt', 'utf8');
+            const currentReadme = fs.readFileSync('/tmp/current_readme.txt', 'utf8');
+
+            const prompt = `You are a documentation analyst for MedEase, a hospital management system.
+
+            The following code changes were just merged to main. Analyze them and determine if any documentation needs updating.
+
+            ## Changed Files
+            ${changedFiles}
+
+            ## Code Diff
+            \`\`\`diff
+            ${diff}
+            \`\`\`
+
+            ## Current README.md
+            ${currentReadme}
+
+            ## Confluence Pages Available (page ID: title)
+            - 360461: Security Architecture
+            - 393218: Architecture & Tech Stack
+            - 393239: Scalability & Performance
+            - 425985: Access Control (RBAC + ABAC)
+            - 426011: API Documentation
+            - 426031: Database Schema
+            - 426062: Developer Guide
+            - 458753: API Versioning Strategy
+
+            ## Your Task
+            Respond with a JSON object (no markdown fences, just raw JSON):
+            {
+              "readme_update_needed": boolean,
+              "readme_reason": "why or 'no changes needed'",
+              "readme_new_content": "full updated README.md content if update needed, otherwise null",
+              "confluence_updates": [
+                {
+                  "page_id": "the page ID",
+                  "page_title": "the page title",
+                  "reason": "why this page needs updating",
+                  "section_guidance": "describe what content should be added/changed"
+                }
+              ]
+            }
+
+            Rules:
+            - Only flag updates that are genuinely needed based on the code changes
+            - README should stay concise (it links to Confluence for details)
+            - Only update README if features, tech stack, setup steps, or test accounts changed
+            - For Confluence, identify which specific pages need updating based on what changed
+            - If no docs need updating, return empty confluence_updates array and readme_update_needed: false
+            - Be conservative — minor refactors or bug fixes usually don't need doc updates`;
+
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01'
+              },
+              body: JSON.stringify({
+                model: 'claude-sonnet-4-6',
+                max_tokens: 8192,
+                messages: [{ role: 'user', content: prompt }]
+              })
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Claude API failed: ${response.status} - ${errorText}`);
+            }
+
+            const result = await response.json();
+            const analysisText = result.content[0].text;
+
+            // Parse JSON from response
+            let analysis;
+            try {
+              analysis = JSON.parse(analysisText);
+            } catch (e) {
+              // Try extracting JSON if wrapped in markdown
+              const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                analysis = JSON.parse(jsonMatch[0]);
+              } else {
+                throw new Error('Could not parse Claude response as JSON');
+              }
+            }
+
+            fs.writeFileSync('/tmp/analysis.json', JSON.stringify(analysis, null, 2));
+
+            core.setOutput('readme_update', analysis.readme_update_needed ? 'true' : 'false');
+            core.setOutput('confluence_count', String(analysis.confluence_updates?.length || 0));
+
+            console.log('=== Documentation Analysis ===');
+            console.log(`README update needed: ${analysis.readme_update_needed}`);
+            console.log(`README reason: ${analysis.readme_reason}`);
+            console.log(`Confluence pages to update: ${analysis.confluence_updates?.length || 0}`);
+            for (const update of (analysis.confluence_updates || [])) {
+              console.log(`  - ${update.page_title} (${update.page_id}): ${update.reason}`);
+            }
+
+      - name: Update README via PR
+        if: steps.changes.outputs.has_code_changes == 'true' && steps.analysis.outputs.readme_update == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const analysis = JSON.parse(fs.readFileSync('/tmp/analysis.json', 'utf8'));
+
+            if (!analysis.readme_new_content) {
+              console.log('No README content provided, skipping');
+              return;
+            }
+
+            const branchName = `docs-sync/readme-${Date.now()}`;
+
+            // Get current main SHA
+            const { data: ref } = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main'
+            });
+
+            // Create branch
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/heads/${branchName}`,
+              sha: ref.object.sha
+            });
+
+            // Get current README file to get its SHA
+            const { data: file } = await github.rest.repos.getContent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: 'README.md',
+              ref: branchName
+            });
+
+            // Update README on the branch
+            await github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: 'README.md',
+              message: `docs: update README [docs-sync]\n\n${analysis.readme_reason}`,
+              content: Buffer.from(analysis.readme_new_content).toString('base64'),
+              sha: file.sha,
+              branch: branchName
+            });
+
+            // Create PR
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `docs: auto-update README`,
+              body: `## Auto-generated documentation update\n\n**Reason:** ${analysis.readme_reason}\n\nThis PR was automatically created by the docs-sync workflow after changes were merged to main.\n\nPlease review the changes before merging.`,
+              head: branchName,
+              base: 'main'
+            });
+
+            console.log(`✅ Created PR #${pr.number}: ${pr.html_url}`);
+
+      - name: Update Confluence pages
+        if: steps.changes.outputs.has_code_changes == 'true' && steps.analysis.outputs.confluence_count != '0'
+        uses: actions/github-script@v7
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_KEY }}
+          CONFLUENCE_BASE_URL: 'https://medease-uok.atlassian.net'
+          CONFLUENCE_EMAIL: 'dhanikaanupama2000@gmail.com'
+        with:
+          script: |
+            const fs = require('fs');
+            const analysis = JSON.parse(fs.readFileSync('/tmp/analysis.json', 'utf8'));
+            const diff = fs.readFileSync('/tmp/code_diff.txt', 'utf8');
+
+            const authHeader = Buffer.from(`${process.env.CONFLUENCE_EMAIL}:${process.env.JIRA_API_TOKEN}`).toString('base64');
+            const baseUrl = process.env.CONFLUENCE_BASE_URL;
+
+            for (const update of analysis.confluence_updates) {
+              try {
+                console.log(`\n=== Updating: ${update.page_title} (${update.page_id}) ===`);
+                console.log(`Reason: ${update.reason}`);
+
+                // Fetch current page content and version
+                const pageResponse = await fetch(
+                  `${baseUrl}/wiki/rest/api/content/${update.page_id}?expand=body.storage,version`,
+                  {
+                    headers: {
+                      'Authorization': `Basic ${authHeader}`,
+                      'Accept': 'application/json'
+                    }
+                  }
+                );
+
+                if (!pageResponse.ok) {
+                  const errText = await pageResponse.text();
+                  console.error(`Failed to fetch page ${update.page_id}: ${pageResponse.status} - ${errText}`);
+                  continue;
+                }
+
+                const pageData = await pageResponse.json();
+                const currentContent = pageData.body.storage.value;
+                const currentVersion = pageData.version.number;
+
+                // Use Claude to generate updated content
+                const updatePrompt = `You are updating a Confluence documentation page for MedEase (hospital management system).
+
+            Page Title: ${update.page_title}
+            Update Reason: ${update.reason}
+            Guidance: ${update.section_guidance}
+
+            ## Current Page Content (Confluence Storage Format / HTML)
+            ${currentContent.substring(0, 40000)}
+
+            ## Code Changes That Triggered This Update
+            \`\`\`diff
+            ${diff.substring(0, 15000)}
+            \`\`\`
+
+            ## Instructions
+            Return ONLY the updated page content in Confluence storage format (XHTML).
+            - Preserve the existing structure and formatting
+            - Only modify the sections that need updating based on the code changes
+            - Keep the content professional and complete
+            - Do NOT wrap in markdown code fences — return raw XHTML only
+            - Make sure all HTML tags are properly closed (self-closing tags like <br/>, <hr/>)`;
+
+                const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': process.env.ANTHROPIC_API_KEY,
+                    'anthropic-version': '2023-06-01'
+                  },
+                  body: JSON.stringify({
+                    model: 'claude-sonnet-4-6',
+                    max_tokens: 16384,
+                    messages: [{ role: 'user', content: updatePrompt }]
+                  })
+                });
+
+                if (!claudeResponse.ok) {
+                  const errText = await claudeResponse.text();
+                  console.error(`Claude API failed for ${update.page_title}: ${claudeResponse.status} - ${errText}`);
+                  continue;
+                }
+
+                const claudeResult = await claudeResponse.json();
+                let newContent = claudeResult.content[0].text;
+
+                // Strip markdown code fences if Claude wrapped them
+                newContent = newContent.replace(/^```(?:html|xhtml)?\n?/i, '').replace(/\n?```$/i, '').trim();
+
+                // Update the Confluence page
+                const updateResponse = await fetch(
+                  `${baseUrl}/wiki/rest/api/content/${update.page_id}`,
+                  {
+                    method: 'PUT',
+                    headers: {
+                      'Authorization': `Basic ${authHeader}`,
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      id: update.page_id,
+                      type: 'page',
+                      title: update.page_title,
+                      version: {
+                        number: currentVersion + 1,
+                        message: `Auto-updated: ${update.reason}`
+                      },
+                      body: {
+                        storage: {
+                          value: newContent,
+                          representation: 'storage'
+                        }
+                      }
+                    })
+                  }
+                );
+
+                if (updateResponse.ok) {
+                  console.log(`✅ Successfully updated: ${update.page_title}`);
+                } else {
+                  const errText = await updateResponse.text();
+                  console.error(`Failed to update ${update.page_title}: ${updateResponse.status} - ${errText}`);
+                }
+
+              } catch (error) {
+                console.error(`Error updating ${update.page_title}: ${error.message}`);
+              }
+            }
+
+            console.log('\n✅ Confluence sync complete');
+
+      - name: Post summary
+        if: steps.changes.outputs.has_code_changes == 'true' && (steps.analysis.outputs.readme_update == 'true' || steps.analysis.outputs.confluence_count != '0')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const analysis = JSON.parse(fs.readFileSync('/tmp/analysis.json', 'utf8'));
+
+            let summary = '### 📄 Documentation Sync Summary\n\n';
+
+            if (analysis.readme_update_needed) {
+              summary += `**README:** Update PR created — ${analysis.readme_reason}\n\n`;
+            }
+
+            if (analysis.confluence_updates?.length > 0) {
+              summary += '**Confluence pages updated:**\n';
+              for (const update of analysis.confluence_updates) {
+                summary += `- [${update.page_title}](https://medease-uok.atlassian.net/wiki/spaces/MEDEASE/pages/${update.page_id}) — ${update.reason}\n`;
+              }
+            }
+
+            console.log(summary);
