@@ -18,7 +18,7 @@ router.use(resolveSubject);
 
 router.use('/:patientId/allergies', allergiesRoutes);
 router.use('/:patientId/vaccinations', vaccinationsRoutes);
-router.use('/:patientId/chronic-conditions', chronicConditionsRoutes);
+router.use('/:patientId/chronic-conditions', sensitiveDataLimiter, chronicConditionsRoutes);
 
 router.get('/me', authorize('patient'), getMe);
 router.get('/me/history', authorize('patient'), getMyHistory);
