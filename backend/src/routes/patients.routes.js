@@ -18,11 +18,6 @@ router.use(resolveSubject);
 router.use('/:patientId/allergies', allergiesRoutes);
 router.use('/:patientId/vaccinations', vaccinationsRoutes);
 
-// Access control enforced in controllers via canAccessPatient() / buildPatientAccessFilter():
-//  - Doctor: only patients they have records/prescriptions/appointments with
-//  - Nurse: only patients in their department
-//  - Patient: own data only
-//  - Admin: all patients
 router.get('/me', authorize('patient'), getMe);
 router.get('/me/history', authorize('patient'), getMyHistory);
 router.get('/me/export-pdf', authorize('patient'), exportLimiter, exportMyMedicalPdf);

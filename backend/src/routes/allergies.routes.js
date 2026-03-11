@@ -5,7 +5,6 @@ const { requirePermission } = require('../middleware/authorize');
 const validate = require('../middleware/validate');
 const { createAllergyValidation, updateAllergyValidation } = require('../validators/allergies.validators');
 
-// Access control enforced in controller via canAccessPatient()
 router.get('/', getByPatientId);
 router.post('/', requirePermission('edit_patient', 'edit_own_profile'), validate(createAllergyValidation), create);
 router.patch('/:id', requirePermission('edit_patient', 'edit_own_profile'), validate(updateAllergyValidation), update);

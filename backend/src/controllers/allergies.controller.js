@@ -28,7 +28,6 @@ const create = async (req, res, next) => {
     const { patientId } = req.params;
     const { allergen, severity, reaction, notedAt } = req.body;
 
-    // Auth checked before existence to prevent patient ID enumeration
     await assertPatientAccess(req.user, patientId);
 
     const result = await db.query(

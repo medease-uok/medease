@@ -58,7 +58,6 @@ const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Auth checked before existence to prevent patient ID enumeration
     await assertPatientAccess(req.user, id);
 
     const patientResult = await db.query(

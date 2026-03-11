@@ -5,11 +5,6 @@ const { requirePermission } = require('../middleware/authorize')
 const validate = require('../middleware/validate')
 const { createVaccinationValidation, updateVaccinationValidation } = require('../validators/vaccinations.validators')
 
-// Access control is enforced in the controller via canAccessPatient():
-//  - Doctor: only patients they have records/prescriptions/appointments with
-//  - Nurse: only patients in their department (via department → doctors → appointments)
-//  - Patient: own records only
-//  - Admin: all patients
 router.get('/', getByPatientId)
 router.get('/:id', getById)
 router.post('/', requirePermission('create_vaccination'), validate(createVaccinationValidation), create)

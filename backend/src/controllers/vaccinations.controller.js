@@ -86,7 +86,6 @@ const create = async (req, res, next) => {
       scheduledDate, administeredDate, nextDoseDate, status, notes,
     } = req.body;
 
-    // Auth checked before existence to prevent patient ID enumeration
     await assertPatientAccess(req.user, patientId);
 
     const administeredBy = req.user.role !== 'patient' ? req.user.id : null;
@@ -133,7 +132,6 @@ const update = async (req, res, next) => {
       throw new AppError('You do not have access to this patient\'s vaccination records.', 403);
     }
 
-    // Build SET clauses only for fields present in the request body
     const fields = [];
     const values = [];
     const body = req.body;

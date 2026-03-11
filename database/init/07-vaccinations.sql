@@ -1,5 +1,3 @@
--- Vaccination / Immunization History
-
 CREATE TYPE vaccination_status AS ENUM ('scheduled', 'completed', 'missed', 'cancelled');
 
 CREATE TABLE vaccinations (
@@ -27,7 +25,6 @@ CREATE INDEX idx_vaccinations_administered_by ON vaccinations(administered_by);
 
 GRANT ALL PRIVILEGES ON TABLE vaccinations TO medease_app;
 
--- Permissions
 INSERT INTO permissions (name, description, category) VALUES
   ('view_vaccinations', 'View all vaccination records', 'vaccinations'),
   ('view_own_vaccinations', 'View own vaccination records', 'vaccinations'),
@@ -35,30 +32,22 @@ INSERT INTO permissions (name, description, category) VALUES
   ('edit_vaccination', 'Edit vaccination records', 'vaccinations'),
   ('delete_vaccination', 'Delete vaccination records', 'vaccinations');
 
--- Admin: full access
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
 WHERE r.name = 'admin' AND p.name IN ('view_vaccinations', 'view_own_vaccinations', 'create_vaccination', 'edit_vaccination', 'delete_vaccination');
 
--- Doctor: view, create, edit
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'doctor' AND p.name IN ('view_vaccinations', 'create_vaccination', 'edit_vaccination');
 
--- Nurse: view, create, edit (nurses commonly administer vaccines)
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'nurse' AND p.name IN ('view_vaccinations', 'create_vaccination', 'edit_vaccination');
 
--- Patient: view own
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.name = 'patient' AND p.name IN ('view_own_vaccinations');
 
--- ABAC policies (admin + patient own records)
--- Clinical staff (doctor, nurse) access is enforced in the controller via relationship-based
--- SQL checks: doctors see only their own patients (via medical_records/prescriptions/appointments),
--- nurses see only patients in their department (via department → doctors → appointments).
 INSERT INTO abac_policies (name, description, resource_type, conditions, effect, priority) VALUES
   ('vaccination_admin_access', 'Admins can manage all vaccination records', 'vaccination',
    '{"any": [{"subject.role": {"in": ["admin"]}}]}',
