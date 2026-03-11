@@ -3,6 +3,7 @@ const AppError = require('../utils/AppError');
 const { uploadToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
 const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
 const auditLog = require('../utils/auditLog');
+const generateMedicalPdf = require('../utils/generateMedicalPdf');
 
 const TRACK_FIELDS = {
   first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
@@ -612,4 +613,108 @@ const getMyHistory = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, getMe, getHistory, getMyHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage };
+const exportMedicalPdf = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const patientResult = await db.query(`${PATIENT_SELECT} WHERE p.id = $1`, [id]);
+    if (patientResult.rows.length === 0) {
+      throw new AppError('Patient not found.', 404);
+    }
+
+    // Access check: patients can only export their own, staff can export any
+    if (req.user.role === 'patient' && patientResult.rows[0].user_id !== req.user.id) {
+      throw new AppError('You can only export your own medical records.', 403);
+    }
+
+    const patient = await mapPatient(patientResult.rows[0]);
+
+    const EXPORT_RECORD_LIMIT = 200;
+
+    const [allergiesResult, recordsResult, rxResult, labsResult] = await Promise.all([
+      db.query(
+        `SELECT id, patient_id, allergen, severity, reaction, noted_at, created_at
+         FROM patient_allergies WHERE patient_id = $1
+         ORDER BY severity DESC, allergen`,
+        [id]
+      ),
+      db.query(
+        `SELECT mr.id, mr.patient_id, mr.doctor_id, mr.diagnosis, mr.treatment, mr.notes, mr.created_at,
+                'Dr. ' || u.first_name || ' ' || u.last_name AS doctor_name
+         FROM medical_records mr
+         LEFT JOIN doctors d ON mr.doctor_id = d.id
+         LEFT JOIN users u ON d.user_id = u.id
+         WHERE mr.patient_id = $1
+         ORDER BY mr.created_at DESC
+         LIMIT $2`,
+        [id, EXPORT_RECORD_LIMIT]
+      ),
+      db.query(
+        `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
+                rx.frequency, rx.duration, rx.status, rx.created_at,
+                'Dr. ' || u.first_name || ' ' || u.last_name AS doctor_name
+         FROM prescriptions rx
+         LEFT JOIN doctors d ON rx.doctor_id = d.id
+         LEFT JOIN users u ON d.user_id = u.id
+         WHERE rx.patient_id = $1
+         ORDER BY rx.created_at DESC
+         LIMIT $2`,
+        [id, EXPORT_RECORD_LIMIT]
+      ),
+      db.query(
+        `SELECT lr.id, lr.patient_id, lr.technician_id, lr.test_name, lr.result,
+                lr.notes, lr.report_date,
+                u.first_name || ' ' || u.last_name AS technician_name
+         FROM lab_reports lr
+         LEFT JOIN users u ON lr.technician_id = u.id
+         WHERE lr.patient_id = $1
+         ORDER BY lr.report_date DESC
+         LIMIT $2`,
+        [id, EXPORT_RECORD_LIMIT]
+      ),
+    ]);
+
+    const pdfBuffer = await generateMedicalPdf({
+      patient,
+      allergies: allergiesResult.rows.map(mapAllergy),
+      medicalRecords: recordsResult.rows.map(mapRecord),
+      prescriptions: rxResult.rows.map(mapPrescription),
+      labReports: labsResult.rows.map(mapLabReport),
+    });
+
+    const safeName = `${patient.firstName}_${patient.lastName}`.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const fileName = `Medical_Record_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+    await auditLog({
+      userId: req.user.id,
+      action: 'EXPORT_MEDICAL_RECORD',
+      resourceType: 'patient',
+      resourceId: id,
+      ip: req.ip,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.send(pdfBuffer);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const exportMyMedicalPdf = async (req, res, next) => {
+  try {
+    const result = await db.query('SELECT id FROM patients WHERE user_id = $1', [req.user.id]);
+    if (result.rows.length === 0) {
+      throw new AppError('Patient profile not found.', 404);
+    }
+    req.params.id = result.rows[0].id;
+    return exportMedicalPdf(req, res, next);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, getMe, getHistory, getMyHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage, exportMedicalPdf, exportMyMedicalPdf };
