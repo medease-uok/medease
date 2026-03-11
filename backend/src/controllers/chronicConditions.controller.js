@@ -40,21 +40,78 @@ function mapCondition(row) {
   };
 }
 
+function groupBy(rows, keyField, mapper) {
+  return rows.reduce((acc, row) => {
+    const key = String(row[keyField]);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(mapper(row));
+    return acc;
+  }, {});
+}
+
 const getByPatientId = async (req, res, next) => {
   try {
     const { patientId } = req.params;
 
     await assertPatientAccess(req.user, patientId);
 
-    const result = await db.query(
-      `${conditionSelect()}
-       WHERE c.patient_id = $1
-       ORDER BY CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
-                c.diagnosed_date DESC NULLS LAST, c.created_at DESC`,
-      [patientId]
-    );
+    const [conditionsResult, prescriptionsResult, recordsResult] = await Promise.all([
+      db.query(
+        `${conditionSelect()}
+         WHERE c.patient_id = $1
+         ORDER BY CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
+                  c.diagnosed_date DESC NULLS LAST, c.created_at DESC`,
+        [patientId]
+      ),
+      db.query(
+        `SELECT rx.id, rx.chronic_condition_id, rx.medication, rx.dosage,
+                rx.frequency, rx.duration, rx.status, rx.created_at
+         FROM prescriptions rx
+         WHERE rx.patient_id = $1 AND rx.chronic_condition_id IS NOT NULL
+         ORDER BY rx.created_at DESC
+         LIMIT 50`,
+        [patientId]
+      ).catch(() => ({ rows: [] })),
+      db.query(
+        `SELECT mr.id, mr.chronic_condition_id, mr.diagnosis, mr.treatment,
+                mr.notes, mr.created_at,
+                du.first_name || ' ' || du.last_name AS doctor_name
+         FROM medical_records mr
+         LEFT JOIN doctors d ON mr.doctor_id = d.id
+         LEFT JOIN users du ON d.user_id = du.id
+         WHERE mr.patient_id = $1 AND mr.chronic_condition_id IS NOT NULL
+         ORDER BY mr.created_at DESC
+         LIMIT 50`,
+        [patientId]
+      ).catch(() => ({ rows: [] })),
+    ]);
 
-    res.json({ status: 'success', data: result.rows.map(mapCondition) });
+    const rxByCondition = groupBy(prescriptionsResult.rows, 'chronic_condition_id', (rx) => ({
+      id: rx.id,
+      medication: rx.medication,
+      dosage: rx.dosage,
+      frequency: rx.frequency,
+      duration: rx.duration,
+      status: rx.status,
+      createdAt: rx.created_at,
+    }));
+
+    const mrByCondition = groupBy(recordsResult.rows, 'chronic_condition_id', (mr) => ({
+      id: mr.id,
+      diagnosis: mr.diagnosis,
+      treatment: mr.treatment,
+      notes: mr.notes,
+      doctorName: mr.doctor_name ? `Dr. ${mr.doctor_name}` : null,
+      createdAt: mr.created_at,
+    }));
+
+    const data = conditionsResult.rows.map((row) => ({
+      ...mapCondition(row),
+      relatedPrescriptions: rxByCondition[String(row.id)] || [],
+      relatedRecords: mrByCondition[String(row.id)] || [],
+    }));
+
+    res.json({ status: 'success', data });
   } catch (err) {
     return next(err);
   }

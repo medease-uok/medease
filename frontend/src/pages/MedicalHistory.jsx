@@ -256,7 +256,7 @@ function TimelineSkeleton() {
   );
 }
 
-export default function MedicalHistory() {
+export default function MedicalHistory({ embedded = false }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -354,32 +354,54 @@ export default function MedicalHistory() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-            Medical History
-          </h1>
-          <p className="text-slate-500 mt-1">
-            A unified timeline of your visits, diagnoses, prescriptions, and lab reports.
-          </p>
+      {!embedded && (
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
+              Medical History
+            </h1>
+            <p className="text-slate-500 mt-1">
+              A unified timeline of your visits, diagnoses, prescriptions, and lab reports.
+            </p>
+          </div>
+          <button
+            onClick={handleExportPdf}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm flex-shrink-0"
+          >
+            {exporting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" /> Export PDF
+              </>
+            )}
+          </button>
         </div>
-        <button
-          onClick={handleExportPdf}
-          disabled={exporting}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm flex-shrink-0"
-        >
-          {exporting ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Exporting...
-            </>
-          ) : (
-            <>
-              <Download className="w-4 h-4" /> Export PDF
-            </>
-          )}
-        </button>
-      </div>
+      )}
+      {embedded && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleExportPdf}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm flex-shrink-0"
+          >
+            {exporting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" /> Export PDF
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Filters and search */}
       <Card>

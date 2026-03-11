@@ -85,7 +85,7 @@ function ListSkeleton() {
   );
 }
 
-export default function LabReports() {
+export default function LabReports({ embedded = false }) {
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -133,16 +133,18 @@ export default function LabReports() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-          {isPatient ? 'My Lab Reports' : 'Lab Reports'}
-        </h1>
-        <p className="text-slate-500 mt-1">
-          {isPatient
-            ? 'View your laboratory test results.'
-            : 'Manage and review patient lab reports.'}
-        </p>
-      </div>
+      {!embedded && (
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
+            {isPatient ? 'My Lab Reports' : 'Lab Reports'}
+          </h1>
+          <p className="text-slate-500 mt-1">
+            {isPatient
+              ? 'View your laboratory test results.'
+              : 'Manage and review patient lab reports.'}
+          </p>
+        </div>
+      )}
 
       {/* Filters and search */}
       <Card>

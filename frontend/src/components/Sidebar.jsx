@@ -19,18 +19,25 @@ import {
 
 
 const navConfig = [
+  // Staff dashboard
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ROLE_GROUPS.STAFF },
+  // Patient navigation (consolidated)
   { path: '/my-health', label: 'My Health', icon: Activity, roles: ROLE_GROUPS.PATIENT_ONLY },
-  { path: '/medical-history', label: 'Medical History', icon: ClipboardList, roles: ROLE_GROUPS.PATIENT_ONLY },
+  { path: '/my-records', label: 'Medical Records', icon: ClipboardList, roles: ROLE_GROUPS.PATIENT_ONLY },
+  { path: '/health-profile', label: 'Health Profile', icon: HeartPulse, roles: ROLE_GROUPS.PATIENT_ONLY },
+  { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.PATIENT_ONLY },
+  { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: ROLE_GROUPS.PATIENT_ONLY },
+  { path: '/documents', label: 'Documents', icon: FolderOpen, roles: ROLE_GROUPS.PATIENT_ONLY },
+  // Staff navigation
   { path: '/patients', label: 'Patients', icon: Users, roles: ROLE_GROUPS.CLINICAL },
-  { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: [ROLES.PATIENT, ROLES.ADMIN] },
-  { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.PATIENT_CARE },
-  { path: '/medical-records', label: 'Medical Records', icon: FileText, roles: ROLE_GROUPS.PATIENT_CARE },
-  { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN] },
-  { path: '/lab-reports', label: 'Lab Reports', icon: FlaskConical, roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN] },
-  { path: '/vaccinations', label: 'Vaccinations', icon: Syringe, roles: ROLE_GROUPS.PATIENT_CARE },
-  { path: '/chronic-conditions', label: 'Chronic Conditions', icon: HeartPulse, roles: ROLE_GROUPS.PATIENT_CARE },
-  { path: '/documents', label: 'Documents', icon: FolderOpen, roles: [...ROLE_GROUPS.PATIENT_CARE, ROLES.LAB_TECHNICIAN] },
+  { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: [ROLES.ADMIN] },
+  { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.CLINICAL },
+  { path: '/medical-records', label: 'Medical Records', icon: FileText, roles: ROLE_GROUPS.CLINICAL },
+  { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: [ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN] },
+  { path: '/lab-reports', label: 'Lab Reports', icon: FlaskConical, roles: [ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN] },
+  { path: '/vaccinations', label: 'Vaccinations', icon: Syringe, roles: ROLE_GROUPS.CLINICAL },
+  { path: '/chronic-conditions', label: 'Chronic Conditions', icon: HeartPulse, roles: ROLE_GROUPS.CLINICAL },
+  { path: '/documents', label: 'Documents', icon: FolderOpen, roles: [...ROLE_GROUPS.CLINICAL, ROLES.LAB_TECHNICIAN] },
   { path: '/permissions', label: 'Permissions', icon: Shield, roles: [ROLES.ADMIN] },
 ];
 

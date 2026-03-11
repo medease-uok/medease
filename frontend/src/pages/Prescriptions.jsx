@@ -387,7 +387,7 @@ function ListSkeleton() {
   );
 }
 
-export default function Prescriptions() {
+export default function Prescriptions({ embedded = false }) {
   const [tab, setTab] = useState('prescriptions');
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -504,16 +504,18 @@ export default function Prescriptions() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-          {isPatient ? 'My Prescriptions' : 'Prescriptions'}
-        </h1>
-        <p className="text-slate-500 mt-1">
-          {isPatient
-            ? 'View your current and past medication prescriptions.'
-            : 'Manage and review patient prescriptions.'}
-        </p>
-      </div>
+      {!embedded && (
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
+            {isPatient ? 'My Prescriptions' : 'Prescriptions'}
+          </h1>
+          <p className="text-slate-500 mt-1">
+            {isPatient
+              ? 'View your current and past medication prescriptions.'
+              : 'Manage and review patient prescriptions.'}
+          </p>
+        </div>
+      )}
 
       {/* Tabs */}
       {canViewRefills && (
