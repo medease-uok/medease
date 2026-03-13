@@ -21,6 +21,7 @@ import MedicalHistory from './pages/MedicalHistory';
 import MedicalDocuments from './pages/MedicalDocuments';
 import Vaccinations from './pages/Vaccinations';
 import ChronicConditions from './pages/ChronicConditions';
+import DoctorDashboard from './pages/DoctorDashboard';
 import MyRecords from './pages/MyRecords';
 import HealthProfile from './pages/HealthProfile';
 import './App.css';
@@ -31,6 +32,7 @@ function DashboardRedirect() {
   const { currentUser } = useAuth();
   if (!currentUser) return <Navigate to="/login" replace />;
   if (currentUser.role === ROLES.PATIENT) return <Navigate to="/my-health" replace />;
+  if (currentUser.role === ROLES.DOCTOR) return <Navigate to="/doctor-dashboard" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -45,6 +47,7 @@ function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<DashboardRedirect />} />
             <Route path="dashboard" element={<R roles={ROLE_GROUPS.STAFF}><DashboardEnhanced /></R>} />
+            <Route path="doctor-dashboard" element={<R roles={[ROLES.DOCTOR]}><DoctorDashboard /></R>} />
             <Route path="my-health" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><PatientDashboard /></R>} />
             <Route path="my-records" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><MyRecords /></R>} />
             <Route path="health-profile" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><HealthProfile /></R>} />

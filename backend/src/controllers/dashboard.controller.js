@@ -387,4 +387,134 @@ const getActivity = async (req, res, next) => {
   }
 };
 
-module.exports = { getStats, getActivity };
+const MAX_TODAY_APPOINTMENTS = 20;
+const MAX_UPCOMING_APPOINTMENTS = 10;
+const MAX_RECENT_PATIENTS = 10;
+const MAX_RECENT_PRESCRIPTIONS = 10;
+
+function mapAppointment(row) {
+  return {
+    id: row.id,
+    patientName: row.patient_name,
+    patientId: row.patient_id,
+    scheduledAt: row.scheduled_at,
+    status: row.status,
+    notes: row.notes,
+  };
+}
+
+const getDoctorDashboard = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const doctorResult = await db.query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+    if (doctorResult.rows.length === 0) {
+      return res.status(403).json({ status: 'error', message: 'Not a doctor account.' });
+    }
+    const doctorId = doctorResult.rows[0].id;
+
+    const [statsResult, todayAptsResult, upcomingAptsResult, recentPatientsResult, recentRxResult] = await Promise.all([
+      db.query(`
+        SELECT
+          (SELECT COUNT(*) FROM appointments a WHERE a.doctor_id = $1 AND a.status IN ('scheduled', 'confirmed', 'in_progress') AND DATE(a.scheduled_at) = CURRENT_DATE) AS today_appointments,
+          (SELECT COUNT(*) FROM appointments a WHERE a.doctor_id = $1 AND a.status = 'completed' AND DATE(a.scheduled_at) = CURRENT_DATE) AS completed_today,
+          (SELECT COUNT(DISTINCT a.patient_id) FROM appointments a WHERE a.doctor_id = $1) AS total_patients,
+          (SELECT COUNT(*) FROM prescriptions WHERE doctor_id = $1 AND status = 'active') AS active_prescriptions,
+          (SELECT COUNT(*) FROM medical_records WHERE doctor_id = $1) AS total_records,
+          (SELECT COUNT(*) FROM appointments a WHERE a.doctor_id = $1 AND a.status IN ('scheduled', 'confirmed') AND a.scheduled_at > NOW()) AS upcoming_count
+      `, [doctorId]),
+
+      db.query(`
+        SELECT a.id, a.scheduled_at, a.status, a.notes,
+               pu.first_name || ' ' || pu.last_name AS patient_name,
+               p.id AS patient_id
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        JOIN users pu ON p.user_id = pu.id
+        WHERE a.doctor_id = $1
+          AND a.status NOT IN ('cancelled', 'no_show')
+          AND DATE(a.scheduled_at) = CURRENT_DATE
+        ORDER BY a.scheduled_at ASC
+        LIMIT $2
+      `, [doctorId, MAX_TODAY_APPOINTMENTS]),
+
+      db.query(`
+        SELECT a.id, a.scheduled_at, a.status, a.notes,
+               pu.first_name || ' ' || pu.last_name AS patient_name,
+               p.id AS patient_id
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        JOIN users pu ON p.user_id = pu.id
+        WHERE a.doctor_id = $1 AND a.status IN ('scheduled', 'confirmed') AND a.scheduled_at > NOW()
+        ORDER BY a.scheduled_at ASC
+        LIMIT $2
+      `, [doctorId, MAX_UPCOMING_APPOINTMENTS]),
+
+      db.query(`
+        SELECT patient_id, patient_name, last_visit, last_status
+        FROM (
+          SELECT DISTINCT ON (p.id)
+                 p.id AS patient_id,
+                 pu.first_name || ' ' || pu.last_name AS patient_name,
+                 a.scheduled_at AS last_visit,
+                 a.status AS last_status
+          FROM appointments a
+          JOIN patients p ON a.patient_id = p.id
+          JOIN users pu ON p.user_id = pu.id
+          WHERE a.doctor_id = $1
+          ORDER BY p.id, a.scheduled_at DESC
+        ) sub
+        ORDER BY last_visit DESC
+        LIMIT $2
+      `, [doctorId, MAX_RECENT_PATIENTS]),
+
+      db.query(`
+        SELECT rx.id, rx.medication, rx.dosage, rx.frequency, rx.status, rx.created_at,
+               pu.first_name || ' ' || pu.last_name AS patient_name
+        FROM prescriptions rx
+        JOIN patients p ON rx.patient_id = p.id
+        JOIN users pu ON p.user_id = pu.id
+        WHERE rx.doctor_id = $1
+        ORDER BY rx.created_at DESC
+        LIMIT $2
+      `, [doctorId, MAX_RECENT_PRESCRIPTIONS]),
+    ]);
+
+    const stats = statsResult.rows[0];
+
+    res.json({
+      status: 'success',
+      data: {
+        stats: {
+          todayAppointments: parseInt(stats.today_appointments, 10),
+          completedToday: parseInt(stats.completed_today, 10),
+          totalPatients: parseInt(stats.total_patients, 10),
+          activePrescriptions: parseInt(stats.active_prescriptions, 10),
+          totalRecords: parseInt(stats.total_records, 10),
+          upcomingCount: parseInt(stats.upcoming_count, 10),
+        },
+        todayAppointments: todayAptsResult.rows.map(mapAppointment),
+        upcomingAppointments: upcomingAptsResult.rows.map(mapAppointment),
+        recentPatients: recentPatientsResult.rows.map((r) => ({
+          patientId: r.patient_id,
+          patientName: r.patient_name,
+          lastVisit: r.last_visit,
+          lastStatus: r.last_status,
+        })),
+        recentPrescriptions: recentRxResult.rows.map((r) => ({
+          id: r.id,
+          medication: r.medication,
+          dosage: r.dosage,
+          frequency: r.frequency,
+          status: r.status,
+          patientName: r.patient_name,
+          createdAt: r.created_at,
+        })),
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getStats, getActivity, getDoctorDashboard };

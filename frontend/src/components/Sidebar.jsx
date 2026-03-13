@@ -19,9 +19,8 @@ import {
 
 
 const navConfig = [
-  // Staff dashboard
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ROLE_GROUPS.STAFF },
-  // Patient navigation (consolidated)
+  { path: '/doctor-dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.DOCTOR] },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.NURSE, ROLES.LAB_TECHNICIAN, ROLES.PHARMACIST, ROLES.ADMIN] },
   { path: '/my-health', label: 'My Health', icon: Activity, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/my-records', label: 'Medical Records', icon: ClipboardList, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/health-profile', label: 'Health Profile', icon: HeartPulse, roles: ROLE_GROUPS.PATIENT_ONLY },
