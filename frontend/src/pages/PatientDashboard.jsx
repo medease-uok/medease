@@ -666,21 +666,21 @@ export default function PatientDashboard() {
           label="Prescriptions"
           count={prescriptionCount}
           color="from-orange-500 to-orange-600"
-          onClick={() => navigate('/prescriptions')}
+          onClick={() => navigate('/my-records?tab=prescriptions')}
         />
         <QuickNavCard
           icon={FlaskConical}
           label="Lab Reports"
           count={labCount}
           color="from-pink-500 to-pink-600"
-          onClick={() => navigate('/lab-reports')}
+          onClick={() => navigate('/my-records?tab=lab-reports')}
         />
         <QuickNavCard
           icon={FileText}
           label="Records"
           count={recordCount}
           color="from-purple-500 to-purple-600"
-          onClick={() => navigate('/medical-records')}
+          onClick={() => navigate('/my-records?tab=diagnoses')}
         />
       </div>
 
@@ -734,7 +734,7 @@ export default function PatientDashboard() {
               <CardDescription>Your current medications</CardDescription>
             </div>
             <button
-              onClick={() => navigate('/prescriptions')}
+              onClick={() => navigate('/my-records?tab=prescriptions')}
               className="text-sm text-primary font-medium flex items-center gap-1 hover:underline"
             >
               View all <ChevronRight className="w-4 h-4" />
@@ -775,7 +775,7 @@ export default function PatientDashboard() {
             <CardDescription>Your latest test results</CardDescription>
           </div>
           <button
-            onClick={() => navigate('/lab-reports')}
+            onClick={() => navigate('/my-records?tab=lab-reports')}
             className="text-sm text-primary font-medium flex items-center gap-1 hover:underline"
           >
             View all <ChevronRight className="w-4 h-4" />

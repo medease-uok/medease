@@ -22,6 +22,8 @@ import MedicalDocuments from './pages/MedicalDocuments';
 import Vaccinations from './pages/Vaccinations';
 import ChronicConditions from './pages/ChronicConditions';
 import DoctorDashboard from './pages/DoctorDashboard';
+import MyRecords from './pages/MyRecords';
+import HealthProfile from './pages/HealthProfile';
 import './App.css';
 
 const R = ({ roles, children }) => <RoleGuard roles={roles}>{children}</RoleGuard>;
@@ -47,6 +49,8 @@ function App() {
             <Route path="dashboard" element={<R roles={ROLE_GROUPS.STAFF}><DashboardEnhanced /></R>} />
             <Route path="doctor-dashboard" element={<R roles={[ROLES.DOCTOR]}><DoctorDashboard /></R>} />
             <Route path="my-health" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><PatientDashboard /></R>} />
+            <Route path="my-records" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><MyRecords /></R>} />
+            <Route path="health-profile" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><HealthProfile /></R>} />
             <Route path="patients" element={<R roles={ROLE_GROUPS.CLINICAL}><PatientsEnhanced /></R>} />
             <Route path="patients/:id" element={<R roles={ROLE_GROUPS.CLINICAL}><PatientDetail /></R>} />
             <Route path="doctors" element={<R roles={[ROLES.PATIENT, ROLES.ADMIN]}><Doctors /></R>} />

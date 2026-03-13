@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useDeferredValue } from 'rea
 import {
   HeartPulse, AlertCircle, Search, User, Calendar, X,
   Plus, CheckCircle2, AlertTriangle, XCircle, Eye,
-  Edit2, Trash2, Pill, FileText, Activity,
+  Edit2, Trash2, Pill, FileText, Activity, Stethoscope,
 } from 'lucide-react'
 import { useAuth } from '../data/AuthContext'
 import api from '../services/api'
@@ -137,6 +137,47 @@ function ConditionCard({ condition, showPatient, canEdit, canDelete, onEdit, onD
             </div>
           )}
         </div>
+
+        {/* Related prescriptions */}
+        {condition.relatedPrescriptions?.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <Pill className="w-3 h-3" /> Prescriptions ({condition.relatedPrescriptions.length})
+            </p>
+            <div className="space-y-1.5">
+              {condition.relatedPrescriptions.map((rx) => (
+                <div key={rx.id} className="flex items-center justify-between text-xs bg-orange-50 rounded-lg px-2.5 py-1.5">
+                  <span className="font-medium text-slate-700">{rx.medication} {rx.dosage}</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                    rx.status === 'active' ? 'bg-green-100 text-green-700' :
+                    rx.status === 'dispensed' ? 'bg-slate-100 text-slate-600' :
+                    rx.status === 'expired' ? 'bg-red-100 text-red-600' :
+                    'bg-slate-100 text-slate-500'
+                  }`}>
+                    {rx.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Related medical records */}
+        {condition.relatedRecords?.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <Stethoscope className="w-3 h-3" /> Diagnoses ({condition.relatedRecords.length})
+            </p>
+            <div className="space-y-1.5">
+              {condition.relatedRecords.map((mr) => (
+                <div key={mr.id} className="text-xs bg-blue-50 rounded-lg px-2.5 py-1.5">
+                  <p className="font-medium text-slate-700">{mr.diagnosis}</p>
+                  {mr.doctorName && <p className="text-slate-500 mt-0.5">{mr.doctorName}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -312,7 +353,7 @@ function DeleteConfirmModal({ condition, onClose, onConfirm, deleting }) {
   )
 }
 
-export default function ChronicConditions() {
+export default function ChronicConditions({ embedded = false }) {
   const { currentUser } = useAuth()
   const role = currentUser?.role
   const isPatient = role === 'patient'
@@ -449,21 +490,23 @@ export default function ChronicConditions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold font-heading text-slate-900">Chronic Conditions</h1>
-          <p className="text-sm text-slate-500 mt-1">Track ongoing conditions and treatment plans</p>
+      {!embedded && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold font-heading text-slate-900">Chronic Conditions</h1>
+            <p className="text-sm text-slate-500 mt-1">Track ongoing conditions and treatment plans</p>
+          </div>
+          {canCreate && (
+            <button
+              onClick={() => { setEditTarget(null); setShowModal(true) }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Condition
+            </button>
+          )}
         </div>
-        {canCreate && (
-          <button
-            onClick={() => { setEditTarget(null); setShowModal(true) }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add Condition
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Filters */}
       <Card>

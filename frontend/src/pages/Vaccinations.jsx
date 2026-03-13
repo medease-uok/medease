@@ -314,7 +314,7 @@ function DeleteConfirmModal({ vaccination, onClose, onConfirm, deleting }) {
   )
 }
 
-export default function Vaccinations() {
+export default function Vaccinations({ embedded = false }) {
   const { currentUser } = useAuth()
   const role = currentUser?.role
   const isPatient = role === 'patient'
@@ -455,21 +455,23 @@ export default function Vaccinations() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold font-heading text-slate-900">Vaccination History</h1>
-          <p className="text-sm text-slate-500 mt-1">Track and manage immunization records</p>
+      {!embedded && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold font-heading text-slate-900">Vaccination History</h1>
+            <p className="text-sm text-slate-500 mt-1">Track and manage immunization records</p>
+          </div>
+          {canCreate && (
+            <button
+              onClick={() => { setEditTarget(null); setShowModal(true) }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Vaccination
+            </button>
+          )}
         </div>
-        {canCreate && (
-          <button
-            onClick={() => { setEditTarget(null); setShowModal(true) }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add Vaccination
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Filters */}
       <Card>
