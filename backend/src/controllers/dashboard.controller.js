@@ -387,6 +387,22 @@ const getActivity = async (req, res, next) => {
   }
 };
 
+const MAX_TODAY_APPOINTMENTS = 20;
+const MAX_UPCOMING_APPOINTMENTS = 10;
+const MAX_RECENT_PATIENTS = 10;
+const MAX_RECENT_PRESCRIPTIONS = 10;
+
+function mapAppointment(row) {
+  return {
+    id: row.id,
+    patientName: row.patient_name,
+    patientId: row.patient_id,
+    scheduledAt: row.scheduled_at,
+    status: row.status,
+    notes: row.notes,
+  };
+}
+
 const getDoctorDashboard = async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -415,10 +431,12 @@ const getDoctorDashboard = async (req, res, next) => {
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN users pu ON p.user_id = pu.id
-        WHERE a.doctor_id = $1 AND DATE(a.scheduled_at) = CURRENT_DATE
+        WHERE a.doctor_id = $1
+          AND a.status NOT IN ('cancelled', 'no_show')
+          AND DATE(a.scheduled_at) = CURRENT_DATE
         ORDER BY a.scheduled_at ASC
-        LIMIT 20
-      `, [doctorId]),
+        LIMIT $2
+      `, [doctorId, MAX_TODAY_APPOINTMENTS]),
 
       db.query(`
         SELECT a.id, a.scheduled_at, a.status, a.notes,
@@ -429,22 +447,26 @@ const getDoctorDashboard = async (req, res, next) => {
         JOIN users pu ON p.user_id = pu.id
         WHERE a.doctor_id = $1 AND a.status IN ('scheduled', 'confirmed') AND a.scheduled_at > NOW()
         ORDER BY a.scheduled_at ASC
-        LIMIT 10
-      `, [doctorId]),
+        LIMIT $2
+      `, [doctorId, MAX_UPCOMING_APPOINTMENTS]),
 
       db.query(`
-        SELECT DISTINCT ON (p.id)
-               p.id AS patient_id,
-               pu.first_name || ' ' || pu.last_name AS patient_name,
-               a.scheduled_at AS last_visit,
-               a.status AS last_status
-        FROM appointments a
-        JOIN patients p ON a.patient_id = p.id
-        JOIN users pu ON p.user_id = pu.id
-        WHERE a.doctor_id = $1
-        ORDER BY p.id, a.scheduled_at DESC
-        LIMIT 10
-      `, [doctorId]),
+        SELECT patient_id, patient_name, last_visit, last_status
+        FROM (
+          SELECT DISTINCT ON (p.id)
+                 p.id AS patient_id,
+                 pu.first_name || ' ' || pu.last_name AS patient_name,
+                 a.scheduled_at AS last_visit,
+                 a.status AS last_status
+          FROM appointments a
+          JOIN patients p ON a.patient_id = p.id
+          JOIN users pu ON p.user_id = pu.id
+          WHERE a.doctor_id = $1
+          ORDER BY p.id, a.scheduled_at DESC
+        ) sub
+        ORDER BY last_visit DESC
+        LIMIT $2
+      `, [doctorId, MAX_RECENT_PATIENTS]),
 
       db.query(`
         SELECT rx.id, rx.medication, rx.dosage, rx.frequency, rx.status, rx.created_at,
@@ -454,39 +476,25 @@ const getDoctorDashboard = async (req, res, next) => {
         JOIN users pu ON p.user_id = pu.id
         WHERE rx.doctor_id = $1
         ORDER BY rx.created_at DESC
-        LIMIT 10
-      `, [doctorId]),
+        LIMIT $2
+      `, [doctorId, MAX_RECENT_PRESCRIPTIONS]),
     ]);
 
-    const s = statsResult.rows[0];
+    const stats = statsResult.rows[0];
 
     res.json({
       status: 'success',
       data: {
         stats: {
-          todayAppointments: parseInt(s.today_appointments),
-          completedToday: parseInt(s.completed_today),
-          totalPatients: parseInt(s.total_patients),
-          activePrescriptions: parseInt(s.active_prescriptions),
-          totalRecords: parseInt(s.total_records),
-          upcomingCount: parseInt(s.upcoming_count),
+          todayAppointments: parseInt(stats.today_appointments, 10),
+          completedToday: parseInt(stats.completed_today, 10),
+          totalPatients: parseInt(stats.total_patients, 10),
+          activePrescriptions: parseInt(stats.active_prescriptions, 10),
+          totalRecords: parseInt(stats.total_records, 10),
+          upcomingCount: parseInt(stats.upcoming_count, 10),
         },
-        todayAppointments: todayAptsResult.rows.map((r) => ({
-          id: r.id,
-          patientName: r.patient_name,
-          patientId: r.patient_id,
-          scheduledAt: r.scheduled_at,
-          status: r.status,
-          notes: r.notes,
-        })),
-        upcomingAppointments: upcomingAptsResult.rows.map((r) => ({
-          id: r.id,
-          patientName: r.patient_name,
-          patientId: r.patient_id,
-          scheduledAt: r.scheduled_at,
-          status: r.status,
-          notes: r.notes,
-        })),
+        todayAppointments: todayAptsResult.rows.map(mapAppointment),
+        upcomingAppointments: upcomingAptsResult.rows.map(mapAppointment),
         recentPatients: recentPatientsResult.rows.map((r) => ({
           patientId: r.patient_id,
           patientName: r.patient_name,
