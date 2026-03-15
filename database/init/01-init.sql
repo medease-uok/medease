@@ -21,7 +21,7 @@ GRANT ALL PRIVILEGES ON DATABASE medease TO medease_app;
 
 -- Create enum types
 CREATE TYPE user_role AS ENUM ('patient', 'doctor', 'nurse', 'lab_technician', 'pharmacist', 'admin');
-CREATE TYPE appointment_status AS ENUM ('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled');
+CREATE TYPE appointment_status AS ENUM ('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show');
 CREATE TYPE prescription_status AS ENUM ('active', 'dispensed', 'expired', 'cancelled');
 
 -- Users table
