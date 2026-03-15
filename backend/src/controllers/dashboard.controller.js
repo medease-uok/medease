@@ -557,4 +557,81 @@ const getDoctorDashboard = async (req, res, next) => {
   }
 };
 
-module.exports = { getStats, getActivity, getDoctorDashboard };
+const QUEUE_LIMIT = 30;
+const QUEUE_POLL_INTERVAL_HINT = 30; // seconds — sent to clients so they know when to refetch
+
+const getPatientQueue = async (req, res, next) => {
+  try {
+    const { role, id: userId } = req.user;
+
+    let roleQueueFilter = '';
+    const params = [QUEUE_LIMIT];
+    const emptyQueue = { queue: [], pollInterval: QUEUE_POLL_INTERVAL_HINT };
+
+    if (role === 'doctor') {
+      // Doctors see only their own queue
+      const doctorResult = await db.query(
+        'SELECT id FROM doctors WHERE user_id = $1', [userId]
+      );
+      const doctorId = doctorResult.rows[0]?.id;
+      if (!doctorId) {
+        return res.json({ status: 'success', data: emptyQueue });
+      }
+      roleQueueFilter = 'AND a.doctor_id = $2';
+      params.push(doctorId);
+    } else if (role === 'nurse') {
+      // Nurses see only their department's doctors' queue
+      const nurseResult = await db.query(
+        'SELECT department FROM nurses WHERE user_id = $1', [userId]
+      );
+      const department = nurseResult.rows[0]?.department;
+      if (!department) {
+        return res.json({ status: 'success', data: emptyQueue });
+      }
+      roleQueueFilter = 'AND d.department = $2';
+      params.push(department);
+    }
+
+    const result = await db.query(
+      `SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
+              pu.first_name || ' ' || pu.last_name AS patient_name,
+              'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name,
+              d.specialization, d.department
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN users pu ON p.user_id = pu.id
+       JOIN doctors d ON a.doctor_id = d.id
+       JOIN users du ON d.user_id = du.id
+       WHERE DATE(a.scheduled_at) = CURRENT_DATE
+         AND a.status IN ('scheduled', 'confirmed', 'in_progress')
+         ${roleQueueFilter}
+       ORDER BY
+         CASE a.status WHEN 'in_progress' THEN 0 ELSE 1 END,
+         a.scheduled_at ASC
+       LIMIT $1`,
+      params
+    );
+
+    const queue = result.rows.map((row, idx) => ({
+      position: idx + 1,
+      id: row.id,
+      patientId: row.patient_id,
+      patientName: row.patient_name,
+      doctorName: row.doctor_name,
+      specialization: row.specialization,
+      department: row.department,
+      scheduledAt: row.scheduled_at,
+      status: row.status,
+      notes: row.notes,
+    }));
+
+    res.json({
+      status: 'success',
+      data: { queue, pollInterval: QUEUE_POLL_INTERVAL_HINT },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getStats, getActivity, getDoctorDashboard, getPatientQueue };

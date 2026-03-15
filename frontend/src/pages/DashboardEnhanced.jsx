@@ -12,6 +12,7 @@ import { QuickActions } from '../components/QuickActions';
 import { ActivityFeed } from '../components/ActivityFeed';
 import UserProfileCard from '../components/UserProfileCard';
 import EditStaffProfileModal from '../components/EditStaffProfileModal';
+import PatientQueue from '../components/PatientQueue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
@@ -398,6 +399,11 @@ export default function DashboardEnhanced() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Patient Queue — visible to clinical staff */}
+      {['admin', 'nurse', 'doctor'].includes(role) && (
+        <PatientQueue />
+      )}
 
       {/* Activity Feed */}
       <div>

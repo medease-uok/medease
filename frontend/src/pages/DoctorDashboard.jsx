@@ -10,6 +10,7 @@ import UserProfileCard from '../components/UserProfileCard';
 import EditStaffProfileModal from '../components/EditStaffProfileModal';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import PatientQueue from '../components/PatientQueue';
 
 const formatTime = (iso) => {
   const d = new Date(iso);
@@ -335,6 +336,9 @@ export default function DoctorDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Patient Queue */}
+      <PatientQueue isDoctor />
 
       {/* Bottom Grid: Recent Patients + Recent Prescriptions */}
       <div className="grid gap-6 lg:grid-cols-2">
