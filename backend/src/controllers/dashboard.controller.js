@@ -1,5 +1,18 @@
 const db = require('../config/database');
 
+const TODAY_LIMIT = 20;
+const UPCOMING_LIMIT = 10;
+const RECENT_LIMIT = 5;
+
+const mapAppointment = (row) => ({
+  id: row.id,
+  patientName: row.patient_name,
+  doctorName: row.doctor_name,
+  scheduledAt: row.scheduled_at,
+  status: row.status,
+  notes: row.notes,
+});
+
 const getStats = async (req, res, next) => {
   try {
     const { role, id: userId } = req.user;
@@ -141,35 +154,29 @@ const getStats = async (req, res, next) => {
 
     let roleFilter = '';
     let filterParams = [];
+    const emptyResponse = { stats, todayAppointments: [], upcomingAppointments: [], recentAppointments: [] };
 
     if (role === 'patient') {
       const patientResult = await db.query(
         'SELECT id FROM patients WHERE user_id = $1', [userId]
       );
       const patientId = patientResult.rows[0]?.id;
-      if (patientId) {
-        roleFilter = 'AND a.patient_id = $1';
-        filterParams = [patientId];
+      if (!patientId) {
+        return res.json({ status: 'success', data: emptyResponse });
       }
+      roleFilter = 'AND a.patient_id = $1';
+      filterParams = [patientId];
     } else if (role === 'doctor') {
       const doctorResult = await db.query(
         'SELECT id FROM doctors WHERE user_id = $1', [userId]
       );
       const doctorId = doctorResult.rows[0]?.id;
-      if (doctorId) {
-        roleFilter = 'AND a.doctor_id = $1';
-        filterParams = [doctorId];
+      if (!doctorId) {
+        return res.json({ status: 'success', data: emptyResponse });
       }
+      roleFilter = 'AND a.doctor_id = $1';
+      filterParams = [doctorId];
     }
-
-    const mapApt = (row) => ({
-      id: row.id,
-      patientName: row.patient_name,
-      doctorName: row.doctor_name,
-      scheduledAt: row.scheduled_at,
-      status: row.status,
-      notes: row.notes,
-    });
 
     const limitIdx = filterParams.length + 1;
 
@@ -181,24 +188,24 @@ const getStats = async (req, res, next) => {
            ${roleFilter}
          ORDER BY a.scheduled_at ASC
          LIMIT $${limitIdx}`,
-        [...filterParams, 20]
+        [...filterParams, TODAY_LIMIT]
       ),
+      // Upcoming: future dates only (excludes today), scheduled or confirmed
       db.query(
         `${baseRecent}
-         WHERE a.scheduled_at > NOW()
-           AND DATE(a.scheduled_at) > CURRENT_DATE
+         WHERE DATE(a.scheduled_at) > CURRENT_DATE
            AND a.status IN ('scheduled', 'confirmed')
            ${roleFilter}
          ORDER BY a.scheduled_at ASC
          LIMIT $${limitIdx}`,
-        [...filterParams, 10]
+        [...filterParams, UPCOMING_LIMIT]
       ),
       db.query(
         `${baseRecent}
-         WHERE 1=1 ${roleFilter}
+         ${roleFilter ? `WHERE ${roleFilter.replace('AND ', '')}` : ''}
          ORDER BY a.scheduled_at DESC
          LIMIT $${limitIdx}`,
-        [...filterParams, 5]
+        [...filterParams, RECENT_LIMIT]
       ),
     ]);
 
@@ -206,9 +213,9 @@ const getStats = async (req, res, next) => {
       status: 'success',
       data: {
         stats,
-        todayAppointments: todayResult.rows.map(mapApt),
-        upcomingAppointments: upcomingResult.rows.map(mapApt),
-        recentAppointments: recentResult.rows.map(mapApt),
+        todayAppointments: todayResult.rows.map(mapAppointment),
+        upcomingAppointments: upcomingResult.rows.map(mapAppointment),
+        recentAppointments: recentResult.rows.map(mapAppointment),
       },
     });
   } catch (err) {
@@ -425,7 +432,7 @@ const MAX_UPCOMING_APPOINTMENTS = 10;
 const MAX_RECENT_PATIENTS = 10;
 const MAX_RECENT_PRESCRIPTIONS = 10;
 
-function mapAppointment(row) {
+function mapDoctorAppointment(row) {
   return {
     id: row.id,
     patientName: row.patient_name,
@@ -526,8 +533,8 @@ const getDoctorDashboard = async (req, res, next) => {
           totalRecords: parseInt(stats.total_records, 10),
           upcomingCount: parseInt(stats.upcoming_count, 10),
         },
-        todayAppointments: todayAptsResult.rows.map(mapAppointment),
-        upcomingAppointments: upcomingAptsResult.rows.map(mapAppointment),
+        todayAppointments: todayAptsResult.rows.map(mapDoctorAppointment),
+        upcomingAppointments: upcomingAptsResult.rows.map(mapDoctorAppointment),
         recentPatients: recentPatientsResult.rows.map((r) => ({
           patientId: r.patient_id,
           patientName: r.patient_name,

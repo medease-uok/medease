@@ -42,7 +42,8 @@ const getById = async (req, res, next) => {
     const isOwner = req.user.id === doctorResult.rows[0].user_id;
     const maskedDoctor = maskSensitiveFields(doctor, req.user.role, isOwner);
 
-    let patientFilter = '';
+    let apptPatientFilter = '';
+    let rxPatientFilter = '';
     const apptParams = [id];
     const rxParams = [id];
 
@@ -51,13 +52,16 @@ const getById = async (req, res, next) => {
         'SELECT id FROM patients WHERE user_id = $1', [req.user.id]
       );
       const patientId = patientResult.rows[0]?.id;
-      if (patientId) {
-        patientFilter = 'AND a.patient_id = $2';
-        apptParams.push(patientId);
-        rxParams.push(patientId);
-      } else {
-        patientFilter = 'AND 1=0';
+      if (!patientId) {
+        return res.json({
+          status: 'success',
+          data: { doctor: maskedDoctor, appointments: [], prescriptions: [] },
+        });
       }
+      apptPatientFilter = 'AND a.patient_id = $2';
+      rxPatientFilter = 'AND rx.patient_id = $2';
+      apptParams.push(patientId);
+      rxParams.push(patientId);
     }
 
     const [apptsResult, rxResult] = await Promise.all([
@@ -67,7 +71,7 @@ const getById = async (req, res, next) => {
          FROM appointments a
          JOIN patients p ON a.patient_id = p.id
          JOIN users pu ON p.user_id = pu.id
-         WHERE a.doctor_id = $1 ${patientFilter}
+         WHERE a.doctor_id = $1 ${apptPatientFilter}
          ORDER BY a.scheduled_at DESC`,
         apptParams
       ),
@@ -78,7 +82,7 @@ const getById = async (req, res, next) => {
          FROM prescriptions rx
          JOIN patients p ON rx.patient_id = p.id
          JOIN users pu ON p.user_id = pu.id
-         WHERE rx.doctor_id = $1 ${patientFilter.replace('a.patient_id', 'rx.patient_id')}
+         WHERE rx.doctor_id = $1 ${rxPatientFilter}
          ORDER BY rx.created_at DESC`,
         rxParams
       ),
