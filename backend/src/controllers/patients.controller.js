@@ -706,4 +706,133 @@ const exportMyMedicalPdf = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, getMe, getHistory, getMyHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage, exportMedicalPdf, exportMyMedicalPdf };
+const getStatistics = async (req, res, next) => {
+  try {
+    const [
+      totalResult,
+      genderResult,
+      bloodTypeResult,
+      ageGroupResult,
+      insuranceResult,
+      appointmentStatsResult,
+      organDonorResult,
+    ] = await Promise.all([
+      db.query(`
+        SELECT COUNT(*) AS total_patients
+        FROM patients p
+        JOIN users u ON p.user_id = u.id
+        WHERE u.is_active = true
+      `),
+
+      db.query(`
+        SELECT COALESCE(p.gender, 'Not specified') AS gender, COUNT(*) AS count
+        FROM patients p
+        JOIN users u ON p.user_id = u.id
+        WHERE u.is_active = true
+        GROUP BY p.gender
+        ORDER BY count DESC
+      `),
+
+      db.query(`
+        SELECT COALESCE(p.blood_type, 'Unknown') AS blood_type, COUNT(*) AS count
+        FROM patients p
+        JOIN users u ON p.user_id = u.id
+        WHERE u.is_active = true
+        GROUP BY p.blood_type
+        ORDER BY count DESC
+      `),
+
+      db.query(`
+        SELECT
+          CASE
+            WHEN AGE(p.date_of_birth) < INTERVAL '18 years' THEN 'Under 18'
+            WHEN AGE(p.date_of_birth) < INTERVAL '30 years' THEN '18-29'
+            WHEN AGE(p.date_of_birth) < INTERVAL '45 years' THEN '30-44'
+            WHEN AGE(p.date_of_birth) < INTERVAL '60 years' THEN '45-59'
+            WHEN p.date_of_birth IS NOT NULL THEN '60+'
+            ELSE 'Unknown'
+          END AS age_group,
+          COUNT(*) AS count
+        FROM patients p
+        JOIN users u ON p.user_id = u.id
+        WHERE u.is_active = true
+        GROUP BY age_group
+        ORDER BY
+          CASE age_group
+            WHEN 'Under 18' THEN 1
+            WHEN '18-29' THEN 2
+            WHEN '30-44' THEN 3
+            WHEN '45-59' THEN 4
+            WHEN '60+' THEN 5
+            ELSE 6
+          END
+      `),
+
+      db.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE p.insurance_provider IS NOT NULL) AS insured,
+          COUNT(*) FILTER (WHERE p.insurance_provider IS NULL) AS uninsured
+        FROM patients p
+        JOIN users u ON p.user_id = u.id
+        WHERE u.is_active = true
+      `),
+
+      db.query(`
+        SELECT
+          COUNT(*) AS total_appointments,
+          COUNT(*) FILTER (WHERE a.status = 'completed') AS completed,
+          COUNT(*) FILTER (WHERE a.status IN ('scheduled', 'confirmed')) AS upcoming,
+          COUNT(*) FILTER (WHERE a.status = 'cancelled') AS cancelled,
+          COUNT(DISTINCT a.doctor_id) AS total_doctors
+        FROM appointments a
+      `),
+
+      db.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE p.organ_donor = true) AS donors,
+          COUNT(*) FILTER (WHERE p.organ_donor = false OR p.organ_donor IS NULL) AS non_donors
+        FROM patients p
+        JOIN users u ON p.user_id = u.id
+        WHERE u.is_active = true
+      `),
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        totalPatients: parseInt(totalResult.rows[0].total_patients, 10),
+        byGender: genderResult.rows.map((r) => ({
+          gender: r.gender,
+          count: parseInt(r.count, 10),
+        })),
+        byBloodType: bloodTypeResult.rows.map((r) => ({
+          bloodType: r.blood_type,
+          count: parseInt(r.count, 10),
+        })),
+        byAgeGroup: ageGroupResult.rows.map((r) => ({
+          ageGroup: r.age_group,
+          count: parseInt(r.count, 10),
+        })),
+        insurance: {
+          insured: parseInt(insuranceResult.rows[0].insured, 10),
+          uninsured: parseInt(insuranceResult.rows[0].uninsured, 10),
+        },
+        appointmentStats: {
+          total: parseInt(appointmentStatsResult.rows[0].total_appointments, 10),
+          completed: parseInt(appointmentStatsResult.rows[0].completed, 10),
+          upcoming: parseInt(appointmentStatsResult.rows[0].upcoming, 10),
+          cancelled: parseInt(appointmentStatsResult.rows[0].cancelled, 10),
+          totalDoctors: parseInt(appointmentStatsResult.rows[0].total_doctors, 10),
+        },
+        organDonors: {
+          donors: parseInt(organDonorResult.rows[0].donors, 10),
+          nonDonors: parseInt(organDonorResult.rows[0].non_donors, 10),
+        },
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, getMe, getHistory, getMyHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage, exportMedicalPdf, exportMyMedicalPdf, getStatistics };

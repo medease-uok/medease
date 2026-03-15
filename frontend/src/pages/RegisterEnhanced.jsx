@@ -201,6 +201,7 @@ export default function RegisterEnhanced() {
         break;
       }
       case 'doctor':
+        if (!form.gender) errs.gender = MSG.required('Gender');
         if (!form.specialization) errs.specialization = MSG.required('Specialization');
         if (!form.licenseNumber.trim()) errs.licenseNumber = MSG.required('License number');
         else if (!PATTERNS.license.doctor.test(form.licenseNumber.trim()))
@@ -525,6 +526,19 @@ export default function RegisterEnhanced() {
 
                     {form.role === 'doctor' && (
                       <>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Gender *</label>
+                          <select
+                            name="gender"
+                            value={form.gender}
+                            onChange={handleChange}
+                            className={`w-full px-4 py-3 border ${fieldErrors.gender ? 'border-red-500' : 'border-slate-300'} rounded-lg focus:ring-2 focus:ring-primary`}
+                          >
+                            <option value="">Select Gender</option>
+                            {genderOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                          {fieldErrors.gender && <p className="mt-1 text-sm text-red-600">{fieldErrors.gender}</p>}
+                        </div>
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-2">Specialization *</label>
                           <div className="relative">

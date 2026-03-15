@@ -123,9 +123,9 @@ const register = async (req, res, next) => {
 
       case 'doctor':
         await client.query(
-          `INSERT INTO doctors (user_id, specialization, license_number, department, available)
-           VALUES ($1, $2, $3, $4, true)`,
-          [user.id, specialization, licenseNumber, department]
+          `INSERT INTO doctors (user_id, specialization, license_number, department, available, gender)
+           VALUES ($1, $2, $3, $4, true, $5)`,
+          [user.id, specialization, licenseNumber, department, gender || null]
         );
         break;
 

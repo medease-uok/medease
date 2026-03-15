@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAll, getById, getMe, getHistory, getMyHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage, exportMedicalPdf, exportMyMedicalPdf } = require('../controllers/patients.controller');
+const { getAll, getById, getMe, getHistory, getMyHistory, getPrescriptions, updateById, uploadProfileImage, deleteProfileImage, exportMedicalPdf, exportMyMedicalPdf, getStatistics } = require('../controllers/patients.controller');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
 const { requirePermission } = require('../middleware/authorize');
@@ -23,6 +23,7 @@ router.use('/:patientId/chronic-conditions', sensitiveDataLimiter, chronicCondit
 router.get('/me', authorize('patient'), getMe);
 router.get('/me/history', authorize('patient'), getMyHistory);
 router.get('/me/export-pdf', authorize('patient'), exportLimiter, exportMyMedicalPdf);
+router.get('/statistics', authorize('admin'), getStatistics);
 router.get('/', authorize('doctor', 'nurse', 'admin'), sensitiveDataLimiter, getAll);
 router.get('/:id', authorize('doctor', 'nurse', 'admin'), sensitiveDataLimiter, getById);
 router.get('/:id/history', authorize('doctor', 'nurse', 'admin', 'patient'), sensitiveDataLimiter, getHistory);
