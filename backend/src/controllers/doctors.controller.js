@@ -6,7 +6,7 @@ const getAll = async (req, res, next) => {
   try {
     const result = await db.query(
       `SELECT d.id, d.user_id, u.first_name, u.last_name, u.email, u.phone,
-              d.specialization, d.license_number, d.department, d.available
+              d.specialization, d.license_number, d.department, d.available, d.gender
        FROM doctors d
        JOIN users u ON d.user_id = u.id
        WHERE u.is_active = true
@@ -27,7 +27,7 @@ const getById = async (req, res, next) => {
 
     const doctorResult = await db.query(
       `SELECT d.id, d.user_id, u.first_name, u.last_name, u.email, u.phone,
-              d.specialization, d.license_number, d.department, d.available
+              d.specialization, d.license_number, d.department, d.available, d.gender
        FROM doctors d
        JOIN users u ON d.user_id = u.id
        WHERE d.id = $1`,
@@ -110,7 +110,121 @@ function mapDoctor(row) {
     licenseNumber: row.license_number,
     department: row.department,
     available: row.available,
+    gender: row.gender ?? null,
   };
 }
 
-module.exports = { getAll, getById };
+const TOP_DOCTORS_LIMIT = 10;
+
+const getStatistics = async (req, res, next) => {
+  try {
+    const [
+      totalResult,
+      departmentResult,
+      genderResult,
+      availabilityResult,
+      appointmentStatsResult,
+      topDoctorsResult,
+    ] = await Promise.all([
+      db.query(`
+        SELECT COUNT(*) AS total_doctors
+        FROM doctors d
+        JOIN users u ON d.user_id = u.id
+        WHERE u.is_active = true
+      `),
+
+      db.query(`
+        SELECT d.department, COUNT(*) AS count
+        FROM doctors d
+        JOIN users u ON d.user_id = u.id
+        WHERE u.is_active = true
+        GROUP BY d.department
+        ORDER BY count DESC
+      `),
+
+      db.query(`
+        SELECT COALESCE(d.gender, 'Not specified') AS gender, COUNT(*) AS count
+        FROM doctors d
+        JOIN users u ON d.user_id = u.id
+        WHERE u.is_active = true
+        GROUP BY d.gender
+        ORDER BY count DESC
+      `),
+
+      db.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE d.available = true) AS available,
+          COUNT(*) FILTER (WHERE d.available = false) AS unavailable
+        FROM doctors d
+        JOIN users u ON d.user_id = u.id
+        WHERE u.is_active = true
+      `),
+
+      db.query(`
+        SELECT
+          COUNT(*) AS total_appointments,
+          COUNT(*) FILTER (WHERE a.status = 'completed') AS completed,
+          COUNT(*) FILTER (WHERE a.status IN ('scheduled', 'confirmed')) AS upcoming,
+          COUNT(*) FILTER (WHERE a.status = 'cancelled') AS cancelled,
+          COUNT(DISTINCT a.patient_id) AS total_patients
+        FROM appointments a
+        JOIN doctors d ON a.doctor_id = d.id
+        JOIN users u ON d.user_id = u.id
+        WHERE u.is_active = true
+      `),
+
+      db.query(`
+        SELECT d.id, u.first_name, u.last_name, d.specialization, d.department, d.gender,
+               COUNT(a.id) AS appointment_count,
+               COUNT(DISTINCT a.patient_id) AS patient_count
+        FROM doctors d
+        JOIN users u ON d.user_id = u.id
+        LEFT JOIN appointments a ON a.doctor_id = d.id
+        WHERE u.is_active = true
+        GROUP BY d.id, u.first_name, u.last_name, d.specialization, d.department, d.gender
+        ORDER BY appointment_count DESC
+        LIMIT $1
+      `, [TOP_DOCTORS_LIMIT]),
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        totalDoctors: parseInt(totalResult.rows[0].total_doctors, 10),
+        byDepartment: departmentResult.rows.map((r) => ({
+          department: r.department,
+          count: parseInt(r.count, 10),
+        })),
+        byGender: genderResult.rows.map((r) => ({
+          gender: r.gender,
+          count: parseInt(r.count, 10),
+        })),
+        availability: {
+          available: parseInt(availabilityResult.rows[0].available, 10),
+          unavailable: parseInt(availabilityResult.rows[0].unavailable, 10),
+        },
+        appointmentStats: {
+          total: parseInt(appointmentStatsResult.rows[0].total_appointments, 10),
+          completed: parseInt(appointmentStatsResult.rows[0].completed, 10),
+          upcoming: parseInt(appointmentStatsResult.rows[0].upcoming, 10),
+          cancelled: parseInt(appointmentStatsResult.rows[0].cancelled, 10),
+          totalPatients: parseInt(appointmentStatsResult.rows[0].total_patients, 10),
+        },
+        topDoctors: topDoctorsResult.rows.map((r) => ({
+          id: r.id,
+          firstName: r.first_name,
+          lastName: r.last_name,
+          specialization: r.specialization,
+          department: r.department,
+          gender: r.gender,
+          appointmentCount: parseInt(r.appointment_count, 10),
+          patientCount: parseInt(r.patient_count, 10),
+        })),
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, getStatistics };

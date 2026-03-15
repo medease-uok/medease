@@ -57,9 +57,9 @@ const registerValidation = [
       return true;
     }),
   body('gender')
-    .if(body('role').equals('patient'))
+    .if(body('role').isIn(['patient', 'doctor']))
     .trim()
-    .notEmpty().withMessage('Gender is required for patients.'),
+    .notEmpty().withMessage('Gender is required.'),
   body('bloodType')
     .optional({ values: 'falsy' })
     .trim()

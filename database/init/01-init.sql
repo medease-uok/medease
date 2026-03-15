@@ -74,6 +74,7 @@ CREATE TABLE doctors (
   specialization VARCHAR(100) NOT NULL,
   license_number VARCHAR(50) UNIQUE NOT NULL,
   department VARCHAR(100),
+  gender VARCHAR(20),
   available BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
