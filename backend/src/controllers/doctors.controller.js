@@ -110,9 +110,11 @@ function mapDoctor(row) {
     licenseNumber: row.license_number,
     department: row.department,
     available: row.available,
-    gender: row.gender || null,
+    gender: row.gender ?? null,
   };
 }
+
+const TOP_DOCTORS_LIMIT = 10;
 
 const getStatistics = async (req, res, next) => {
   try {
@@ -166,6 +168,9 @@ const getStatistics = async (req, res, next) => {
           COUNT(*) FILTER (WHERE a.status = 'cancelled') AS cancelled,
           COUNT(DISTINCT a.patient_id) AS total_patients
         FROM appointments a
+        JOIN doctors d ON a.doctor_id = d.id
+        JOIN users u ON d.user_id = u.id
+        WHERE u.is_active = true
       `),
 
       db.query(`
@@ -178,8 +183,8 @@ const getStatistics = async (req, res, next) => {
         WHERE u.is_active = true
         GROUP BY d.id, u.first_name, u.last_name, d.specialization, d.department, d.gender
         ORDER BY appointment_count DESC
-        LIMIT 10
-      `),
+        LIMIT $1
+      `, [TOP_DOCTORS_LIMIT]),
     ]);
 
     res.json({

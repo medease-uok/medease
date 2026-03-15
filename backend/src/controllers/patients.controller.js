@@ -745,12 +745,12 @@ const getStatistics = async (req, res, next) => {
       db.query(`
         SELECT
           CASE
+            WHEN p.date_of_birth IS NULL THEN 'Unknown'
             WHEN AGE(p.date_of_birth) < INTERVAL '18 years' THEN 'Under 18'
             WHEN AGE(p.date_of_birth) < INTERVAL '30 years' THEN '18-29'
             WHEN AGE(p.date_of_birth) < INTERVAL '45 years' THEN '30-44'
             WHEN AGE(p.date_of_birth) < INTERVAL '60 years' THEN '45-59'
-            WHEN p.date_of_birth IS NOT NULL THEN '60+'
-            ELSE 'Unknown'
+            ELSE '60+'
           END AS age_group,
           COUNT(*) AS count
         FROM patients p
@@ -785,6 +785,9 @@ const getStatistics = async (req, res, next) => {
           COUNT(*) FILTER (WHERE a.status = 'cancelled') AS cancelled,
           COUNT(DISTINCT a.doctor_id) AS total_doctors
         FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        JOIN users u ON p.user_id = u.id
+        WHERE u.is_active = true
       `),
 
       db.query(`

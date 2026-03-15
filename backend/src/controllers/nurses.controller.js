@@ -1,11 +1,11 @@
-const db = require('../config/database')
+const db = require('../config/database');
 
 const getStatistics = async (req, res, next) => {
   try {
     const [
       totalResult,
       departmentResult,
-      genderResult,
+      ageGroupResult,
     ] = await Promise.all([
       db.query(`
         SELECT COUNT(*) AS total_nurses
@@ -51,7 +51,7 @@ const getStatistics = async (req, res, next) => {
             ELSE 6
           END
       `),
-    ])
+    ]);
 
     res.json({
       status: 'success',
@@ -61,15 +61,15 @@ const getStatistics = async (req, res, next) => {
           department: r.department,
           count: parseInt(r.count, 10),
         })),
-        byAgeGroup: genderResult.rows.map((r) => ({
+        byAgeGroup: ageGroupResult.rows.map((r) => ({
           ageGroup: r.age_group,
           count: parseInt(r.count, 10),
         })),
       },
-    })
+    });
   } catch (err) {
-    return next(err)
+    return next(err);
   }
-}
+};
 
-module.exports = { getStatistics }
+module.exports = { getStatistics };
