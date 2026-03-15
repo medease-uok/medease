@@ -3,7 +3,7 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
-const { SLOT_DURATION_MINUTES } = require('./schedules.controller');
+const { SLOT_DURATION_MINUTES } = require('../utils/scheduleHelpers');
 
 const mapAppointment = (row) => ({
   id: row.id,
@@ -55,9 +55,15 @@ const getAll = async (req, res, next) => {
   }
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError('Invalid appointment ID format.', 400);
+    }
 
     const result = await db.query(
       `SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
@@ -87,6 +93,17 @@ const getById = async (req, res, next) => {
       );
       const patientId = patientResult.rows[0]?.id;
       if (row.patient_id !== patientId) {
+        throw new AppError('You do not have permission to view this appointment.', 403);
+      }
+    }
+
+    // Access check: doctor can only view appointments where they are assigned
+    if (req.user.role === 'doctor') {
+      const doctorResult = await db.query(
+        'SELECT id FROM doctors WHERE user_id = $1', [req.user.id]
+      );
+      const doctorId = doctorResult.rows[0]?.id;
+      if (row.doctor_id !== doctorId) {
         throw new AppError('You do not have permission to view this appointment.', 403);
       }
     }
@@ -149,41 +166,43 @@ const create = async (req, res, next) => {
 
     // Slot validation: verify doctor has an active schedule and time is on a valid slot boundary
     const apptDate = new Date(scheduledAt);
-    const dayOfWeek = apptDate.getDay();
-
-    const scheduleResult = await db.query(
-      `SELECT start_time, end_time, is_active
-       FROM doctor_schedules
-       WHERE doctor_id = $1 AND day_of_week = $2`,
-      [doctorId, dayOfWeek]
-    );
-
-    if (scheduleResult.rows.length === 0 || !scheduleResult.rows[0].is_active) {
-      throw new AppError('Doctor is not available on this day.', 400);
-    }
-
-    const schedule = scheduleResult.rows[0];
+    // Use UTC consistently for both day-of-week and time extraction
+    const dayOfWeek = apptDate.getUTCDay();
     const apptHours = apptDate.getUTCHours();
     const apptMinutes = apptDate.getUTCMinutes();
     const apptTotalMinutes = apptHours * 60 + apptMinutes;
 
-    const [schStartH, schStartM] = schedule.start_time.slice(0, 5).split(':').map(Number);
-    const [schEndH, schEndM] = schedule.end_time.slice(0, 5).split(':').map(Number);
-    const schedStartMinutes = schStartH * 60 + schStartM;
-    const schedEndMinutes = schEndH * 60 + schEndM;
-
-    // Must be within schedule hours and on a slot boundary
-    if (apptTotalMinutes < schedStartMinutes || apptTotalMinutes + SLOT_DURATION_MINUTES > schedEndMinutes) {
-      throw new AppError('Appointment time is outside the doctor\'s schedule hours.', 400);
-    }
-
-    if ((apptTotalMinutes - schedStartMinutes) % SLOT_DURATION_MINUTES !== 0) {
-      throw new AppError(`Appointment time must be on a ${SLOT_DURATION_MINUTES}-minute slot boundary.`, 400);
-    }
-
     const client = await db.getClient();
     try {
       await client.query('BEGIN');
+
+      // Slot validation inside transaction to prevent race conditions
+      const scheduleResult = await client.query(
+        `SELECT start_time, end_time, is_active
+         FROM doctor_schedules
+         WHERE doctor_id = $1 AND day_of_week = $2`,
+        [doctorId, dayOfWeek]
+      );
+
+      if (scheduleResult.rows.length === 0 || !scheduleResult.rows[0].is_active) {
+        throw new AppError('Doctor is not available on this day.', 400);
+      }
+
+      const schedule = scheduleResult.rows[0];
+
+      const [schStartH, schStartM] = schedule.start_time.slice(0, 5).split(':').map(Number);
+      const [schEndH, schEndM] = schedule.end_time.slice(0, 5).split(':').map(Number);
+      const schedStartMinutes = schStartH * 60 + schStartM;
+      const schedEndMinutes = schEndH * 60 + schEndM;
+
+      // Must be within schedule hours and on a slot boundary
+      if (apptTotalMinutes < schedStartMinutes || apptTotalMinutes + SLOT_DURATION_MINUTES > schedEndMinutes) {
+        throw new AppError('Appointment time is outside the doctor\'s schedule hours.', 400);
+      }
+
+      if ((apptTotalMinutes - schedStartMinutes) % SLOT_DURATION_MINUTES !== 0) {
+        throw new AppError(`Appointment time must be on a ${SLOT_DURATION_MINUTES}-minute slot boundary.`, 400);
+      }
 
       const result = await client.query(
         `INSERT INTO appointments (patient_id, doctor_id, scheduled_at, notes)

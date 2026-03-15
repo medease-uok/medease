@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const { generateSlots } = require('./schedules.controller');
+const { generateSlots } = require('../utils/scheduleHelpers');
 
 const TODAY_LIMIT = 20;
 const UPCOMING_LIMIT = 10;
@@ -565,6 +565,11 @@ const QUEUE_POLL_INTERVAL_HINT = 30; // seconds — sent to clients so they know
 const getPatientQueue = async (req, res, next) => {
   try {
     const { role, id: userId } = req.user;
+
+    // Only staff roles can access the patient queue
+    if (!['doctor', 'nurse', 'admin'].includes(role)) {
+      return res.status(403).json({ status: 'error', message: 'Access denied.' });
+    }
 
     let roleQueueFilter = '';
     const params = [QUEUE_LIMIT];

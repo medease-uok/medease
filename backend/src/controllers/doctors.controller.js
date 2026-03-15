@@ -82,6 +82,9 @@ const getById = async (req, res, next) => {
         'SELECT id FROM doctors WHERE user_id = $1', [req.user.id]
       );
       const viewingDoctorId = viewingDoctorResult.rows[0]?.id;
+      if (!viewingDoctorId) {
+        throw new AppError('Doctor profile not found.', 404);
+      }
 
       rxQuery = `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
                 rx.frequency, rx.duration, rx.status, rx.created_at,
@@ -97,7 +100,7 @@ const getById = async (req, res, next) => {
            WHERE a.doctor_id = $1
          )
          ORDER BY rx.created_at DESC`;
-      rxParams = [viewingDoctorId || id];
+      rxParams = [viewingDoctorId];
     } else {
       // Admin, nurse, etc. — see all prescriptions written by this doctor
       rxQuery = `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,

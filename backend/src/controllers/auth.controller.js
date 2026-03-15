@@ -130,13 +130,29 @@ const register = async (req, res, next) => {
         const newDoctorId = doctorResult.rows[0].id;
 
         // Insert schedule from request or default Mon-Fri 08:00-17:00
-        const scheduleEntries = req.body.schedule || [
+        const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+        const defaultSchedule = [
           { dayOfWeek: 1, startTime: '08:00', endTime: '17:00', isActive: true },
           { dayOfWeek: 2, startTime: '08:00', endTime: '17:00', isActive: true },
           { dayOfWeek: 3, startTime: '08:00', endTime: '17:00', isActive: true },
           { dayOfWeek: 4, startTime: '08:00', endTime: '17:00', isActive: true },
           { dayOfWeek: 5, startTime: '08:00', endTime: '17:00', isActive: true },
         ];
+        const scheduleEntries = req.body.schedule || defaultSchedule;
+
+        // Validate schedule entries
+        for (const entry of scheduleEntries) {
+          if (typeof entry.dayOfWeek !== 'number' || entry.dayOfWeek < 0 || entry.dayOfWeek > 6) {
+            throw new AppError('Invalid schedule: dayOfWeek must be 0-6.', 400);
+          }
+          if (!TIME_REGEX.test(entry.startTime) || !TIME_REGEX.test(entry.endTime)) {
+            throw new AppError('Invalid schedule: times must be in HH:MM format.', 400);
+          }
+          if (entry.endTime <= entry.startTime) {
+            throw new AppError('Invalid schedule: endTime must be after startTime.', 400);
+          }
+        }
+
         for (const entry of scheduleEntries) {
           await client.query(
             `INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active)
