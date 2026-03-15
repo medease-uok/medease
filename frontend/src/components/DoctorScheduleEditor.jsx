@@ -45,7 +45,7 @@ export default function DoctorScheduleEditor({ doctorId, onSave, readOnly = fals
     const fetchSchedule = async () => {
       try {
         const res = await api.get(`/schedules/${doctorId}`)
-        const data = res.data.data || res.data
+        const data = res.data || res
         if (data.schedule && data.schedule.length > 0) {
           // Merge fetched schedule with defaults for any missing days
           const merged = DEFAULT_SCHEDULE.map((def) => {
@@ -79,9 +79,9 @@ export default function DoctorScheduleEditor({ doctorId, onSave, readOnly = fals
     try {
       const res = await api.put(`/schedules/${doctorId}`, { schedule })
       setSuccess('Schedule saved successfully.')
-      if (onSave) onSave(res.data.data || res.data)
+      if (onSave) onSave(res.data || res)
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save schedule.')
+      setError(err.data?.message || err.message || 'Failed to save schedule.')
     } finally {
       setSaving(false)
     }

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, Clock, Mail, Phone, Stethoscope,
   BadgeCheck, Building2, CalendarPlus, X, CheckCircle, AlertCircle,
+  FileText, User,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -10,6 +11,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import StatusBadge from '../components/StatusBadge';
 import DataTable from '../components/DataTable';
+import AppointmentDetailModal from '../components/AppointmentDetailModal';
 
 function formatSlotTime(time) {
   const [h, m] = time.split(':').map(Number);
@@ -41,8 +43,7 @@ function BookingModal({ doctor, onClose, onBooked }) {
       setError(null);
       try {
         const res = await api.get(`/schedules/${doctor.id}/slots?date=${date}`);
-        const data = res.data.data || res.data;
-        setSlots(data.slots || []);
+        setSlots(res.data?.slots || []);
       } catch {
         setError('Failed to load available slots.');
         setSlots([]);
@@ -69,7 +70,7 @@ function BookingModal({ doctor, onClose, onBooked }) {
       });
       onBooked();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to book appointment.');
+      setError(err.data?.message || err.message || 'Failed to book appointment.');
     } finally {
       setSubmitting(false);
     }
@@ -220,24 +221,30 @@ export default function DoctorDetail() {
   const [loading, setLoading] = useState(true);
   const [showBooking, setShowBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [selectedApptId, setSelectedApptId] = useState(null);
 
   const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const fetchDoctor = () => {
+  const fetchDoctor = async () => {
     setLoading(true);
-    Promise.all([
-      api.get(`/doctors/${id}`),
-      api.get(`/schedules/${id}`).catch(() => ({ data: { data: { schedule: [] } } })),
-    ])
-      .then(([docRes, schedRes]) => {
-        setDoctor(docRes.data.doctor);
-        setAppts(docRes.data.appointments);
-        setRxs(docRes.data.prescriptions);
-        const schedData = schedRes.data.data || schedRes.data;
-        setSchedule(schedData.schedule || []);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const docRes = await api.get(`/doctors/${id}`);
+      setDoctor(docRes.data?.doctor || null);
+      setAppts(docRes.data?.appointments || []);
+      setRxs(docRes.data?.prescriptions || []);
+
+      // Fetch schedule separately — don't let it block the page
+      try {
+        const schedRes = await api.get(`/schedules/${id}`);
+        setSchedule(schedRes.data?.schedule || []);
+      } catch {
+        setSchedule([]);
+      }
+    } catch (err) {
+      console.error('Failed to load doctor:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchDoctor(); }, [id]);
@@ -432,6 +439,7 @@ export default function DoctorDetail() {
                 { key: 'notes', label: 'Notes', render: (val) => val ? val.substring(0, 50) + (val.length > 50 ? '...' : '') : '-' },
               ]}
               data={appts}
+              onRowClick={(row) => setSelectedApptId(row.id)}
             />
           ) : (
             <p className="text-sm text-slate-400 text-center py-6">
@@ -447,13 +455,14 @@ export default function DoctorDetail() {
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-5 h-5 text-slate-400" />
             <h2 className="text-lg font-semibold text-slate-900">
-              {isPatient ? 'My Prescriptions' : 'Prescriptions Written'} ({rxs.length})
+              {isPatient ? 'My Prescriptions' : 'Prescriptions'} ({rxs.length})
             </h2>
           </div>
           {rxs.length > 0 ? (
             <DataTable
               columns={[
                 ...(!isPatient ? [{ key: 'patientName', label: 'Patient' }] : []),
+                ...(role === 'doctor' ? [{ key: 'doctorName', label: 'Prescribed By' }] : []),
                 { key: 'medication', label: 'Medication' },
                 { key: 'dosage', label: 'Dosage' },
                 { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
@@ -474,6 +483,15 @@ export default function DoctorDetail() {
           doctor={doctor}
           onClose={() => setShowBooking(false)}
           onBooked={handleBooked}
+        />
+      )}
+
+      {/* Appointment detail modal */}
+      {selectedApptId && (
+        <AppointmentDetailModal
+          appointmentId={selectedApptId}
+          onClose={() => setSelectedApptId(null)}
+          onStatusChange={fetchDoctor}
         />
       )}
     </div>

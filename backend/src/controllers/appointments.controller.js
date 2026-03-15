@@ -55,6 +55,66 @@ const getAll = async (req, res, next) => {
   }
 };
 
+const getById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      `SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
+              a.created_at, a.updated_at,
+              pu.first_name || ' ' || pu.last_name AS patient_name,
+              'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name,
+              d.specialization, d.department
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN users pu ON p.user_id = pu.id
+       JOIN doctors d ON a.doctor_id = d.id
+       JOIN users du ON d.user_id = du.id
+       WHERE a.id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Appointment not found.', 404);
+    }
+
+    const row = result.rows[0];
+
+    // Access check: patient can only view own appointments
+    if (req.user.role === 'patient') {
+      const patientResult = await db.query(
+        'SELECT id FROM patients WHERE user_id = $1', [req.user.id]
+      );
+      const patientId = patientResult.rows[0]?.id;
+      if (row.patient_id !== patientId) {
+        throw new AppError('You do not have permission to view this appointment.', 403);
+      }
+    }
+
+    await auditLog({ userId: req.user.id, action: 'VIEW_APPOINTMENT', resourceType: 'appointment', resourceId: id, ip: req.ip });
+
+    res.json({
+      status: 'success',
+      data: {
+        id: row.id,
+        patientId: row.patient_id,
+        doctorId: row.doctor_id,
+        patientName: row.patient_name,
+        doctorName: row.doctor_name,
+        specialization: row.specialization,
+        department: row.department,
+        scheduledAt: row.scheduled_at,
+        status: row.status,
+        notes: row.notes,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const create = async (req, res, next) => {
   try {
     const { doctorId, scheduledAt, notes } = req.body;
@@ -263,4 +323,4 @@ const updateStatus = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, create, updateStatus };
+module.exports = { getAll, getById, create, updateStatus };

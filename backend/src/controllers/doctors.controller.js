@@ -43,9 +43,11 @@ const getById = async (req, res, next) => {
     const maskedDoctor = maskSensitiveFields(doctor, req.user.role, isOwner);
 
     let apptPatientFilter = '';
-    let rxPatientFilter = '';
     const apptParams = [id];
-    const rxParams = [id];
+
+    // For prescriptions, doctors need to see all meds for their shared patients
+    let rxQuery;
+    let rxParams;
 
     if (req.user.role === 'patient') {
       const patientResult = await db.query(
@@ -59,9 +61,57 @@ const getById = async (req, res, next) => {
         });
       }
       apptPatientFilter = 'AND a.patient_id = $2';
-      rxPatientFilter = 'AND rx.patient_id = $2';
       apptParams.push(patientId);
-      rxParams.push(patientId);
+
+      // Patients see only their own prescriptions from this doctor
+      rxQuery = `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
+                rx.frequency, rx.duration, rx.status, rx.created_at,
+                pu.first_name || ' ' || pu.last_name AS patient_name,
+                'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
+         FROM prescriptions rx
+         JOIN patients p ON rx.patient_id = p.id
+         JOIN users pu ON p.user_id = pu.id
+         JOIN doctors d ON rx.doctor_id = d.id
+         JOIN users du ON d.user_id = du.id
+         WHERE rx.doctor_id = $1 AND rx.patient_id = $2
+         ORDER BY rx.created_at DESC`;
+      rxParams = [id, patientId];
+    } else if (req.user.role === 'doctor') {
+      // Doctors see all prescriptions for patients they share appointments with
+      const viewingDoctorResult = await db.query(
+        'SELECT id FROM doctors WHERE user_id = $1', [req.user.id]
+      );
+      const viewingDoctorId = viewingDoctorResult.rows[0]?.id;
+
+      rxQuery = `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
+                rx.frequency, rx.duration, rx.status, rx.created_at,
+                pu.first_name || ' ' || pu.last_name AS patient_name,
+                'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
+         FROM prescriptions rx
+         JOIN patients p ON rx.patient_id = p.id
+         JOIN users pu ON p.user_id = pu.id
+         JOIN doctors d ON rx.doctor_id = d.id
+         JOIN users du ON d.user_id = du.id
+         WHERE rx.patient_id IN (
+           SELECT DISTINCT a.patient_id FROM appointments a
+           WHERE a.doctor_id = $1
+         )
+         ORDER BY rx.created_at DESC`;
+      rxParams = [viewingDoctorId || id];
+    } else {
+      // Admin, nurse, etc. — see all prescriptions written by this doctor
+      rxQuery = `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
+                rx.frequency, rx.duration, rx.status, rx.created_at,
+                pu.first_name || ' ' || pu.last_name AS patient_name,
+                'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
+         FROM prescriptions rx
+         JOIN patients p ON rx.patient_id = p.id
+         JOIN users pu ON p.user_id = pu.id
+         JOIN doctors d ON rx.doctor_id = d.id
+         JOIN users du ON d.user_id = du.id
+         WHERE rx.doctor_id = $1
+         ORDER BY rx.created_at DESC`;
+      rxParams = [id];
     }
 
     const [apptsResult, rxResult] = await Promise.all([
@@ -75,17 +125,7 @@ const getById = async (req, res, next) => {
          ORDER BY a.scheduled_at DESC`,
         apptParams
       ),
-      db.query(
-        `SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
-                rx.frequency, rx.duration, rx.status, rx.created_at,
-                pu.first_name || ' ' || pu.last_name AS patient_name
-         FROM prescriptions rx
-         JOIN patients p ON rx.patient_id = p.id
-         JOIN users pu ON p.user_id = pu.id
-         WHERE rx.doctor_id = $1 ${rxPatientFilter}
-         ORDER BY rx.created_at DESC`,
-        rxParams
-      ),
+      db.query(rxQuery, rxParams),
     ]);
 
     res.json({
@@ -106,6 +146,7 @@ const getById = async (req, res, next) => {
           patientId: row.patient_id,
           doctorId: row.doctor_id,
           patientName: row.patient_name,
+          doctorName: row.doctor_name,
           medication: row.medication,
           dosage: row.dosage,
           frequency: row.frequency,

@@ -21,7 +21,7 @@ const labels = {
 
 export default function StatusBadge({ status }) {
   const variant = statusVariants[status] || 'secondary';
-  const label = labels[status] || status.charAt(0).toUpperCase() + status.slice(1);
+  const label = labels[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown');
 
   return (
     <Badge variant={variant}>
