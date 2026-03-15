@@ -38,7 +38,7 @@ const formatDate = (iso) => {
   if (!iso) return '-';
   const date = new Date(iso);
   if (isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
 
 const formatFileSize = (bytes) => {

@@ -91,27 +91,30 @@ INSERT INTO pharmacists (user_id, license_number) VALUES
 -- ============================================
 
 INSERT INTO appointments (patient_id, doctor_id, scheduled_at, status, notes) VALUES
-  -- Completed appointments (past)
-  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', NOW() - INTERVAL '30 days', 'completed', 'Routine cardiac checkup. ECG normal.'),
-  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', NOW() - INTERVAL '25 days', 'completed', 'Follow-up for recurring headaches. MRI ordered.'),
-  ('ce000000-0000-0000-0000-000000000003', 'dc000000-0000-0000-0000-000000000003', NOW() - INTERVAL '20 days', 'completed', 'Knee pain evaluation. X-ray taken.'),
-  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001', NOW() - INTERVAL '15 days', 'completed', 'Blood pressure monitoring. Medication adjusted.'),
-  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000002', NOW() - INTERVAL '10 days', 'completed', 'Neurological assessment. All clear.'),
+  -- Completed appointments (past, with specific clinic hours)
+  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE - INTERVAL '30 days') + TIME '09:00', 'completed', 'Routine cardiac checkup. ECG normal.'),
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', (CURRENT_DATE - INTERVAL '25 days') + TIME '10:30', 'completed', 'Follow-up for recurring headaches. MRI ordered.'),
+  ('ce000000-0000-0000-0000-000000000003', 'dc000000-0000-0000-0000-000000000003', (CURRENT_DATE - INTERVAL '20 days') + TIME '14:00', 'completed', 'Knee pain evaluation. X-ray taken.'),
+  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE - INTERVAL '15 days') + TIME '11:15', 'completed', 'Blood pressure monitoring. Medication adjusted.'),
+  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000002', (CURRENT_DATE - INTERVAL '10 days') + TIME '15:30', 'completed', 'Neurological assessment. All clear.'),
 
-  -- Confirmed appointments (upcoming)
-  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000001', NOW() + INTERVAL '2 days', 'confirmed', 'First cardiac consultation.'),
-  ('ce000000-0000-0000-0000-000000000006', 'dc000000-0000-0000-0000-000000000003', NOW() + INTERVAL '3 days', 'confirmed', 'Sports injury follow-up.'),
+  -- Confirmed appointments (upcoming, with specific clinic hours)
+  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE + INTERVAL '2 days') + TIME '09:30', 'confirmed', 'First cardiac consultation.'),
+  ('ce000000-0000-0000-0000-000000000006', 'dc000000-0000-0000-0000-000000000003', (CURRENT_DATE + INTERVAL '3 days') + TIME '14:00', 'confirmed', 'Sports injury follow-up.'),
 
-  -- Scheduled appointments (upcoming)
-  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', NOW() + INTERVAL '5 days', 'scheduled', 'MRI results review.'),
-  ('ce000000-0000-0000-0000-000000000003', 'dc000000-0000-0000-0000-000000000004', NOW() + INTERVAL '7 days', 'scheduled', 'Pediatric referral for daughter.'),
-  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', NOW() + INTERVAL '14 days', 'scheduled', 'Quarterly cardiac review.'),
+  -- Scheduled appointments (upcoming, with specific clinic hours)
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', (CURRENT_DATE + INTERVAL '5 days') + TIME '10:00', 'scheduled', 'MRI results review.'),
+  ('ce000000-0000-0000-0000-000000000003', 'dc000000-0000-0000-0000-000000000004', (CURRENT_DATE + INTERVAL '7 days') + TIME '11:00', 'scheduled', 'Pediatric referral for daughter.'),
+  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE + INTERVAL '14 days') + TIME '09:00', 'scheduled', 'Quarterly cardiac review.'),
 
-  -- In-progress appointment
-  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000002', NOW(), 'in_progress', 'Neurology consultation in progress.'),
+  -- Today's appointments (with specific times)
+  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000002', CURRENT_DATE + TIME '08:30', 'completed', 'Morning neurology consultation completed.'),
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000001', CURRENT_DATE + TIME '10:00', 'in_progress', 'Cardiology follow-up in progress.'),
+  ('ce000000-0000-0000-0000-000000000006', 'dc000000-0000-0000-0000-000000000002', CURRENT_DATE + TIME '13:00', 'scheduled', 'Afternoon neurology appointment.'),
+  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000003', CURRENT_DATE + TIME '15:30', 'scheduled', 'Orthopedic consultation.'),
 
   -- Cancelled appointment
-  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004', NOW() - INTERVAL '5 days', 'cancelled', 'Patient requested cancellation.');
+  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004', (CURRENT_DATE - INTERVAL '5 days') + TIME '16:00', 'cancelled', 'Patient requested cancellation.');
 
 -- ============================================
 -- MEDICAL RECORDS
@@ -156,16 +159,16 @@ INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency,
 -- ============================================
 
 INSERT INTO lab_reports (patient_id, technician_id, test_name, result, notes, report_date) VALUES
-  ('ce000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Complete Blood Count (CBC)', 'WBC: 7.2 x10^9/L, RBC: 4.8 x10^12/L, Hemoglobin: 13.5 g/dL, Platelets: 250 x10^9/L', 'All values within normal range.', NOW() - INTERVAL '28 days'),
-  ('ce000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002', 'Lipid Panel', 'Total Cholesterol: 210 mg/dL, LDL: 130 mg/dL, HDL: 55 mg/dL, Triglycerides: 150 mg/dL', 'LDL slightly elevated. Dietary modification recommended.', NOW() - INTERVAL '28 days'),
-  ('ce000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'MRI Brain', 'No acute intracranial abnormality. No mass, hemorrhage, or midline shift.', 'Normal study. Report sent to Dr. Silva.', NOW() - INTERVAL '22 days'),
-  ('ce000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000002', 'X-Ray Left Knee (AP/Lateral)', 'No fracture or dislocation. Mild soft tissue swelling noted. Joint spaces preserved.', 'Correlate clinically. No bony abnormality.', NOW() - INTERVAL '18 days'),
-  ('ce000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'ECG (12-Lead)', 'Irregular rhythm. Atrial fibrillation with controlled ventricular rate (78 bpm). No ST changes.', 'AF confirmed. Recommend echocardiogram.', NOW() - INTERVAL '14 days'),
-  ('ce000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'INR (Prothrombin Time)', 'INR: 2.3, PT: 26.5 seconds', 'Within therapeutic range (target 2.0-3.0). Continue current Warfarin dose.', NOW() - INTERVAL '7 days'),
-  ('ce000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000002', 'Nerve Conduction Study', 'Mild reduction in sensory nerve conduction velocity in bilateral lower limbs. Motor conduction normal.', 'Findings consistent with early sensory neuropathy.', NOW() - INTERVAL '12 days'),
-  ('ce000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'Complete Blood Count (CBC)', 'WBC: 6.8 x10^9/L, RBC: 3.9 x10^12/L, Hemoglobin: 9.2 g/dL, Platelets: 280 x10^9/L', 'Low hemoglobin indicates anemia. Recommend serum ferritin and iron studies.', NOW() - INTERVAL '10 days'),
-  ('ce000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000002', 'Serum Ferritin', 'Ferritin: 8 ng/mL (Normal: 12-150 ng/mL)', 'Low ferritin confirms iron deficiency. Treatment recommended.', NOW() - INTERVAL '9 days'),
-  ('ce000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001', 'MRI Left Knee', 'Partial tear of anterior cruciate ligament (Grade 2). Mild joint effusion. Menisci intact.', 'ACL partially torn. No meniscal damage. Conservative management may be appropriate.', NOW() - INTERVAL '5 days');
+  ('ce000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Complete Blood Count (CBC)', 'WBC: 7.2 x10^9/L, RBC: 4.8 x10^12/L, Hemoglobin: 13.5 g/dL, Platelets: 250 x10^9/L', 'All values within normal range.', (CURRENT_DATE - INTERVAL '28 days') + TIME '08:45'),
+  ('ce000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002', 'Lipid Panel', 'Total Cholesterol: 210 mg/dL, LDL: 130 mg/dL, HDL: 55 mg/dL, Triglycerides: 150 mg/dL', 'LDL slightly elevated. Dietary modification recommended.', (CURRENT_DATE - INTERVAL '28 days') + TIME '09:30'),
+  ('ce000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'MRI Brain', 'No acute intracranial abnormality. No mass, hemorrhage, or midline shift.', 'Normal study. Report sent to Dr. Silva.', (CURRENT_DATE - INTERVAL '22 days') + TIME '11:00'),
+  ('ce000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000002', 'X-Ray Left Knee (AP/Lateral)', 'No fracture or dislocation. Mild soft tissue swelling noted. Joint spaces preserved.', 'Correlate clinically. No bony abnormality.', (CURRENT_DATE - INTERVAL '18 days') + TIME '14:15'),
+  ('ce000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'ECG (12-Lead)', 'Irregular rhythm. Atrial fibrillation with controlled ventricular rate (78 bpm). No ST changes.', 'AF confirmed. Recommend echocardiogram.', (CURRENT_DATE - INTERVAL '14 days') + TIME '10:00'),
+  ('ce000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'INR (Prothrombin Time)', 'INR: 2.3, PT: 26.5 seconds', 'Within therapeutic range (target 2.0-3.0). Continue current Warfarin dose.', (CURRENT_DATE - INTERVAL '7 days') + TIME '08:30'),
+  ('ce000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000002', 'Nerve Conduction Study', 'Mild reduction in sensory nerve conduction velocity in bilateral lower limbs. Motor conduction normal.', 'Findings consistent with early sensory neuropathy.', (CURRENT_DATE - INTERVAL '12 days') + TIME '15:00'),
+  ('ce000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'Complete Blood Count (CBC)', 'WBC: 6.8 x10^9/L, RBC: 3.9 x10^12/L, Hemoglobin: 9.2 g/dL, Platelets: 280 x10^9/L', 'Low hemoglobin indicates anemia. Recommend serum ferritin and iron studies.', (CURRENT_DATE - INTERVAL '10 days') + TIME '09:15'),
+  ('ce000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000002', 'Serum Ferritin', 'Ferritin: 8 ng/mL (Normal: 12-150 ng/mL)', 'Low ferritin confirms iron deficiency. Treatment recommended.', (CURRENT_DATE - INTERVAL '9 days') + TIME '10:45'),
+  ('ce000000-0000-0000-0000-000000000006', '10000000-0000-0000-0000-000000000001', 'MRI Left Knee', 'Partial tear of anterior cruciate ligament (Grade 2). Mild joint effusion. Menisci intact.', 'ACL partially torn. No meniscal damage. Conservative management may be appropriate.', (CURRENT_DATE - INTERVAL '5 days') + TIME '13:30');
 
 -- ============================================
 -- PATIENT ALLERGIES

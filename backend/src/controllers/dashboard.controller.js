@@ -1,5 +1,18 @@
 const db = require('../config/database');
 
+const TODAY_LIMIT = 20;
+const UPCOMING_LIMIT = 10;
+const RECENT_LIMIT = 5;
+
+const mapAppointment = (row) => ({
+  id: row.id,
+  patientName: row.patient_name,
+  doctorName: row.doctor_name,
+  scheduledAt: row.scheduled_at,
+  status: row.status,
+  notes: row.notes,
+});
+
 const getStats = async (req, res, next) => {
   try {
     const { role, id: userId } = req.user;
@@ -129,9 +142,6 @@ const getStats = async (req, res, next) => {
       }
     }
 
-    let recentQuery;
-    let recentParams = [];
-
     const baseRecent = `
       SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
              pu.first_name || ' ' || pu.last_name AS patient_name,
@@ -142,42 +152,72 @@ const getStats = async (req, res, next) => {
       JOIN doctors d ON a.doctor_id = d.id
       JOIN users du ON d.user_id = du.id`;
 
+    let roleFilter = '';
+    let filterParams = [];
+    const emptyResponse = { stats, todayAppointments: [], upcomingAppointments: [], recentAppointments: [] };
+
     if (role === 'patient') {
       const patientResult = await db.query(
         'SELECT id FROM patients WHERE user_id = $1', [userId]
       );
       const patientId = patientResult.rows[0]?.id;
-      if (patientId) {
-        recentQuery = `${baseRecent} WHERE a.patient_id = $1 ORDER BY a.scheduled_at DESC LIMIT 5`;
-        recentParams = [patientId];
+      if (!patientId) {
+        return res.json({ status: 'success', data: emptyResponse });
       }
+      roleFilter = 'AND a.patient_id = $1';
+      filterParams = [patientId];
     } else if (role === 'doctor') {
       const doctorResult = await db.query(
         'SELECT id FROM doctors WHERE user_id = $1', [userId]
       );
       const doctorId = doctorResult.rows[0]?.id;
-      if (doctorId) {
-        recentQuery = `${baseRecent} WHERE a.doctor_id = $1 ORDER BY a.scheduled_at DESC LIMIT 5`;
-        recentParams = [doctorId];
+      if (!doctorId) {
+        return res.json({ status: 'success', data: emptyResponse });
       }
-    } else {
-      recentQuery = `${baseRecent} ORDER BY a.scheduled_at DESC LIMIT 5`;
+      roleFilter = 'AND a.doctor_id = $1';
+      filterParams = [doctorId];
     }
 
-    let recentAppointments = [];
-    if (recentQuery) {
-      const recentResult = await db.query(recentQuery, recentParams);
-      recentAppointments = recentResult.rows.map((row) => ({
-        id: row.id,
-        patientName: row.patient_name,
-        doctorName: row.doctor_name,
-        scheduledAt: row.scheduled_at,
-        status: row.status,
-        notes: row.notes,
-      }));
-    }
+    const limitIdx = filterParams.length + 1;
 
-    res.json({ status: 'success', data: { stats, recentAppointments } });
+    const [todayResult, upcomingResult, recentResult] = await Promise.all([
+      db.query(
+        `${baseRecent}
+         WHERE DATE(a.scheduled_at) = CURRENT_DATE
+           AND a.status NOT IN ('cancelled', 'no_show')
+           ${roleFilter}
+         ORDER BY a.scheduled_at ASC
+         LIMIT $${limitIdx}`,
+        [...filterParams, TODAY_LIMIT]
+      ),
+      // Upcoming: future dates only (excludes today), scheduled or confirmed
+      db.query(
+        `${baseRecent}
+         WHERE DATE(a.scheduled_at) > CURRENT_DATE
+           AND a.status IN ('scheduled', 'confirmed')
+           ${roleFilter}
+         ORDER BY a.scheduled_at ASC
+         LIMIT $${limitIdx}`,
+        [...filterParams, UPCOMING_LIMIT]
+      ),
+      db.query(
+        `${baseRecent}
+         ${roleFilter ? `WHERE ${roleFilter.replace('AND ', '')}` : ''}
+         ORDER BY a.scheduled_at DESC
+         LIMIT $${limitIdx}`,
+        [...filterParams, RECENT_LIMIT]
+      ),
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        stats,
+        todayAppointments: todayResult.rows.map(mapAppointment),
+        upcomingAppointments: upcomingResult.rows.map(mapAppointment),
+        recentAppointments: recentResult.rows.map(mapAppointment),
+      },
+    });
   } catch (err) {
     return next(err);
   }
@@ -392,7 +432,7 @@ const MAX_UPCOMING_APPOINTMENTS = 10;
 const MAX_RECENT_PATIENTS = 10;
 const MAX_RECENT_PRESCRIPTIONS = 10;
 
-function mapAppointment(row) {
+function mapDoctorAppointment(row) {
   return {
     id: row.id,
     patientName: row.patient_name,
@@ -493,8 +533,8 @@ const getDoctorDashboard = async (req, res, next) => {
           totalRecords: parseInt(stats.total_records, 10),
           upcomingCount: parseInt(stats.upcoming_count, 10),
         },
-        todayAppointments: todayAptsResult.rows.map(mapAppointment),
-        upcomingAppointments: upcomingAptsResult.rows.map(mapAppointment),
+        todayAppointments: todayAptsResult.rows.map(mapDoctorAppointment),
+        upcomingAppointments: upcomingAptsResult.rows.map(mapDoctorAppointment),
         recentPatients: recentPatientsResult.rows.map((r) => ({
           patientId: r.patient_id,
           patientName: r.patient_name,

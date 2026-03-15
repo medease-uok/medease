@@ -21,6 +21,11 @@ const formatDate = (iso) => {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+const formatTime = (iso) => {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
 const calculateAge = (dob) => {
   if (!dob) return null;
   const diff = Date.now() - new Date(dob).getTime();
@@ -710,7 +715,7 @@ export default function PatientDashboard() {
                       <div>
                         <p className="font-medium text-sm text-slate-900">{apt.doctorName}</p>
                         <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> {formatDate(apt.scheduledAt)}
+                          <Clock className="w-3 h-3" /> {formatDate(apt.scheduledAt)} at {formatTime(apt.scheduledAt)}
                         </p>
                       </div>
                     </div>
@@ -798,7 +803,7 @@ export default function PatientDashboard() {
                     <TableRow key={lr.id}>
                       <TableCell className="font-medium">{lr.testName}</TableCell>
                       <TableCell>{lr.result || '-'}</TableCell>
-                      <TableCell>{formatDate(lr.reportDate)}</TableCell>
+                      <TableCell>{formatDate(lr.reportDate)} at {formatTime(lr.reportDate)}</TableCell>
                       <TableCell>{lr.technicianName || '-'}</TableCell>
                     </TableRow>
                   ))}
