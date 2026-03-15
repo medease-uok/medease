@@ -51,7 +51,7 @@ export default function DoctorDetail() {
         <DataTable
           columns={[
             { key: 'patientName', label: 'Patient' },
-            { key: 'scheduledAt', label: 'Date', render: (val) => new Date(val).toLocaleDateString() },
+            { key: 'scheduledAt', label: 'Date & Time', render: (val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) },
             { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
             { key: 'notes', label: 'Notes', render: (val) => val?.substring(0, 50) + '...' },
           ]}

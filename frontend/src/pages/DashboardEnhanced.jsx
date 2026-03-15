@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users, Calendar, FileText, Activity, Stethoscope, Pill, FlaskConical,
   CheckCircle2, XCircle, Shield, ClipboardList, UserCheck, AlertTriangle, History,
+  Clock, ChevronRight,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -50,6 +51,11 @@ const roleGreetings = {
 const formatDate = (iso) => {
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const formatTime = (iso) => {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
 function AppointmentStatusBadge({ status }) {
@@ -113,26 +119,6 @@ const adminTabs = [
   { id: 'changes', label: 'Profile Changes', icon: History },
 ];
 
-const appointmentTableConfig = {
-  patient: {
-    title: 'My Appointments',
-    subtitle: 'Your upcoming and recent appointments',
-    columns: ['Doctor', 'Date', 'Status'],
-    render: (apt) => [apt.doctorName, formatDate(apt.scheduledAt), <AppointmentStatusBadge key="s" status={apt.status} />],
-  },
-  doctor: {
-    title: 'My Patient Appointments',
-    subtitle: 'Recent appointments with your patients',
-    columns: ['Patient', 'Date', 'Status'],
-    render: (apt) => [apt.patientName, formatDate(apt.scheduledAt), <AppointmentStatusBadge key="s" status={apt.status} />],
-  },
-  default: {
-    title: 'Recent Appointments',
-    subtitle: 'Latest scheduled appointments in the system',
-    columns: ['Patient', 'Doctor', 'Date', 'Status'],
-    render: (apt) => [apt.patientName, apt.doctorName, formatDate(apt.scheduledAt), <AppointmentStatusBadge key="s" status={apt.status} />],
-  },
-};
 
 export default function DashboardEnhanced() {
   const { currentUser, updateUser } = useAuth();
@@ -254,9 +240,7 @@ export default function DashboardEnhanced() {
     );
   }
 
-  const { stats, recentAppointments } = dashData;
-
-  const tableConfig = appointmentTableConfig[role] || appointmentTableConfig.default;
+  const { stats, todayAppointments = [], upcomingAppointments = [] } = dashData;
 
   const filteredUsers = activeUsers.filter((u) =>
     `${u.firstName} ${u.lastName} ${u.email} ${u.role}`.toLowerCase().includes(adminSearch.toLowerCase())
@@ -314,54 +298,110 @@ export default function DashboardEnhanced() {
 
       <QuickActions onActionClick={handleQuickAction} role={role} />
 
-      <div className="grid gap-6 lg:grid-cols-3 items-stretch">
-        <div className="lg:col-span-2 h-full">
-          <Card className="h-full flex flex-col hover:shadow-lg transition-shadow duration-300">
-            <CardHeader>
-              <CardTitle>{tableConfig.title}</CardTitle>
-              <CardDescription>{tableConfig.subtitle}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <div className="rounded-md border border-slate-200">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {tableConfig.columns.map((col) => (
-                        <TableHead key={col}>{col}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentAppointments && recentAppointments.length > 0 ? (
-                      recentAppointments.map((apt, idx) => {
-                        const cells = tableConfig.render(apt);
-                        return (
-                          <TableRow key={apt.id || idx}>
-                            {cells.map((cell, i) => (
-                              <TableCell key={i} className={i === 0 ? 'font-medium' : ''}>
-                                {cell}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        );
-                      })
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={tableConfig.columns.length} className="h-24 text-center text-slate-500">
-                          No appointments found
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+      {/* Appointments Overview */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Today's Appointments */}
+        <div className="lg:col-span-2">
+          <Card className="h-full hover:shadow-lg transition-shadow duration-300">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-blue-500" />
+                  Today's Appointments
+                </CardTitle>
+                <CardDescription>
+                  {todayAppointments.length} appointment{todayAppointments.length !== 1 ? 's' : ''} scheduled for today
+                </CardDescription>
               </div>
+              <button
+                onClick={() => navigate('/appointments')}
+                className="text-sm text-primary hover:underline flex items-center gap-1"
+              >
+                View All <ChevronRight className="w-3 h-3" />
+              </button>
+            </CardHeader>
+            <CardContent>
+              {todayAppointments.length > 0 ? (
+                <div className="space-y-2">
+                  {todayAppointments.map((apt) => {
+                    const nameField = role === 'patient' ? apt.doctorName : apt.patientName;
+                    return (
+                      <div
+                        key={apt.id}
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-sm font-semibold text-slate-600">
+                            {nameField.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm text-slate-900">{nameField}</p>
+                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatTime(apt.scheduledAt)}
+                              {apt.notes && <span className="ml-1">— {apt.notes}</span>}
+                            </p>
+                          </div>
+                        </div>
+                        <AppointmentStatusBadge status={apt.status} />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-slate-400">
+                  <Calendar className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No appointments today</p>
+                  <p className="text-sm mt-1">Your schedule is clear.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        <div className="h-full">
-          <ActivityFeed activities={activityData} maxItems={8} />
-        </div>
+        {/* Upcoming Appointments */}
+        <Card className="h-full hover:shadow-lg transition-shadow duration-300">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Clock className="w-5 h-5 text-indigo-500" />
+              Upcoming
+            </CardTitle>
+            <CardDescription>{upcomingAppointments.length} scheduled</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {upcomingAppointments.length > 0 ? (
+              <div className="space-y-3">
+                {upcomingAppointments.map((apt) => {
+                  const nameField = role === 'patient' ? apt.doctorName : apt.patientName;
+                  return (
+                    <div
+                      key={apt.id}
+                      className="p-3 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-medium text-sm text-slate-900">{nameField}</p>
+                        <AppointmentStatusBadge status={apt.status} />
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        {formatDate(apt.scheduledAt)} at {formatTime(apt.scheduledAt)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-400">
+                <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No upcoming appointments</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Activity Feed */}
+      <div>
+        <ActivityFeed activities={activityData} maxItems={8} />
       </div>
 
       {isAdmin && (

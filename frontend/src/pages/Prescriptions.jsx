@@ -30,7 +30,7 @@ const formatDate = (iso) => {
   const date = new Date(iso);
   if (isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
   });
 };
 

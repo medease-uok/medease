@@ -129,9 +129,6 @@ const getStats = async (req, res, next) => {
       }
     }
 
-    let recentQuery;
-    let recentParams = [];
-
     const baseRecent = `
       SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
              pu.first_name || ' ' || pu.last_name AS patient_name,
@@ -142,14 +139,17 @@ const getStats = async (req, res, next) => {
       JOIN doctors d ON a.doctor_id = d.id
       JOIN users du ON d.user_id = du.id`;
 
+    let roleFilter = '';
+    let filterParams = [];
+
     if (role === 'patient') {
       const patientResult = await db.query(
         'SELECT id FROM patients WHERE user_id = $1', [userId]
       );
       const patientId = patientResult.rows[0]?.id;
       if (patientId) {
-        recentQuery = `${baseRecent} WHERE a.patient_id = $1 ORDER BY a.scheduled_at DESC LIMIT 5`;
-        recentParams = [patientId];
+        roleFilter = 'AND a.patient_id = $1';
+        filterParams = [patientId];
       }
     } else if (role === 'doctor') {
       const doctorResult = await db.query(
@@ -157,27 +157,60 @@ const getStats = async (req, res, next) => {
       );
       const doctorId = doctorResult.rows[0]?.id;
       if (doctorId) {
-        recentQuery = `${baseRecent} WHERE a.doctor_id = $1 ORDER BY a.scheduled_at DESC LIMIT 5`;
-        recentParams = [doctorId];
+        roleFilter = 'AND a.doctor_id = $1';
+        filterParams = [doctorId];
       }
-    } else {
-      recentQuery = `${baseRecent} ORDER BY a.scheduled_at DESC LIMIT 5`;
     }
 
-    let recentAppointments = [];
-    if (recentQuery) {
-      const recentResult = await db.query(recentQuery, recentParams);
-      recentAppointments = recentResult.rows.map((row) => ({
-        id: row.id,
-        patientName: row.patient_name,
-        doctorName: row.doctor_name,
-        scheduledAt: row.scheduled_at,
-        status: row.status,
-        notes: row.notes,
-      }));
-    }
+    const mapApt = (row) => ({
+      id: row.id,
+      patientName: row.patient_name,
+      doctorName: row.doctor_name,
+      scheduledAt: row.scheduled_at,
+      status: row.status,
+      notes: row.notes,
+    });
 
-    res.json({ status: 'success', data: { stats, recentAppointments } });
+    const limitIdx = filterParams.length + 1;
+
+    const [todayResult, upcomingResult, recentResult] = await Promise.all([
+      db.query(
+        `${baseRecent}
+         WHERE DATE(a.scheduled_at) = CURRENT_DATE
+           AND a.status NOT IN ('cancelled', 'no_show')
+           ${roleFilter}
+         ORDER BY a.scheduled_at ASC
+         LIMIT $${limitIdx}`,
+        [...filterParams, 20]
+      ),
+      db.query(
+        `${baseRecent}
+         WHERE a.scheduled_at > NOW()
+           AND DATE(a.scheduled_at) > CURRENT_DATE
+           AND a.status IN ('scheduled', 'confirmed')
+           ${roleFilter}
+         ORDER BY a.scheduled_at ASC
+         LIMIT $${limitIdx}`,
+        [...filterParams, 10]
+      ),
+      db.query(
+        `${baseRecent}
+         WHERE 1=1 ${roleFilter}
+         ORDER BY a.scheduled_at DESC
+         LIMIT $${limitIdx}`,
+        [...filterParams, 5]
+      ),
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        stats,
+        todayAppointments: todayResult.rows.map(mapApt),
+        upcomingAppointments: upcomingResult.rows.map(mapApt),
+        recentAppointments: recentResult.rows.map(mapApt),
+      },
+    });
   } catch (err) {
     return next(err);
   }
