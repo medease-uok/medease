@@ -16,8 +16,7 @@ router.use(authenticate)
 // Get a doctor's weekly schedule
 router.get(
   '/:doctorId',
-  getDoctorIdValidation,
-  validate,
+  validate(getDoctorIdValidation),
   requirePermission('view_doctor_slots'),
   getSchedule
 )
@@ -25,8 +24,7 @@ router.get(
 // Update a doctor's schedule (doctor=own, admin=any)
 router.put(
   '/:doctorId',
-  upsertScheduleValidation,
-  validate,
+  validate(upsertScheduleValidation),
   authorize('doctor', 'admin'),
   upsertSchedule
 )
@@ -34,8 +32,7 @@ router.put(
 // Get available slots for a specific date
 router.get(
   '/:doctorId/slots',
-  getSlotsValidation,
-  validate,
+  validate(getSlotsValidation),
   requirePermission('view_doctor_slots', 'create_appointment'),
   getAvailableSlots
 )
