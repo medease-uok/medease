@@ -3,6 +3,7 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
+const { SLOT_DURATION_MINUTES } = require('./schedules.controller');
 
 const mapAppointment = (row) => ({
   id: row.id,
@@ -85,6 +86,40 @@ const create = async (req, res, next) => {
     if (patientCheck.rows.length === 0) throw new AppError('Patient not found.', 404);
     const doctor = doctorCheck.rows[0];
     const patient = patientCheck.rows[0];
+
+    // Slot validation: verify doctor has an active schedule and time is on a valid slot boundary
+    const apptDate = new Date(scheduledAt);
+    const dayOfWeek = apptDate.getDay();
+
+    const scheduleResult = await db.query(
+      `SELECT start_time, end_time, is_active
+       FROM doctor_schedules
+       WHERE doctor_id = $1 AND day_of_week = $2`,
+      [doctorId, dayOfWeek]
+    );
+
+    if (scheduleResult.rows.length === 0 || !scheduleResult.rows[0].is_active) {
+      throw new AppError('Doctor is not available on this day.', 400);
+    }
+
+    const schedule = scheduleResult.rows[0];
+    const apptHours = apptDate.getUTCHours();
+    const apptMinutes = apptDate.getUTCMinutes();
+    const apptTotalMinutes = apptHours * 60 + apptMinutes;
+
+    const [schStartH, schStartM] = schedule.start_time.slice(0, 5).split(':').map(Number);
+    const [schEndH, schEndM] = schedule.end_time.slice(0, 5).split(':').map(Number);
+    const schedStartMinutes = schStartH * 60 + schStartM;
+    const schedEndMinutes = schEndH * 60 + schEndM;
+
+    // Must be within schedule hours and on a slot boundary
+    if (apptTotalMinutes < schedStartMinutes || apptTotalMinutes + SLOT_DURATION_MINUTES > schedEndMinutes) {
+      throw new AppError('Appointment time is outside the doctor\'s schedule hours.', 400);
+    }
+
+    if ((apptTotalMinutes - schedStartMinutes) % SLOT_DURATION_MINUTES !== 0) {
+      throw new AppError(`Appointment time must be on a ${SLOT_DURATION_MINUTES}-minute slot boundary.`, 400);
+    }
 
     const client = await db.getClient();
     try {

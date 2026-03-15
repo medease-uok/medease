@@ -11,6 +11,7 @@ import EditStaffProfileModal from '../components/EditStaffProfileModal';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import PatientQueue from '../components/PatientQueue';
+import DoctorScheduleEditor from '../components/DoctorScheduleEditor';
 
 const formatTime = (iso) => {
   const d = new Date(iso);
@@ -113,7 +114,7 @@ export default function DoctorDashboard() {
     );
   }
 
-  const { stats, todayAppointments, upcomingAppointments, recentPatients, recentPrescriptions } = data;
+  const { doctorId, stats, todayAppointments, upcomingAppointments, recentPatients, recentPrescriptions } = data;
 
   const now = new Date();
   const currentApt = todayAppointments.find((a) => a.status === 'in_progress');
@@ -337,8 +338,11 @@ export default function DoctorDashboard() {
         </Card>
       </div>
 
-      {/* Patient Queue */}
-      <PatientQueue isDoctor />
+      {/* Patient Queue + Schedule Editor */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <PatientQueue isDoctor />
+        {doctorId && <DoctorScheduleEditor doctorId={doctorId} />}
+      </div>
 
       {/* Bottom Grid: Recent Patients + Recent Prescriptions */}
       <div className="grid gap-6 lg:grid-cols-2">

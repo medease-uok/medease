@@ -80,6 +80,20 @@ CREATE TABLE doctors (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Doctor schedules table (weekly availability template)
+CREATE TABLE doctor_schedules (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  doctor_id UUID NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+  day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT chk_schedule_time_range CHECK (end_time > start_time),
+  CONSTRAINT uq_doctor_day UNIQUE (doctor_id, day_of_week)
+);
+
 -- Nurses table
 CREATE TABLE nurses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -194,6 +208,9 @@ CREATE INDEX idx_medical_records_patient ON medical_records(patient_id);
 CREATE INDEX idx_prescriptions_patient ON prescriptions(patient_id);
 CREATE INDEX idx_lab_reports_patient ON lab_reports(patient_id);
 CREATE INDEX idx_patient_allergies_patient ON patient_allergies(patient_id);
+CREATE INDEX idx_doctor_schedules_doctor ON doctor_schedules(doctor_id);
+CREATE INDEX idx_doctor_schedules_active ON doctor_schedules(doctor_id, is_active);
+CREATE UNIQUE INDEX uq_appointments_slot ON appointments(doctor_id, scheduled_at) WHERE status NOT IN ('cancelled', 'no_show');
 CREATE INDEX idx_nurses_user ON nurses(user_id);
 CREATE INDEX idx_nurses_department ON nurses(department);
 CREATE INDEX idx_pharmacists_user ON pharmacists(user_id);
@@ -203,6 +220,26 @@ CREATE INDEX idx_profile_change_history_created ON profile_change_history(create
 CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_created ON audit_logs(created_at);
 
+-- Trigger: auto-update doctors.available based on schedule
+CREATE OR REPLACE FUNCTION update_doctor_availability()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE doctors
+  SET available = EXISTS(
+    SELECT 1 FROM doctor_schedules
+    WHERE doctor_id = COALESCE(NEW.doctor_id, OLD.doctor_id)
+      AND is_active = true
+  ),
+  updated_at = NOW()
+  WHERE id = COALESCE(NEW.doctor_id, OLD.doctor_id);
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_update_doctor_availability
+AFTER INSERT OR UPDATE OR DELETE ON doctor_schedules
+FOR EACH ROW EXECUTE FUNCTION update_doctor_availability();
+
 -- Enable Row-Level Security
 ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medical_records ENABLE ROW LEVEL SECURITY;
@@ -211,6 +248,7 @@ ALTER TABLE lab_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE patient_allergies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nurses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pharmacists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctor_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profile_change_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 

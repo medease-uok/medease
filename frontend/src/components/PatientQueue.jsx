@@ -139,6 +139,9 @@ export default function PatientQueue({ isDoctor = false }) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {item.remainingSlots != null && (
+                          <span className="text-xs text-slate-400">({item.remainingSlots} slots left)</span>
+                        )}
                         <QueueStatusBadge status={item.status} />
                         {isDoctor && <ChevronRight className="w-4 h-4 text-slate-400" />}
                       </div>
@@ -176,6 +179,9 @@ export default function PatientQueue({ isDoctor = false }) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {item.remainingSlots != null && (
+                          <span className="text-xs text-slate-400">({item.remainingSlots} slots left)</span>
+                        )}
                         <QueueStatusBadge status={item.status} />
                         {isDoctor && <ChevronRight className="w-4 h-4 text-slate-400" />}
                       </div>

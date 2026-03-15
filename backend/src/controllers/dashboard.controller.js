@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { generateSlots } = require('./schedules.controller');
 
 const TODAY_LIMIT = 20;
 const UPCOMING_LIMIT = 10;
@@ -525,6 +526,7 @@ const getDoctorDashboard = async (req, res, next) => {
     res.json({
       status: 'success',
       data: {
+        doctorId,
         stats: {
           todayAppointments: parseInt(stats.today_appointments, 10),
           completedToday: parseInt(stats.completed_today, 10),
@@ -612,6 +614,42 @@ const getPatientQueue = async (req, res, next) => {
       params
     );
 
+    // Compute remaining slots per doctor for today
+    const doctorIds = [...new Set(result.rows.map((r) => r.doctor_id))];
+    const remainingSlotsMap = {};
+    const todayDow = new Date().getDay();
+
+    if (doctorIds.length > 0) {
+      const [schedResults, bookingResults] = await Promise.all([
+        db.query(
+          `SELECT doctor_id, start_time, end_time
+           FROM doctor_schedules
+           WHERE doctor_id = ANY($1) AND day_of_week = $2 AND is_active = true`,
+          [doctorIds, todayDow]
+        ),
+        db.query(
+          `SELECT doctor_id, COUNT(*) AS booked
+           FROM appointments
+           WHERE doctor_id = ANY($1)
+             AND DATE(scheduled_at) = CURRENT_DATE
+             AND status NOT IN ('cancelled', 'no_show')
+           GROUP BY doctor_id`,
+          [doctorIds]
+        ),
+      ]);
+
+      const bookedMap = {};
+      for (const r of bookingResults.rows) {
+        bookedMap[r.doctor_id] = parseInt(r.booked, 10);
+      }
+
+      for (const r of schedResults.rows) {
+        const totalSlots = generateSlots(r.start_time.slice(0, 5), r.end_time.slice(0, 5)).length;
+        const booked = bookedMap[r.doctor_id] || 0;
+        remainingSlotsMap[r.doctor_id] = Math.max(0, totalSlots - booked);
+      }
+    }
+
     const queue = result.rows.map((row, idx) => ({
       position: idx + 1,
       id: row.id,
@@ -623,6 +661,7 @@ const getPatientQueue = async (req, res, next) => {
       scheduledAt: row.scheduled_at,
       status: row.status,
       notes: row.notes,
+      remainingSlots: remainingSlotsMap[row.doctor_id] ?? null,
     }));
 
     res.json({

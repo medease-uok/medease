@@ -121,13 +121,31 @@ const register = async (req, res, next) => {
         );
         break;
 
-      case 'doctor':
-        await client.query(
+      case 'doctor': {
+        const doctorResult = await client.query(
           `INSERT INTO doctors (user_id, specialization, license_number, department, available, gender)
-           VALUES ($1, $2, $3, $4, true, $5)`,
+           VALUES ($1, $2, $3, $4, true, $5) RETURNING id`,
           [user.id, specialization, licenseNumber, department, gender || null]
         );
+        const newDoctorId = doctorResult.rows[0].id;
+
+        // Insert schedule from request or default Mon-Fri 08:00-17:00
+        const scheduleEntries = req.body.schedule || [
+          { dayOfWeek: 1, startTime: '08:00', endTime: '17:00', isActive: true },
+          { dayOfWeek: 2, startTime: '08:00', endTime: '17:00', isActive: true },
+          { dayOfWeek: 3, startTime: '08:00', endTime: '17:00', isActive: true },
+          { dayOfWeek: 4, startTime: '08:00', endTime: '17:00', isActive: true },
+          { dayOfWeek: 5, startTime: '08:00', endTime: '17:00', isActive: true },
+        ];
+        for (const entry of scheduleEntries) {
+          await client.query(
+            `INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [newDoctorId, entry.dayOfWeek, entry.startTime, entry.endTime, entry.isActive]
+          );
+        }
         break;
+      }
 
       case 'nurse':
         await client.query(

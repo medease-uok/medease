@@ -11,24 +11,57 @@ import { Badge } from '../components/ui/badge';
 import StatusBadge from '../components/StatusBadge';
 import DataTable from '../components/DataTable';
 
+function formatSlotTime(time) {
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
+}
+
 function BookingModal({ doctor, onClose, onBooked }) {
   const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState(null);
   const [notes, setNotes] = useState('');
+  const [slots, setSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   const today = new Date().toISOString().split('T')[0];
 
+  useEffect(() => {
+    if (!date) {
+      setSlots([]);
+      setSelectedSlot(null);
+      return;
+    }
+    const fetchSlots = async () => {
+      setLoadingSlots(true);
+      setSelectedSlot(null);
+      setError(null);
+      try {
+        const res = await api.get(`/schedules/${doctor.id}/slots?date=${date}`);
+        const data = res.data.data || res.data;
+        setSlots(data.slots || []);
+      } catch {
+        setError('Failed to load available slots.');
+        setSlots([]);
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+    fetchSlots();
+  }, [date, doctor.id]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!date || !time) return;
+    if (!date || !selectedSlot) return;
 
     setSubmitting(true);
     setError(null);
 
     try {
-      const scheduledAt = new Date(`${date}T${time}`).toISOString();
+      const scheduledAt = new Date(`${date}T${selectedSlot}:00`).toISOString();
       await api.post('/appointments', {
         doctorId: doctor.id,
         scheduledAt,
@@ -42,10 +75,12 @@ function BookingModal({ doctor, onClose, onBooked }) {
     }
   };
 
+  const availableSlots = slots.filter((s) => s.available);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden"
+        className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-5 border-b border-slate-200">
@@ -88,22 +123,52 @@ function BookingModal({ doctor, onClose, onBooked }) {
             />
           </div>
 
-          <div>
-            <label htmlFor="appt-time" className="block text-sm font-medium text-slate-700 mb-1">
-              Time
-            </label>
-            <input
-              id="appt-time"
-              type="time"
-              required
-              min="08:00"
-              max="17:00"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
-            <p className="text-xs text-slate-400 mt-1">Clinic hours: 8:00 AM - 5:00 PM</p>
-          </div>
+          {/* Slot picker */}
+          {date && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Available Slots
+              </label>
+              {loadingSlots ? (
+                <div className="flex items-center justify-center py-6">
+                  <div className="w-6 h-6 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : slots.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">
+                  Doctor is not available on this day.
+                </p>
+              ) : availableSlots.length === 0 ? (
+                <p className="text-sm text-amber-600 text-center py-4">
+                  No slots available for this day. All slots are booked.
+                </p>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  {slots.map((slot) => (
+                    <button
+                      key={slot.time}
+                      type="button"
+                      disabled={!slot.available}
+                      onClick={() => setSelectedSlot(slot.time)}
+                      className={`px-2 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                        selectedSlot === slot.time
+                          ? 'bg-primary text-white border-primary'
+                          : slot.available
+                            ? 'bg-white text-slate-700 border-slate-200 hover:border-primary hover:text-primary'
+                            : 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed line-through'
+                      }`}
+                    >
+                      {formatSlotTime(slot.time)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {availableSlots.length > 0 && (
+                <p className="text-xs text-slate-400 mt-2">
+                  {availableSlots.length} of {slots.length} slots available
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label htmlFor="appt-notes" className="block text-sm font-medium text-slate-700 mb-1">
@@ -130,10 +195,10 @@ function BookingModal({ doctor, onClose, onBooked }) {
             </button>
             <button
               type="submit"
-              disabled={submitting || !date || !time}
+              disabled={submitting || !date || !selectedSlot}
               className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {submitting ? 'Booking...' : 'Book Appointment'}
+              {submitting ? 'Booking...' : selectedSlot ? `Book ${formatSlotTime(selectedSlot)}` : 'Select a slot'}
             </button>
           </div>
         </form>
@@ -151,17 +216,25 @@ export default function DoctorDetail() {
   const [doctor, setDoctor] = useState(null);
   const [appts, setAppts] = useState([]);
   const [rxs, setRxs] = useState([]);
+  const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showBooking, setShowBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
+  const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
   const fetchDoctor = () => {
     setLoading(true);
-    api.get(`/doctors/${id}`)
-      .then((res) => {
-        setDoctor(res.data.doctor);
-        setAppts(res.data.appointments);
-        setRxs(res.data.prescriptions);
+    Promise.all([
+      api.get(`/doctors/${id}`),
+      api.get(`/schedules/${id}`).catch(() => ({ data: { data: { schedule: [] } } })),
+    ])
+      .then(([docRes, schedRes]) => {
+        setDoctor(docRes.data.doctor);
+        setAppts(docRes.data.appointments);
+        setRxs(docRes.data.prescriptions);
+        const schedData = schedRes.data.data || schedRes.data;
+        setSchedule(schedData.schedule || []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -299,6 +372,38 @@ export default function DoctorDetail() {
               </div>
             )}
           </div>
+
+          {/* Weekly schedule summary */}
+          {schedule.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-slate-100">
+              <p className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-400" />
+                Weekly Schedule
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {DAYS_SHORT.map((day, idx) => {
+                  const entry = schedule.find((s) => s.dayOfWeek === idx);
+                  const active = entry && entry.isActive;
+                  return (
+                    <div
+                      key={idx}
+                      className={`px-3 py-2 rounded-lg text-xs text-center ${
+                        active
+                          ? 'bg-green-50 border border-green-200 text-green-700'
+                          : 'bg-slate-50 border border-slate-100 text-slate-400'
+                      }`}
+                    >
+                      <p className="font-semibold">{day}</p>
+                      {active && (
+                        <p className="mt-0.5">{entry.startTime} - {entry.endTime}</p>
+                      )}
+                      {!active && <p className="mt-0.5">Closed</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
