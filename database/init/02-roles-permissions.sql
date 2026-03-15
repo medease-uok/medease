@@ -92,6 +92,12 @@ INSERT INTO permissions (name, description, category) VALUES
   ('create_lab_report', 'Create lab reports', 'lab_reports'),
   ('edit_lab_report', 'Edit lab reports', 'lab_reports');
 
+-- Schedules
+INSERT INTO permissions (name, description, category) VALUES
+  ('manage_own_schedule', 'Manage own doctor schedule', 'schedules'),
+  ('manage_any_schedule', 'Manage any doctor schedule', 'schedules'),
+  ('view_doctor_slots', 'View available appointment slots', 'schedules');
+
 -- User & system management
 INSERT INTO permissions (name, description, category) VALUES
   ('manage_users', 'Activate/deactivate user accounts', 'admin'),
@@ -128,7 +134,8 @@ WHERE r.name = 'doctor' AND p.name IN (
   'view_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status',
   'view_medical_records', 'create_medical_record', 'edit_medical_record',
   'view_prescriptions', 'create_prescription', 'cancel_prescription',
-  'view_lab_reports'
+  'view_lab_reports',
+  'manage_own_schedule', 'view_doctor_slots'
 );
 
 -- Nurse
@@ -139,7 +146,8 @@ WHERE r.name = 'nurse' AND p.name IN (
   'view_appointments', 'update_appointment_status',
   'view_medical_records',
   'view_prescriptions',
-  'view_lab_reports'
+  'view_lab_reports',
+  'view_doctor_slots'
 );
 
 -- Patient
@@ -150,7 +158,8 @@ WHERE r.name = 'patient' AND p.name IN (
   'view_own_appointments', 'create_appointment', 'cancel_appointment',
   'view_own_medical_records',
   'view_own_prescriptions',
-  'view_own_lab_reports'
+  'view_own_lab_reports',
+  'view_doctor_slots'
 );
 
 -- Lab Technician

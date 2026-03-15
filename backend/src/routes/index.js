@@ -16,6 +16,7 @@ const notificationRoutes = require('./notifications.routes');
 const refillRequestRoutes = require('./refillRequests.routes');
 const medicalDocumentRoutes = require('./medicalDocuments.routes');
 const nurseRoutes = require('./nurses.routes');
+const scheduleRoutes = require('./schedules.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -41,5 +42,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/refill-requests', refillRequestRoutes);
 router.use('/medical-documents', medicalDocumentRoutes);
 router.use('/nurses', nurseRoutes);
+router.use('/schedules', scheduleRoutes);
 
 module.exports = router;

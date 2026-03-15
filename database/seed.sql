@@ -512,4 +512,40 @@ INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes,
    'Headache frequency 4/month, duration 8-12 hours. CT brain normal. Meets ICHD-3 criteria for migraine without aura.',
    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000005' AND condition_name = 'Migraine without Aura'));
 
+-- ============================================
+-- DOCTOR SCHEDULES (Mon-Fri 08:00-17:00)
+-- ============================================
+
+-- Dr. Kamal Perera (Cardiology)
+INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000001', 1, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000001', 2, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000001', 3, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000001', 4, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000001', 5, '08:00', '17:00', true);
+
+-- Dr. Sithara Silva (Neurology)
+INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000002', 1, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000002', 2, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000002', 3, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000002', 4, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000002', 5, '08:00', '17:00', true);
+
+-- Dr. Ruwan Fernando (Orthopedics)
+INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000003', 1, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000003', 2, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000003', 3, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000003', 4, '08:00', '17:00', true),
+  ('dc000000-0000-0000-0000-000000000003', 5, '08:00', '17:00', true);
+
+-- Dr. Anjali Dissanayake (Pediatrics) — inactive (doctor not available)
+INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000004', 1, '08:00', '17:00', false),
+  ('dc000000-0000-0000-0000-000000000004', 2, '08:00', '17:00', false),
+  ('dc000000-0000-0000-0000-000000000004', 3, '08:00', '17:00', false),
+  ('dc000000-0000-0000-0000-000000000004', 4, '08:00', '17:00', false),
+  ('dc000000-0000-0000-0000-000000000004', 5, '08:00', '17:00', false);
+
 COMMIT;

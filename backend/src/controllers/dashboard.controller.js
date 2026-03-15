@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { generateSlots } = require('../utils/scheduleHelpers');
 
 const TODAY_LIMIT = 20;
 const UPCOMING_LIMIT = 10;
@@ -525,6 +526,7 @@ const getDoctorDashboard = async (req, res, next) => {
     res.json({
       status: 'success',
       data: {
+        doctorId,
         stats: {
           todayAppointments: parseInt(stats.today_appointments, 10),
           completedToday: parseInt(stats.completed_today, 10),
@@ -557,4 +559,123 @@ const getDoctorDashboard = async (req, res, next) => {
   }
 };
 
-module.exports = { getStats, getActivity, getDoctorDashboard };
+const QUEUE_LIMIT = 30;
+const QUEUE_POLL_INTERVAL_HINT = 30; // seconds — sent to clients so they know when to refetch
+
+const getPatientQueue = async (req, res, next) => {
+  try {
+    const { role, id: userId } = req.user;
+
+    // Only staff roles can access the patient queue
+    if (!['doctor', 'nurse', 'admin'].includes(role)) {
+      return res.status(403).json({ status: 'error', message: 'Access denied.' });
+    }
+
+    let roleQueueFilter = '';
+    const params = [QUEUE_LIMIT];
+    const emptyQueue = { queue: [], pollInterval: QUEUE_POLL_INTERVAL_HINT };
+
+    if (role === 'doctor') {
+      // Doctors see only their own queue
+      const doctorResult = await db.query(
+        'SELECT id FROM doctors WHERE user_id = $1', [userId]
+      );
+      const doctorId = doctorResult.rows[0]?.id;
+      if (!doctorId) {
+        return res.json({ status: 'success', data: emptyQueue });
+      }
+      roleQueueFilter = 'AND a.doctor_id = $2';
+      params.push(doctorId);
+    } else if (role === 'nurse') {
+      // Nurses see only their department's doctors' queue
+      const nurseResult = await db.query(
+        'SELECT department FROM nurses WHERE user_id = $1', [userId]
+      );
+      const department = nurseResult.rows[0]?.department;
+      if (!department) {
+        return res.json({ status: 'success', data: emptyQueue });
+      }
+      roleQueueFilter = 'AND d.department = $2';
+      params.push(department);
+    }
+
+    const result = await db.query(
+      `SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
+              pu.first_name || ' ' || pu.last_name AS patient_name,
+              'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name,
+              d.specialization, d.department
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN users pu ON p.user_id = pu.id
+       JOIN doctors d ON a.doctor_id = d.id
+       JOIN users du ON d.user_id = du.id
+       WHERE DATE(a.scheduled_at) = CURRENT_DATE
+         AND a.status IN ('scheduled', 'confirmed', 'in_progress')
+         ${roleQueueFilter}
+       ORDER BY
+         CASE a.status WHEN 'in_progress' THEN 0 ELSE 1 END,
+         a.scheduled_at ASC
+       LIMIT $1`,
+      params
+    );
+
+    // Compute remaining slots per doctor for today
+    const doctorIds = [...new Set(result.rows.map((r) => r.doctor_id))];
+    const remainingSlotsMap = {};
+    const todayDow = new Date().getDay();
+
+    if (doctorIds.length > 0) {
+      const [schedResults, bookingResults] = await Promise.all([
+        db.query(
+          `SELECT doctor_id, start_time, end_time
+           FROM doctor_schedules
+           WHERE doctor_id = ANY($1) AND day_of_week = $2 AND is_active = true`,
+          [doctorIds, todayDow]
+        ),
+        db.query(
+          `SELECT doctor_id, COUNT(*) AS booked
+           FROM appointments
+           WHERE doctor_id = ANY($1)
+             AND DATE(scheduled_at) = CURRENT_DATE
+             AND status NOT IN ('cancelled', 'no_show')
+           GROUP BY doctor_id`,
+          [doctorIds]
+        ),
+      ]);
+
+      const bookedMap = {};
+      for (const r of bookingResults.rows) {
+        bookedMap[r.doctor_id] = parseInt(r.booked, 10);
+      }
+
+      for (const r of schedResults.rows) {
+        const totalSlots = generateSlots(r.start_time.slice(0, 5), r.end_time.slice(0, 5)).length;
+        const booked = bookedMap[r.doctor_id] || 0;
+        remainingSlotsMap[r.doctor_id] = Math.max(0, totalSlots - booked);
+      }
+    }
+
+    const queue = result.rows.map((row, idx) => ({
+      position: idx + 1,
+      id: row.id,
+      patientId: row.patient_id,
+      patientName: row.patient_name,
+      doctorName: row.doctor_name,
+      specialization: row.specialization,
+      department: row.department,
+      scheduledAt: row.scheduled_at,
+      status: row.status,
+      notes: row.notes,
+      remainingSlots: remainingSlotsMap[row.doctor_id] ?? null,
+    }));
+
+    res.json({
+      status: 'success',
+      data: { queue, pollInterval: QUEUE_POLL_INTERVAL_HINT },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getStats, getActivity, getDoctorDashboard, getPatientQueue };

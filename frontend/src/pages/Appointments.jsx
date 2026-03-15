@@ -7,6 +7,7 @@ import { useAuth } from '../data/AuthContext';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import AppointmentDetailModal from '../components/AppointmentDetailModal';
 
 const STATUS_STYLES = {
   scheduled: { variant: 'default', label: 'Scheduled' },
@@ -34,11 +35,15 @@ const matchesSearch = (a, query) => {
     .some((field) => a[field]?.toLowerCase().includes(q));
 };
 
-function AppointmentCard({ appointment, showPatient }) {
+function AppointmentCard({ appointment, showPatient, onClick }) {
   const style = STATUS_STYLES[appointment.status] ?? { variant: 'outline', label: appointment.status ?? 'Unknown' };
 
   return (
-    <div className="group relative rounded-xl border border-slate-200 bg-white p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200">
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative rounded-xl border border-slate-200 bg-white p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200 text-left w-full cursor-pointer"
+    >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
@@ -68,7 +73,7 @@ function AppointmentCard({ appointment, showPatient }) {
           </div>
         )}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -102,6 +107,7 @@ export default function Appointments() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
   const deferredSearch = useDeferredValue(search);
@@ -279,7 +285,7 @@ export default function Appointments() {
       {!loading && !error && filtered.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((a) => (
-            <AppointmentCard key={a.id} appointment={a} showPatient={!isPatient} />
+            <AppointmentCard key={a.id} appointment={a} showPatient={!isPatient} onClick={() => setSelectedId(a.id)} />
           ))}
         </div>
       )}
@@ -309,6 +315,15 @@ export default function Appointments() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Appointment detail modal */}
+      {selectedId && (
+        <AppointmentDetailModal
+          appointmentId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onStatusChange={fetchAppointments}
+        />
       )}
     </div>
   );

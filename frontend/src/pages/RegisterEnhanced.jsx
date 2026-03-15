@@ -4,6 +4,7 @@ import { Turnstile } from '@marsidev/react-turnstile';
 import { useAuth } from '../data/AuthContext';
 import { roles as allRoles } from '../constants';
 import TermsModal from '../components/TermsModal';
+import DoctorScheduleEditor, { DEFAULT_SCHEDULE } from '../components/DoctorScheduleEditor';
 import {
   Activity,
   Mail,
@@ -41,6 +42,9 @@ const departments = [
 ];
 
 function getStepLabels(role, hasInsurance) {
+  if (role === 'doctor') {
+    return ['Account', 'Details', 'Schedule', 'Password'];
+  }
   if (role === 'patient' && hasInsurance) {
     return ['Account', 'Details', 'Insurance', 'Password'];
   }
@@ -127,6 +131,56 @@ function InputField({ label, name, type = 'text', icon: Icon, error, value, onCh
   );
 }
 
+const SCHED_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const SCHED_SLOT_MINS = 20;
+const SCHED_TIME_OPTIONS = (() => {
+  const opts = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  return opts;
+})();
+
+function ScheduleInlineEditor({ schedule, onChange }) {
+  const update = (dayOfWeek, field, value) => {
+    onChange(schedule.map((e) => e.dayOfWeek === dayOfWeek ? { ...e, [field]: value } : e));
+  };
+
+  return (
+    <div className="space-y-2">
+      {schedule.map((entry) => {
+        const [sh, sm] = entry.startTime.split(':').map(Number);
+        const [eh, em] = entry.endTime.split(':').map(Number);
+        const slots = entry.isActive ? Math.max(0, Math.floor(((eh * 60 + em) - (sh * 60 + sm)) / SCHED_SLOT_MINS)) : 0;
+        return (
+          <div key={entry.dayOfWeek} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${entry.isActive ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100'}`}>
+            <label className="flex items-center gap-2 min-w-[120px] cursor-pointer">
+              <input type="checkbox" checked={entry.isActive} onChange={(e) => update(entry.dayOfWeek, 'isActive', e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600" />
+              <span className={`text-sm font-medium ${entry.isActive ? 'text-slate-900' : 'text-slate-400'}`}>{SCHED_DAYS[entry.dayOfWeek]}</span>
+            </label>
+            {entry.isActive ? (
+              <>
+                <select value={entry.startTime} onChange={(e) => update(entry.dayOfWeek, 'startTime', e.target.value)} className="text-sm border border-slate-200 rounded-md px-2 py-1.5 bg-white">
+                  {SCHED_TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <span className="text-slate-400 text-sm">to</span>
+                <select value={entry.endTime} onChange={(e) => update(entry.dayOfWeek, 'endTime', e.target.value)} className="text-sm border border-slate-200 rounded-md px-2 py-1.5 bg-white">
+                  {SCHED_TIME_OPTIONS.filter((t) => t > entry.startTime).map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <span className="text-xs text-slate-400 ml-auto">{slots} slot{slots !== 1 ? 's' : ''}</span>
+              </>
+            ) : (
+              <span className="text-xs text-slate-400 ml-auto">Closed</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function RegisterEnhanced() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -137,6 +191,7 @@ export default function RegisterEnhanced() {
     insurancePlanType: '', insuranceExpiryDate: '',
     specialization: '', licenseNumber: '', department: '',
   });
+  const [doctorSchedule, setDoctorSchedule] = useState(DEFAULT_SCHEDULE);
   const [hasInsurance, setHasInsurance] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -151,6 +206,7 @@ export default function RegisterEnhanced() {
   const totalSteps = stepLabels.length;
   const passwordStep = totalSteps;
   const insuranceStep = hasInsurance && form.role === 'patient' ? 3 : null;
+  const scheduleStep = form.role === 'doctor' ? 3 : null;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -278,7 +334,11 @@ export default function RegisterEnhanced() {
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
     setLoading(true);
-    const result = await register({ ...form, captchaToken });
+    const payload = { ...form, captchaToken };
+    if (form.role === 'doctor') {
+      payload.schedule = doctorSchedule;
+    }
+    const result = await register(payload);
     setLoading(false);
     if (result.success) {
       navigate('/verify-email', { state: { email: form.email } });
@@ -645,6 +705,25 @@ export default function RegisterEnhanced() {
                       <InputField label="Expiry Date" name="insuranceExpiryDate" type="date" icon={Calendar} value={form.insuranceExpiryDate} onChange={handleChange} disabled={loading} />
                     </div>
                     <div className="flex justify-between">
+                      <button type="button" onClick={handleBack} className="flex items-center gap-2 px-6 py-3 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-all">
+                        <ChevronLeft className="w-5 h-5" /> Back
+                      </button>
+                      <button type="button" onClick={handleNext} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-cta text-white font-semibold rounded-lg hover:shadow-lg transition-all">
+                        Next <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* STEP 3: Doctor Schedule */}
+                {step === scheduleStep && (
+                  <>
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Set Your Weekly Schedule</h3>
+                    <p className="text-sm text-slate-500 mb-4">
+                      Configure your weekly availability. Each appointment slot is 20 minutes. You can change this later from your dashboard.
+                    </p>
+                    <ScheduleInlineEditor schedule={doctorSchedule} onChange={setDoctorSchedule} />
+                    <div className="flex justify-between mt-6">
                       <button type="button" onClick={handleBack} className="flex items-center gap-2 px-6 py-3 border-2 border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-all">
                         <ChevronLeft className="w-5 h-5" /> Back
                       </button>
