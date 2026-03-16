@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, Users, Pill, FileText, Clock, CheckCircle2,
-  ArrowRight, ChevronRight, Activity, Stethoscope, TrendingUp,
+  ArrowRight, ChevronRight, Activity,
+  Play, ClipboardList, RefreshCw, CalendarClock,
+  FlaskConical, Zap,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -12,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import PatientQueue from '../components/PatientQueue';
 import DoctorScheduleEditor from '../components/DoctorScheduleEditor';
+import AppointmentDetailModal from '../components/AppointmentDetailModal';
 
 const formatTime = (iso) => {
   const d = new Date(iso);
@@ -77,6 +80,9 @@ export default function DoctorDashboard() {
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
+  const [selectedApptId, setSelectedApptId] = useState(null);
+  const [startingApptId, setStartingApptId] = useState(null);
+  const [quickActionsExpanded, setQuickActionsExpanded] = useState(false);
 
   useEffect(() => {
     const fetchDashboard = api.get('/dashboard/doctor').then((res) => {
@@ -92,6 +98,34 @@ export default function DoctorDashboard() {
 
     Promise.allSettled([fetchDashboard, fetchProfile]).finally(() => setLoading(false));
   }, []);
+
+  const refreshDashboard = () => {
+    api.get('/dashboard/doctor').then((res) => setData(res.data)).catch(console.error);
+  };
+
+  const handleStartAppointment = async (aptId) => {
+    setStartingApptId(aptId);
+    try {
+      await api.patch(`/appointments/${aptId}/status`, { status: 'in_progress' });
+      refreshDashboard();
+    } catch (err) {
+      console.error('Failed to start appointment:', err);
+    } finally {
+      setStartingApptId(null);
+    }
+  };
+
+  const handleCompleteAppointment = async (aptId) => {
+    setStartingApptId(aptId);
+    try {
+      await api.patch(`/appointments/${aptId}/status`, { status: 'completed' });
+      refreshDashboard();
+    } catch (err) {
+      console.error('Failed to complete appointment:', err);
+    } finally {
+      setStartingApptId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -120,6 +154,9 @@ export default function DoctorDashboard() {
   const currentApt = todayAppointments.find((a) => a.status === 'in_progress');
   const nextApt = todayAppointments.find((a) =>
     ['scheduled', 'confirmed'].includes(a.status) && new Date(a.scheduledAt) > now
+  );
+  const readyToStart = todayAppointments.find((a) =>
+    ['scheduled', 'confirmed'].includes(a.status) && new Date(a.scheduledAt) <= now
   );
 
   return (
@@ -228,30 +265,92 @@ export default function DoctorDashboard() {
         />
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-5 gap-3">
-        {[
-          { label: 'Appointments', icon: Calendar, path: '/appointments', color: 'from-blue-500 to-blue-600' },
-          { label: 'Patients', icon: Users, path: '/patients', color: 'from-green-500 to-green-600' },
-          { label: 'Records', icon: FileText, path: '/medical-records', color: 'from-purple-500 to-purple-600' },
-          { label: 'Prescriptions', icon: Pill, path: '/prescriptions', color: 'from-orange-500 to-orange-600' },
-          { label: 'Lab Reports', icon: Stethoscope, path: '/lab-reports', color: 'from-rose-500 to-rose-600' },
-        ].map((action) => {
-          const Icon = action.icon;
-          return (
-            <button
-              key={action.label}
-              onClick={() => navigate(action.path)}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white border-2 border-slate-100 hover:border-transparent hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group"
-            >
-              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${action.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                <Icon className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900">{action.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Quick Actions Menu */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-amber-500" />
+            <CardTitle className="text-lg">Quick Actions</CardTitle>
+          </div>
+          <button
+            onClick={() => setQuickActionsExpanded(!quickActionsExpanded)}
+            className="text-sm text-primary hover:underline"
+          >
+            {quickActionsExpanded ? 'Show less' : 'Show all'}
+          </button>
+        </CardHeader>
+        <CardContent>
+          {/* Contextual actions — shown based on current state */}
+          {(currentApt || readyToStart) && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {currentApt && (
+                <>
+                  <button
+                    onClick={() => navigate(`/patients/${currentApt.patientId}`)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 transition-colors text-sm font-medium"
+                  >
+                    <Activity className="w-4 h-4" />
+                    View Current Patient
+                  </button>
+                  <button
+                    onClick={() => handleCompleteAppointment(currentApt.id)}
+                    disabled={startingApptId === currentApt.id}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors text-sm font-medium"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    {startingApptId === currentApt.id ? 'Completing...' : 'Complete Appointment'}
+                  </button>
+                </>
+              )}
+              {readyToStart && !currentApt && (
+                <button
+                  onClick={() => handleStartAppointment(readyToStart.id)}
+                  disabled={startingApptId === readyToStart.id}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors text-sm font-medium"
+                >
+                  <Play className="w-4 h-4" />
+                  {startingApptId === readyToStart.id ? 'Starting...' : `Start: ${readyToStart.patientName} (${formatTime(readyToStart.scheduledAt)})`}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Primary navigation shortcuts */}
+          <div className={`grid gap-2 ${quickActionsExpanded ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4' : 'grid-cols-3 sm:grid-cols-5'}`}>
+            {[
+              { label: 'Appointments', icon: Calendar, path: '/appointments', color: 'from-blue-500 to-blue-600', desc: 'View & manage' },
+              { label: 'Patients', icon: Users, path: '/patients', color: 'from-green-500 to-green-600', desc: 'Browse patients' },
+              { label: 'Prescriptions', icon: Pill, path: '/prescriptions', color: 'from-orange-500 to-orange-600', desc: 'Issue & review' },
+              { label: 'Medical Records', icon: FileText, path: '/medical-records', color: 'from-purple-500 to-purple-600', desc: 'Create & view' },
+              { label: 'Lab Reports', icon: FlaskConical, path: '/lab-reports', color: 'from-rose-500 to-rose-600', desc: 'View results' },
+              ...(quickActionsExpanded ? [
+                { label: 'Refill Requests', icon: RefreshCw, path: '/prescriptions', color: 'from-teal-500 to-teal-600', desc: 'Approve or deny' },
+                { label: 'My Schedule', icon: CalendarClock, path: null, action: () => document.getElementById('schedule-editor')?.scrollIntoView({ behavior: 'smooth' }), color: 'from-indigo-500 to-indigo-600', desc: 'Edit availability' },
+                { label: 'Patient Queue', icon: ClipboardList, path: null, action: () => document.getElementById('patient-queue')?.scrollIntoView({ behavior: 'smooth' }), color: 'from-cyan-500 to-cyan-600', desc: 'Today\'s queue' },
+              ] : []),
+            ].map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.label}
+                  onClick={() => action.path ? navigate(action.path) : action.action?.()}
+                  className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white border-2 border-slate-100 hover:border-transparent hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group"
+                >
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${action.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="text-center">
+                    <span className="text-xs font-medium text-slate-700 group-hover:text-slate-900 block">{action.label}</span>
+                    {quickActionsExpanded && (
+                      <span className="text-[10px] text-slate-400">{action.desc}</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
@@ -276,7 +375,7 @@ export default function DoctorDashboard() {
                   {todayAppointments.map((apt) => (
                     <div
                       key={apt.id}
-                      onClick={() => navigate(`/patients/${apt.patientId}`)}
+                      onClick={() => setSelectedApptId(apt.id)}
                       className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-transparent hover:border-slate-200"
                     >
                       <div className="flex items-center gap-3">
@@ -288,7 +387,27 @@ export default function DoctorDashboard() {
                           <p className="text-xs text-slate-500">{formatTime(apt.scheduledAt)}</p>
                         </div>
                       </div>
-                      <StatusBadge status={apt.status} />
+                      <div className="flex items-center gap-2">
+                        {['scheduled', 'confirmed'].includes(apt.status) && new Date(apt.scheduledAt) <= now && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleStartAppointment(apt.id); }}
+                            disabled={startingApptId === apt.id}
+                            className="px-2 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-md hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+                          >
+                            {startingApptId === apt.id ? '...' : 'Start'}
+                          </button>
+                        )}
+                        {apt.status === 'in_progress' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCompleteAppointment(apt.id); }}
+                            disabled={startingApptId === apt.id}
+                            className="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                          >
+                            {startingApptId === apt.id ? '...' : 'Complete'}
+                          </button>
+                        )}
+                        <StatusBadge status={apt.status} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -340,8 +459,14 @@ export default function DoctorDashboard() {
 
       {/* Patient Queue + Schedule Editor */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <PatientQueue isDoctor />
-        {doctorId && <DoctorScheduleEditor doctorId={doctorId} />}
+        <div id="patient-queue">
+          <PatientQueue isDoctor />
+        </div>
+        {doctorId && (
+          <div id="schedule-editor">
+            <DoctorScheduleEditor doctorId={doctorId} />
+          </div>
+        )}
       </div>
 
       {/* Bottom Grid: Recent Patients + Recent Prescriptions */}
@@ -429,6 +554,15 @@ export default function DoctorDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Appointment Detail Modal */}
+      {selectedApptId && (
+        <AppointmentDetailModal
+          appointmentId={selectedApptId}
+          onClose={() => setSelectedApptId(null)}
+          onStatusChange={refreshDashboard}
+        />
+      )}
     </div>
   );
 }
