@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Upload, X, AlertCircle, Eye, Loader2,
+  Upload, X, AlertCircle, Eye, Loader2, Download, ExternalLink,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -161,6 +161,84 @@ function QuickUploadModal({ open, onClose, onSuccess, patientId, category }) {
   );
 }
 
+function DocumentPreviewModal({ doc, onClose }) {
+  if (!doc) return null;
+
+  const isPdf = doc.mimeType === 'application/pdf';
+  const isImage = doc.mimeType?.startsWith('image/');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-slate-900 truncate">{doc.title}</h2>
+            <p className="text-sm text-slate-500 mt-0.5">{doc.fileName}</p>
+          </div>
+          <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+            <a
+              href={doc.url}
+              download={doc.fileName}
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              title="Download"
+            >
+              <Download className="w-5 h-5" />
+            </a>
+            <a
+              href={doc.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              title="Open in new tab"
+            >
+              <ExternalLink className="w-5 h-5" />
+            </a>
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-1 min-h-0 bg-slate-50 rounded-b-2xl">
+          {isPdf && (
+            <iframe
+              src={doc.url}
+              title={doc.title}
+              className="w-full h-[70vh] rounded-b-xl border-0"
+            />
+          )}
+          {isImage && (
+            <div className="flex items-center justify-center p-6">
+              <img
+                src={doc.url}
+                alt={doc.title}
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
+              />
+            </div>
+          )}
+          {!isPdf && !isImage && (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+              <p className="text-sm">Preview not available for this file type.</p>
+              <a
+                href={doc.url}
+                download={doc.fileName}
+                className="mt-3 px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                Download File
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PatientDetail() {
   const { id } = useParams();
   const { currentUser } = useAuth();
@@ -173,6 +251,7 @@ export default function PatientDetail() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadCategory, setUploadCategory] = useState(null);
+  const [previewDoc, setPreviewDoc] = useState(null);
 
   useEffect(() => {
     api.get(`/patients/${id}`)
@@ -206,26 +285,28 @@ export default function PatientDetail() {
   const handleViewDoc = async (docId) => {
     try {
       const res = await api.get(`/medical-documents/${docId}`);
-      if (res.data?.url) window.open(res.data.url, '_blank');
+      if (res.data) {
+        setPreviewDoc(res.data);
+      }
     } catch { /* ignore */ }
   };
 
   const renderFilesCell = (category) => {
     const docs = docsByCategory(category);
     if (!docs.length) {
-      return <span className="text-slate-300 text-xs">—</span>;
+      return <span className="text-slate-300">—</span>;
     }
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1.5">
         {docs.map((doc) => (
           <button
             key={doc.id}
             onClick={(e) => { e.stopPropagation(); handleViewDoc(doc.id); }}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 hover:underline transition-colors text-left"
-            title={`View: ${doc.fileName}`}
+            className="inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-primary bg-primary/5 border border-primary/20 rounded-md hover:bg-primary/10 transition-colors"
+            title={doc.title}
           >
-            <Eye className="w-3 h-3 flex-shrink-0" />
-            <span className="truncate max-w-[120px]">{doc.title}</span>
+            <Eye className="w-3.5 h-3.5" />
+            View
           </button>
         ))}
       </div>
@@ -372,6 +453,11 @@ export default function PatientDetail() {
         onSuccess={fetchDocuments}
         patientId={id}
         category={uploadCategory || 'other'}
+      />
+
+      <DocumentPreviewModal
+        doc={previewDoc}
+        onClose={() => setPreviewDoc(null)}
       />
     </div>
   );
