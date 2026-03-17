@@ -9,7 +9,8 @@ const MAX_DESCRIPTION_LENGTH = 1000;
 
 const VALID_CATEGORIES = [
   'lab_report', 'imaging', 'discharge_summary', 'referral',
-  'insurance', 'consent_form', 'clinical_note', 'other',
+  'insurance', 'consent_form', 'clinical_note', 'medical_record',
+  'prescription', 'other',
 ];
 
 const mapDocument = (row) => ({

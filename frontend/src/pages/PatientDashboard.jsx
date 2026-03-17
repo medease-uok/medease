@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Calendar, FileText, Pill, FlaskConical, Stethoscope,
+  Calendar, CalendarDays, FileText, Pill, FlaskConical, Stethoscope,
   Droplets, Phone, MapPin, User, Clock, AlertCircle, ChevronRight, Pencil, Loader2, Trash2, Shield,
   Plus, X, AlertTriangle, Heart,
 } from 'lucide-react';
@@ -658,13 +658,20 @@ export default function PatientDashboard() {
         />
       )}
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
         <QuickNavCard
           icon={Calendar}
           label="Appointments"
           count={appointmentCount}
           color="from-blue-500 to-blue-600"
           onClick={() => navigate('/appointments')}
+        />
+        <QuickNavCard
+          icon={CalendarDays}
+          label="Schedule"
+          count={appointmentCount}
+          color="from-teal-500 to-teal-600"
+          onClick={() => navigate('/schedule')}
         />
         <QuickNavCard
           icon={Pill}

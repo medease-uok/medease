@@ -25,8 +25,8 @@ function redact() {
 }
 
 const MASKING_RULES = {
-  phone:                 { mask: maskPhone,      fullAccessRoles: ['admin'],           ownerCanSeeAll: true },
-  email:                 { mask: maskEmailField,  fullAccessRoles: ['admin'],           ownerCanSeeAll: true },
+  phone:                 { mask: maskPhone,      fullAccessRoles: ['admin', 'doctor'], ownerCanSeeAll: true },
+  email:                 { mask: maskEmailField,  fullAccessRoles: ['admin', 'doctor'], ownerCanSeeAll: true },
   emergencyContact:      { mask: maskPartial,    fullAccessRoles: ['admin', 'doctor'], ownerCanSeeAll: true },
   emergencyPhone:        { mask: maskPhone,      fullAccessRoles: ['admin', 'doctor'], ownerCanSeeAll: true },
   emergencyRelationship: { mask: redact,         fullAccessRoles: ['admin', 'doctor'], ownerCanSeeAll: true },

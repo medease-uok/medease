@@ -2,7 +2,8 @@
 
 CREATE TYPE document_category AS ENUM (
   'lab_report', 'imaging', 'discharge_summary', 'referral',
-  'insurance', 'consent_form', 'clinical_note', 'other'
+  'insurance', 'consent_form', 'clinical_note', 'medical_record',
+  'prescription', 'other'
 );
 
 CREATE TABLE medical_documents (

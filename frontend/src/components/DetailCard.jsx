@@ -1,9 +1,9 @@
 import './DetailCard.css';
 
-export default function DetailCard({ title, fields }) {
+export default function DetailCard({ title, fields, titleAs: TitleTag = 'h2' }) {
   return (
     <div className="detail-card">
-      {title && <h2 className="detail-card-title">{title}</h2>}
+      {title && <TitleTag className="detail-card-title">{title}</TitleTag>}
       <div className="detail-card-grid">
         {fields.map((field, i) => (
           <div key={i} className="detail-card-field">

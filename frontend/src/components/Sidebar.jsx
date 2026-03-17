@@ -6,15 +6,13 @@ import {
   Users,
   Stethoscope,
   Calendar,
+  CalendarDays,
   FileText,
   Pill,
-  FlaskConical,
   Activity,
   Shield,
   ClipboardList,
   FolderOpen,
-  Syringe,
-  HeartPulse,
 } from 'lucide-react';
 
 
@@ -26,20 +24,16 @@ const navConfig = [
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/documents', label: 'Documents', icon: FolderOpen, roles: ROLE_GROUPS.PATIENT_ONLY },
-  { path: '/health-profile', label: 'Health Profile', icon: HeartPulse, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/my-records', label: 'Medical Records', icon: ClipboardList, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/my-health', label: 'My Health', icon: Activity, roles: ROLE_GROUPS.PATIENT_ONLY },
   // Staff navigation (alphabetical)
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.CLINICAL },
-  { path: '/chronic-conditions', label: 'Chronic Conditions', icon: HeartPulse, roles: ROLE_GROUPS.CLINICAL },
+  { path: '/schedule', label: 'Schedule', icon: CalendarDays, roles: [ROLES.NURSE, ROLES.ADMIN] },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: [ROLES.ADMIN] },
-  { path: '/documents', label: 'Documents', icon: FolderOpen, roles: [...ROLE_GROUPS.CLINICAL, ROLES.LAB_TECHNICIAN] },
-  { path: '/lab-reports', label: 'Lab Reports', icon: FlaskConical, roles: [ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN] },
-  { path: '/medical-records', label: 'Medical Records', icon: FileText, roles: ROLE_GROUPS.CLINICAL },
   { path: '/patients', label: 'Patients', icon: Users, roles: ROLE_GROUPS.CLINICAL },
   { path: '/permissions', label: 'Permissions', icon: Shield, roles: [ROLES.ADMIN] },
   { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: [ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN] },
-  { path: '/vaccinations', label: 'Vaccinations', icon: Syringe, roles: ROLE_GROUPS.CLINICAL },
+  { path: '/records', label: 'Records', icon: FileText, roles: [...ROLE_GROUPS.CLINICAL, ROLES.LAB_TECHNICIAN] },
 ];
 
 const roleColors = {

@@ -21,9 +21,10 @@ import MedicalHistory from './pages/MedicalHistory';
 import MedicalDocuments from './pages/MedicalDocuments';
 import Vaccinations from './pages/Vaccinations';
 import ChronicConditions from './pages/ChronicConditions';
+import ScheduleCalendar from './pages/ScheduleCalendar';
 import DoctorDashboard from './pages/DoctorDashboard';
 import MyRecords from './pages/MyRecords';
-import HealthProfile from './pages/HealthProfile';
+import StaffRecords from './pages/StaffRecords';
 import './App.css';
 
 const R = ({ roles, children }) => <RoleGuard roles={roles}>{children}</RoleGuard>;
@@ -50,13 +51,15 @@ function App() {
             <Route path="doctor-dashboard" element={<R roles={[ROLES.DOCTOR]}><DoctorDashboard /></R>} />
             <Route path="my-health" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><PatientDashboard /></R>} />
             <Route path="my-records" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><MyRecords /></R>} />
-            <Route path="health-profile" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><HealthProfile /></R>} />
+            <Route path="health-profile" element={<Navigate to="/my-records?tab=conditions" replace />} />
             <Route path="patients" element={<R roles={ROLE_GROUPS.CLINICAL}><PatientsEnhanced /></R>} />
             <Route path="patients/:id" element={<R roles={ROLE_GROUPS.CLINICAL}><PatientDetail /></R>} />
             <Route path="doctors" element={<R roles={[ROLES.PATIENT, ROLES.ADMIN]}><Doctors /></R>} />
             <Route path="doctors/:id" element={<R roles={[ROLES.PATIENT, ROLES.ADMIN]}><DoctorDetail /></R>} />
             <Route path="appointments" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><Appointments /></R>} />
+            <Route path="schedule" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><ScheduleCalendar /></R>} />
             <Route path="medical-history" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><MedicalHistory /></R>} />
+            <Route path="records" element={<R roles={[...ROLE_GROUPS.CLINICAL, ROLES.LAB_TECHNICIAN]}><StaffRecords /></R>} />
             <Route path="medical-records" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><MedicalRecords /></R>} />
             <Route path="prescriptions" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN]}><Prescriptions /></R>} />
             <Route path="lab-reports" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN]}><LabReports /></R>} />

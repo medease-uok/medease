@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
-  Calendar, AlertCircle, Search, Clock, User, Stethoscope, CalendarDays, X, FileText,
+  Calendar, AlertCircle, Search, Clock, User, Stethoscope, CalendarDays, X, FileText, List,
 } from 'lucide-react';
 import { appointmentStatuses } from '../constants';
 import { useAuth } from '../data/AuthContext';
@@ -8,6 +8,7 @@ import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
+import ScheduleCalendar from './ScheduleCalendar';
 
 const STATUS_STYLES = {
   scheduled: { variant: 'default', label: 'Scheduled' },
@@ -35,8 +36,12 @@ const matchesSearch = (a, query) => {
     .some((field) => a[field]?.toLowerCase().includes(q));
 };
 
-function AppointmentCard({ appointment, showPatient, onClick }) {
+function AppointmentCard({ appointment, showPatient, isDoctor, onClick }) {
   const style = STATUS_STYLES[appointment.status] ?? { variant: 'outline', label: appointment.status ?? 'Unknown' };
+  const primaryName = isDoctor
+    ? (appointment.patientName || 'Patient')
+    : (appointment.doctorName || 'Doctor');
+  const secondaryName = isDoctor ? null : (showPatient && appointment.patientName);
 
   return (
     <button
@@ -46,13 +51,15 @@ function AppointmentCard({ appointment, showPatient, onClick }) {
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-            <Calendar className="w-5 h-5 text-blue-600" aria-hidden="true" />
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isDoctor ? 'bg-green-100' : 'bg-blue-100'}`}>
+            {isDoctor
+              ? <User className="w-5 h-5 text-green-600" aria-hidden="true" />
+              : <Calendar className="w-5 h-5 text-blue-600" aria-hidden="true" />}
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900">{appointment.doctorName || 'Doctor'}</h3>
-            {showPatient && appointment.patientName && (
-              <p className="text-sm text-slate-500">{appointment.patientName}</p>
+            <h3 className="font-semibold text-slate-900">{primaryName}</h3>
+            {secondaryName && (
+              <p className="text-sm text-slate-500">{secondaryName}</p>
             )}
           </div>
         </div>
@@ -108,8 +115,10 @@ export default function Appointments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [viewMode, setViewMode] = useState('list');
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
+  const isDoctor = currentUser?.role === 'doctor';
   const deferredSearch = useDeferredValue(search);
 
   const fetchAppointments = useCallback(() => {
@@ -169,152 +178,202 @@ export default function Appointments() {
         </p>
       </div>
 
-      {/* Filters and search */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
-                <label htmlFor="apt-search" className="sr-only">Search appointments</label>
-                <input
-                  id="apt-search"
-                  type="search"
-                  placeholder="Search doctors, patients, notes..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
-                />
-              </div>
-              <div className="flex items-center gap-2" role="group" aria-label="Filter by date range">
-                <CalendarDays className="w-4 h-4 text-slate-400 flex-shrink-0" aria-hidden="true" />
-                <div className="flex items-center gap-1.5">
-                  <label htmlFor="apt-date-from" className="sr-only">From date</label>
-                  <input
-                    id="apt-date-from"
-                    type="date"
-                    value={dateFrom}
-                    max={dateTo || undefined}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
-                  />
-                  <span className="text-sm text-slate-400">to</span>
-                  <label htmlFor="apt-date-to" className="sr-only">To date</label>
-                  <input
-                    id="apt-date-to"
-                    type="date"
-                    value={dateTo}
-                    min={dateFrom || undefined}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
-                  />
+      {/* List / Calendar toggle for doctors */}
+      {isDoctor && (
+        <div className="border-b border-slate-200">
+          <nav className="flex gap-1 -mb-px" aria-label="View mode">
+            <button
+              onClick={() => setViewMode('list')}
+              role="tab"
+              aria-selected={viewMode === 'list'}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                viewMode === 'list'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              <List className="w-4 h-4" />
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              role="tab"
+              aria-selected={viewMode === 'calendar'}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                viewMode === 'calendar'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              <CalendarDays className="w-4 h-4" />
+              Calendar
+            </button>
+          </nav>
+        </div>
+      )}
+
+      {/* Calendar view for doctors */}
+      {isDoctor && viewMode === 'calendar' && (
+        <ScheduleCalendar
+          embedded
+          appointments={appointments}
+          loading={loading}
+          error={error}
+          onRetry={fetchAppointments}
+          onSelectAppointment={setSelectedId}
+        />
+      )}
+
+      {/* List view (always for non-doctors, only in list mode for doctors) */}
+      {(!isDoctor || viewMode === 'list') && (
+        <>
+          <Card>
+            <CardContent className="py-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+                    <label htmlFor="apt-search" className="sr-only">Search appointments</label>
+                    <input
+                      id="apt-search"
+                      type="search"
+                      placeholder="Search doctors, patients, notes..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2" role="group" aria-label="Filter by date range">
+                    <CalendarDays className="w-4 h-4 text-slate-400 flex-shrink-0" aria-hidden="true" />
+                    <div className="flex items-center gap-1.5">
+                      <label htmlFor="apt-date-from" className="sr-only">From date</label>
+                      <input
+                        id="apt-date-from"
+                        type="date"
+                        value={dateFrom}
+                        max={dateTo || undefined}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                      />
+                      <span className="text-sm text-slate-400">to</span>
+                      <label htmlFor="apt-date-to" className="sr-only">To date</label>
+                      <input
+                        id="apt-date-to"
+                        type="date"
+                        value={dateTo}
+                        min={dateFrom || undefined}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                      />
+                    </div>
+                    {(dateFrom || dateTo) && (
+                      <button
+                        onClick={() => { setDateFrom(''); setDateTo(''); }}
+                        className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                        aria-label="Clear date range"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {(dateFrom || dateTo) && (
+                <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Filter by status">
                   <button
-                    onClick={() => { setDateFrom(''); setDateTo(''); }}
-                    className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
-                    aria-label="Clear date range"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Filter by status">
-              <button
-                onClick={() => setFilter('all')}
-                aria-pressed={filter === 'all'}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                  filter === 'all'
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                All ({appointments.length})
-              </button>
-              {appointmentStatuses.map((s) => {
-                const style = STATUS_STYLES[s] || {};
-                return (
-                  <button
-                    key={s}
-                    onClick={() => setFilter(s)}
-                    aria-pressed={filter === s}
+                    onClick={() => setFilter('all')}
+                    aria-pressed={filter === 'all'}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                      filter === s
+                      filter === 'all'
                         ? 'bg-primary text-white shadow-sm'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {style.label || s} ({statusCounts[s] || 0})
+                    All ({appointments.length})
                   </button>
-                );
-              })}
+                  {appointmentStatuses.map((s) => {
+                    const style = STATUS_STYLES[s] || {};
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => setFilter(s)}
+                        aria-pressed={filter === s}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                          filter === s
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {style.label || s} ({statusCounts[s] || 0})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
+              <button
+                onClick={fetchAppointments}
+                className="ml-auto px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+              >
+                Retry
+              </button>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          )}
 
-      {/* Error */}
-      {error && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-          <p className="text-sm text-red-700">{error}</p>
-          <button
-            onClick={fetchAppointments}
-            className="ml-auto px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+          {/* Loading */}
+          {loading && !error && <ListSkeleton />}
 
-      {/* Loading */}
-      {loading && !error && <ListSkeleton />}
+          {/* Results count */}
+          {!loading && !error && (
+            <output aria-live="polite" className="block text-sm text-slate-500">
+              {filtered.length} {filtered.length === 1 ? 'appointment' : 'appointments'}
+              {filter !== 'all' && ` (${STATUS_STYLES[filter]?.label || filter})`}
+              {search && ` matching "${search}"`}
+              {(dateFrom || dateTo) && ` from ${dateFrom || '...'} to ${dateTo || '...'}`}
+            </output>
+          )}
 
-      {/* Results count */}
-      {!loading && !error && (
-        <output aria-live="polite" className="block text-sm text-slate-500">
-          {filtered.length} {filtered.length === 1 ? 'appointment' : 'appointments'}
-          {filter !== 'all' && ` (${STATUS_STYLES[filter]?.label || filter})`}
-          {search && ` matching "${search}"`}
-          {(dateFrom || dateTo) && ` from ${dateFrom || '...'} to ${dateTo || '...'}`}
-        </output>
-      )}
-
-      {/* Appointment cards */}
-      {!loading && !error && filtered.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((a) => (
-            <AppointmentCard key={a.id} appointment={a} showPatient={!isPatient} onClick={() => setSelectedId(a.id)} />
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && !error && filtered.length === 0 && (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-lg font-medium text-slate-700">No appointments found</p>
-              <p className="text-sm text-slate-500 mt-1">
-                {hasFilters
-                  ? 'Try adjusting your search or filters.'
-                  : isPatient
-                    ? 'Your appointments will appear here when scheduled.'
-                    : 'No appointments in the system yet.'}
-              </p>
-              {hasFilters && (
-                <button
-                  onClick={() => { setSearch(''); setFilter('all'); setDateFrom(''); setDateTo(''); }}
-                  className="mt-3 px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  Clear filters
-                </button>
-              )}
+          {/* Appointment cards */}
+          {!loading && !error && filtered.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((a) => (
+                <AppointmentCard key={a.id} appointment={a} showPatient={!isPatient} isDoctor={isDoctor} onClick={() => setSelectedId(a.id)} />
+              ))}
             </div>
-          </CardContent>
-        </Card>
+          )}
+
+          {/* Empty state */}
+          {!loading && !error && filtered.length === 0 && (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-lg font-medium text-slate-700">No appointments found</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {hasFilters
+                      ? 'Try adjusting your search or filters.'
+                      : isPatient
+                        ? 'Your appointments will appear here when scheduled.'
+                        : 'No appointments in the system yet.'}
+                  </p>
+                  {hasFilters && (
+                    <button
+                      onClick={() => { setSearch(''); setFilter('all'); setDateFrom(''); setDateTo(''); }}
+                      className="mt-3 px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* Appointment detail modal */}

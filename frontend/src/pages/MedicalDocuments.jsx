@@ -20,6 +20,8 @@ const CATEGORIES = [
   { value: 'insurance', label: 'Insurance' },
   { value: 'consent_form', label: 'Consent Form' },
   { value: 'clinical_note', label: 'Clinical Note' },
+  { value: 'medical_record', label: 'Medical Record' },
+  { value: 'prescription', label: 'Prescription' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -31,6 +33,8 @@ const CATEGORY_COLORS = {
   insurance: 'bg-yellow-100 text-yellow-700',
   consent_form: 'bg-pink-100 text-pink-700',
   clinical_note: 'bg-teal-100 text-teal-700',
+  medical_record: 'bg-indigo-100 text-indigo-700',
+  prescription: 'bg-amber-100 text-amber-700',
   other: 'bg-slate-100 text-slate-700',
 };
 
@@ -471,7 +475,7 @@ function DeleteConfirmModal({ doc, onClose, onConfirm }) {
   );
 }
 
-export default function MedicalDocuments() {
+export default function MedicalDocuments({ embedded = false }) {
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -564,26 +568,38 @@ export default function MedicalDocuments() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-            {isPatient ? 'My Documents' : 'Medical Documents'}
-          </h1>
-          <p className="text-slate-500 mt-1">
-            {isPatient
-              ? 'View and manage your medical documents and reports.'
-              : 'View, upload, and manage patient medical documents.'}
-          </p>
+      {!embedded && (
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
+              {isPatient ? 'My Documents' : 'Medical Documents'}
+            </h1>
+            <p className="text-slate-500 mt-1">
+              {isPatient
+                ? 'View and manage your medical documents and reports.'
+                : 'View, upload, and manage patient medical documents.'}
+            </p>
+          </div>
+          {canUpload && (
+            <button
+              onClick={() => setUploadOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors shadow-sm flex-shrink-0"
+            >
+              <Upload className="w-4 h-4" /> Upload Document
+            </button>
+          )}
         </div>
-        {canUpload && (
+      )}
+      {embedded && canUpload && (
+        <div className="flex justify-end">
           <button
             onClick={() => setUploadOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors shadow-sm flex-shrink-0"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Upload className="w-4 h-4" /> Upload Document
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Filters */}
       <Card>

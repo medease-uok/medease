@@ -1,36 +1,27 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Clock, FileText, Pill, FlaskConical, HeartPulse, Syringe,
+  FileText, FlaskConical, FolderOpen,
 } from 'lucide-react';
-import MedicalHistory from './MedicalHistory';
 import MedicalRecords from './MedicalRecords';
-import Prescriptions from './Prescriptions';
 import LabReports from './LabReports';
-import ChronicConditions from './ChronicConditions';
-import Vaccinations from './Vaccinations';
+import MedicalDocuments from './MedicalDocuments';
 
 const TABS = [
-  { id: 'timeline', label: 'Timeline', icon: Clock },
-  { id: 'diagnoses', label: 'Diagnoses', icon: FileText },
-  { id: 'prescriptions', label: 'Prescriptions', icon: Pill },
+  { id: 'records', label: 'Medical Records', icon: FileText },
   { id: 'lab-reports', label: 'Lab Reports', icon: FlaskConical },
-  { id: 'conditions', label: 'Chronic Conditions', icon: HeartPulse },
-  { id: 'vaccinations', label: 'Vaccinations', icon: Syringe },
+  { id: 'documents', label: 'Documents', icon: FolderOpen },
 ];
 
 const TAB_COMPONENTS = {
-  timeline: MedicalHistory,
-  diagnoses: MedicalRecords,
-  prescriptions: Prescriptions,
+  records: MedicalRecords,
   'lab-reports': LabReports,
-  conditions: ChronicConditions,
-  vaccinations: Vaccinations,
+  documents: MedicalDocuments,
 };
 
-export default function MyRecords() {
+export default function StaffRecords() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = TABS.find((t) => t.id === searchParams.get('tab'))?.id || 'timeline';
+  const initialTab = TABS.find((t) => t.id === searchParams.get('tab'))?.id || 'records';
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const handleTabChange = (tabId) => {
@@ -44,16 +35,16 @@ export default function MyRecords() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-          My Records
+          Records
         </h1>
         <p className="text-slate-500 mt-1">
-          Your medical records, prescriptions, lab reports, health conditions, and vaccination history.
+          Medical records, lab reports, and documents in one place.
         </p>
       </div>
 
       {/* Tab navigation */}
       <div className="border-b border-slate-200">
-        <nav className="flex gap-1 -mb-px" aria-label="Medical records tabs">
+        <nav className="flex gap-1 -mb-px" aria-label="Records tabs">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;

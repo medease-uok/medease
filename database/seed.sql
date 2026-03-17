@@ -378,7 +378,38 @@ INSERT INTO medical_documents (patient_id, uploaded_by, category, title, descrip
   ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000001', 'referral',
    'Dermatology Referral', 'Referral letter for dermatology consultation.',
    'medical-documents/ce000000-0000-0000-0000-000000000005/seed-derm-referral.pdf',
-   'Dermatology_Referral.pdf', 102400, 'application/pdf', NOW() - INTERVAL '5 days');
+   'Dermatology_Referral.pdf', 102400, 'application/pdf', NOW() - INTERVAL '5 days'),
+
+  -- Medical Record & Prescription uploads (new categories)
+  -- Sarah Fernando - medical record scan
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'medical_record',
+   'Anemia Diagnosis Notes - Mar 2026', 'Scanned clinical notes from iron deficiency anemia diagnosis.',
+   'medical-documents/ce000000-0000-0000-0000-000000000001/seed-anemia-notes.pdf',
+   'Anemia_Diagnosis_Notes.pdf', 198000, 'application/pdf', NOW() - INTERVAL '2 days'),
+
+  -- Sarah Fernando - prescription scan
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'prescription',
+   'Ferrous Sulfate Prescription', 'Scanned prescription for ferrous sulfate 200mg.',
+   'medical-documents/ce000000-0000-0000-0000-000000000001/seed-ferrous-rx.jpg',
+   'Ferrous_Sulfate_Prescription.jpg', 350000, 'image/jpeg', NOW() - INTERVAL '2 days'),
+
+  -- Dinesh Rajapaksa - medical record scan
+  ('ce000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'medical_record',
+   'Migraine Assessment Report', 'Detailed migraine assessment and trigger analysis.',
+   'medical-documents/ce000000-0000-0000-0000-000000000002/seed-migraine-assessment.pdf',
+   'Migraine_Assessment.pdf', 275000, 'application/pdf', NOW() - INTERVAL '3 days'),
+
+  -- Dinesh Rajapaksa - prescription scan
+  ('ce000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'prescription',
+   'Sumatriptan & Propranolol Prescription', 'Scanned prescription for migraine medication.',
+   'medical-documents/ce000000-0000-0000-0000-000000000002/seed-migraine-rx.pdf',
+   'Migraine_Prescription.pdf', 220000, 'application/pdf', NOW() - INTERVAL '3 days'),
+
+  -- Nuwan Jayasuriya - prescription scan
+  ('ce000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000003', 'prescription',
+   'Cardiac Medication Prescription', 'Prescription for post-checkup cardiac medication.',
+   'medical-documents/ce000000-0000-0000-0000-000000000004/seed-cardiac-rx.jpg',
+   'Cardiac_Prescription.jpg', 410000, 'image/jpeg', NOW() - INTERVAL '7 days');
 
 -- ============================================
 -- VACCINATIONS (immunization history)
