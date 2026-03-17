@@ -94,18 +94,6 @@ const DOC_CONTENT = {
       '', 'Borderline high. Dietary counseling recommended.',
     ],
   },
-  'seed-migraine-assessment': {
-    title: 'Migraine Assessment Report',
-    lines: [
-      'Patient: Dinesh Rajapaksa', 'Doctor: Dr. Sithara Silva', 'Date: 2026-03-14', '',
-      'Presentation: Recurring unilateral headaches, 3-4 episodes/month',
-      'Duration: 4-6 hours per episode',
-      'Triggers: Stress, irregular sleep, bright lights',
-      'MRI Brain: Normal, no structural abnormalities',
-      'Diagnosis: Tension-type headache',
-      'Plan: Paracetamol PRN, stress management',
-    ],
-  },
   'seed-mri-brain': {
     title: 'MRI Brain Scan Report',
     lines: [
@@ -125,16 +113,6 @@ const DOC_CONTENT = {
       'Exam: All cranial nerves intact, reflexes normal',
       'No focal neurological deficits',
       'Plan: MRI brain, headache diary, follow-up in 4 weeks',
-    ],
-  },
-  'seed-paracetamol-rx': {
-    title: 'Prescription - Paracetamol',
-    lines: [
-      'Patient: Dinesh Rajapaksa', 'Doctor: Dr. Sithara Silva', '',
-      'Rx: Paracetamol 500mg',
-      'Sig: 1-2 tablets every 4-6 hours as needed',
-      'Max: 4g per day',
-      'Duration: 1 month', 'Refills: 2',
     ],
   },
   'seed-discharge': {
@@ -158,25 +136,6 @@ const DOC_CONTENT = {
       'Status: Submitted',
     ],
   },
-  'seed-knee-assessment': {
-    title: 'Knee Assessment Report',
-    lines: [
-      'Patient: Kavindi Weerasinghe', 'Doctor: Dr. Ruwan Fernando', '',
-      'Diagnosis: Patellofemoral pain syndrome',
-      'X-ray: No fracture, mild joint space narrowing',
-      'Plan: Physical therapy 2x/week, NSAIDs',
-    ],
-  },
-  'seed-af-assessment': {
-    title: 'Atrial Fibrillation Assessment',
-    lines: [
-      'Patient: Nuwan Jayasuriya', 'Doctor: Dr. Kamal Perera', '',
-      'ECG: Irregularly irregular rhythm, AF confirmed',
-      'Echocardiogram: EF 55%, normal chamber sizes',
-      'CHA2DS2-VASc Score: 2',
-      'Plan: Warfarin 5mg daily, monthly INR monitoring',
-    ],
-  },
   'seed-ecg-report': {
     title: 'ECG Report',
     lines: [
@@ -186,89 +145,6 @@ const DOC_CONTENT = {
       'Axis: Normal',
       'No ST-T wave changes',
       'Impression: Atrial fibrillation, controlled rate',
-    ],
-  },
-  'seed-inr-report': {
-    title: 'INR Monitoring Report',
-    lines: [
-      'Patient: Nuwan Jayasuriya', 'Date: 2026-03-12', '',
-      'INR: 2.3  (Therapeutic range: 2.0-3.0)',
-      'Warfarin dose: 5mg daily',
-      'Status: Within therapeutic range',
-      'Next test: 4 weeks',
-    ],
-  },
-  'seed-anemia-notes': {
-    title: 'Iron Deficiency Anemia - Clinical Notes',
-    lines: [
-      'Patient: Hasini Abeywickrama', 'Doctor: Dr. Anjali Dissanayake', '',
-      'Hemoglobin: 9.2 g/dL (Low)',
-      'Serum Ferritin: 8 ng/mL (Low)',
-      'Diagnosis: Iron deficiency anemia',
-      'Treatment: Ferrous sulfate 200mg BD with meals',
-      'Dietary counseling provided. Repeat CBC in 6 weeks.',
-    ],
-  },
-  'seed-migraine-notes': {
-    title: 'Migraine Assessment - Hasini Abeywickrama',
-    lines: [
-      'Patient: Hasini Abeywickrama', 'Doctor: Dr. Anjali Dissanayake', '',
-      'Type: Migraine without aura, episodic',
-      'Frequency: 2-3 episodes/month',
-      'Abortive: Sumatriptan 50mg PRN',
-      'Prophylaxis: Propranolol 40mg BD',
-      'Trigger diary initiated',
-    ],
-  },
-  'seed-ferritin-report': {
-    title: 'Serum Ferritin Report',
-    lines: [
-      'Patient: Hasini Abeywickrama', 'Date: 2026-03-14', '',
-      'Serum Ferritin: 8 ng/mL',
-      'Reference Range: 12-150 ng/mL',
-      'Status: LOW',
-      '', 'Consistent with iron deficiency.',
-    ],
-  },
-  'seed-cbc-hasini': {
-    title: 'Complete Blood Count - Hasini Abeywickrama',
-    lines: [
-      'Patient: Hasini Abeywickrama', 'Date: 2026-03-13', '',
-      'WBC: 6.8 x10^9/L  (Normal)',
-      'RBC: 3.9 x10^12/L  (Low)',
-      'Hemoglobin: 9.2 g/dL  (Low)',
-      'MCV: 72 fL  (Low - microcytic)',
-      'Platelets: 280 x10^9/L  (Normal)',
-      '', 'Impression: Microcytic anemia, likely iron deficiency.',
-    ],
-  },
-  'seed-derm-referral': {
-    title: 'Dermatology Referral',
-    lines: [
-      'Patient: Hasini Abeywickrama', 'Referring: Dr. Kamal Perera', '',
-      'Reason: Persistent skin rash, 3 weeks duration',
-      'Location: Bilateral forearms',
-      'Failed treatment: Topical hydrocortisone',
-      'Please assess and advise.',
-    ],
-  },
-  'seed-sumatriptan-rx': {
-    title: 'Prescription - Sumatriptan',
-    lines: [
-      'Patient: Hasini Abeywickrama', 'Doctor: Dr. Anjali Dissanayake', '',
-      'Rx: Sumatriptan 50mg tablets',
-      'Sig: 1 tablet at onset of migraine, may repeat once after 2 hours',
-      'Max: 2 tablets/day, 6 tablets/month',
-    ],
-  },
-  'seed-acl-assessment': {
-    title: 'ACL Sprain Assessment',
-    lines: [
-      'Patient: Lahiru Gunasekara', 'Doctor: Dr. Ruwan Fernando', '',
-      'Injury: Grade 2 ACL sprain, cricket match',
-      'MRI: Partial ACL tear, no meniscal involvement',
-      'Plan: Knee brace, rest, ice. PT after 2 weeks.',
-      'No surgery needed at this stage.',
     ],
   },
 }

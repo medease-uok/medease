@@ -380,9 +380,9 @@ INSERT INTO medical_documents (patient_id, uploaded_by, category, title, descrip
    'medical-documents/ce000000-0000-0000-0000-000000000005/seed-derm-referral.pdf',
    'Dermatology_Referral.pdf', 102400, 'application/pdf', NOW() - INTERVAL '5 days'),
 
-  -- ---- Medical Record & Prescription & Lab Report uploads (per-category) ----
+  -- ---- One document per patient per category for medical_record, prescription, lab_report ----
 
-  -- Sarah Fernando (ce...001) - medical_record, prescription, lab_report
+  -- Sarah Fernando (ce...001) - 1 medical_record, 1 prescription, 1 lab_report
   ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'medical_record',
    'Hypertension Diagnosis Notes', 'Scanned clinical notes from Stage 1 hypertension diagnosis.',
    'medical-documents/ce000000-0000-0000-0000-000000000001/seed-hypertension-notes.pdf',
@@ -390,81 +390,7 @@ INSERT INTO medical_documents (patient_id, uploaded_by, category, title, descrip
   ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'prescription',
    'Amlodipine Prescription Scan', 'Scanned prescription for Amlodipine 5mg daily.',
    'medical-documents/ce000000-0000-0000-0000-000000000001/seed-amlodipine-rx.jpg',
-   'Amlodipine_Prescription.jpg', 350000, 'image/jpeg', NOW() - INTERVAL '2 days'),
-  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'lab_report',
-   'Lipid Panel Results', 'Fasting lipid panel results for cardiovascular risk assessment.',
-   'medical-documents/ce000000-0000-0000-0000-000000000001/seed-lipid-panel.pdf',
-   'Lipid_Panel_Results.pdf', 165000, 'application/pdf', NOW() - INTERVAL '2 days'),
-
-  -- Dinesh Rajapaksa (ce...002) - medical_record, prescription, lab_report
-  ('ce000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'medical_record',
-   'Migraine Assessment Report', 'Detailed migraine assessment and trigger analysis.',
-   'medical-documents/ce000000-0000-0000-0000-000000000002/seed-migraine-assessment.pdf',
-   'Migraine_Assessment.pdf', 275000, 'application/pdf', NOW() - INTERVAL '3 days'),
-  ('ce000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 'prescription',
-   'Paracetamol Prescription', 'Scanned prescription for headache management.',
-   'medical-documents/ce000000-0000-0000-0000-000000000002/seed-paracetamol-rx.pdf',
-   'Paracetamol_Prescription.pdf', 220000, 'application/pdf', NOW() - INTERVAL '3 days'),
-
-  -- Kavindi Weerasinghe (ce...003) - medical_record, prescription
-  ('ce000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000003', 'medical_record',
-   'Knee Assessment Report', 'Patellofemoral pain syndrome assessment and X-ray findings.',
-   'medical-documents/ce000000-0000-0000-0000-000000000003/seed-knee-assessment.pdf',
-   'Knee_Assessment_Report.pdf', 310000, 'application/pdf', NOW() - INTERVAL '4 days'),
-  ('ce000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000003', 'prescription',
-   'Ibuprofen Prescription', 'Scanned prescription for post-injury pain management.',
-   'medical-documents/ce000000-0000-0000-0000-000000000003/seed-ibuprofen-rx.jpg',
-   'Ibuprofen_Prescription.jpg', 280000, 'image/jpeg', NOW() - INTERVAL '4 days'),
-
-  -- Nuwan Jayasuriya (ce...004) - medical_record, prescription, lab_report
-  ('ce000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000001', 'medical_record',
-   'Atrial Fibrillation Assessment', 'ECG-confirmed AF assessment and treatment plan.',
-   'medical-documents/ce000000-0000-0000-0000-000000000004/seed-af-assessment.pdf',
-   'AF_Assessment_Report.pdf', 290000, 'application/pdf', NOW() - INTERVAL '6 days'),
-  ('ce000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000001', 'prescription',
-   'Warfarin Prescription', 'Prescription for anticoagulation therapy.',
-   'medical-documents/ce000000-0000-0000-0000-000000000004/seed-warfarin-rx.jpg',
-   'Warfarin_Prescription.jpg', 410000, 'image/jpeg', NOW() - INTERVAL '7 days'),
-  ('ce000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000002', 'lab_report',
-   'INR Monitoring Report', 'International Normalized Ratio results for Warfarin monitoring.',
-   'medical-documents/ce000000-0000-0000-0000-000000000004/seed-inr-report.pdf',
-   'INR_Monitoring_Report.pdf', 145000, 'application/pdf', NOW() - INTERVAL '5 days'),
-
-  -- Hasini Abeywickrama (ce...005) - medical_record, prescription, lab_report
-  ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000004', 'medical_record',
-   'Iron Deficiency Anemia Notes', 'Clinical notes from anemia diagnosis and dietary counseling.',
-   'medical-documents/ce000000-0000-0000-0000-000000000005/seed-anemia-notes.pdf',
-   'Anemia_Diagnosis_Notes.pdf', 198000, 'application/pdf', NOW() - INTERVAL '2 days'),
-  ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000004', 'medical_record',
-   'Migraine Assessment - Hasini', 'Migraine without aura assessment and trigger diary.',
-   'medical-documents/ce000000-0000-0000-0000-000000000005/seed-migraine-notes.pdf',
-   'Migraine_Assessment_Hasini.pdf', 215000, 'application/pdf', NOW() - INTERVAL '1 day'),
-  ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000004', 'prescription',
-   'Ferrous Sulfate Prescription', 'Scanned prescription for ferrous sulfate 200mg twice daily.',
-   'medical-documents/ce000000-0000-0000-0000-000000000005/seed-ferrous-rx.jpg',
-   'Ferrous_Sulfate_Prescription.jpg', 350000, 'image/jpeg', NOW() - INTERVAL '2 days'),
-  ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000004', 'prescription',
-   'Sumatriptan Prescription', 'Scanned prescription for migraine abortive therapy.',
-   'medical-documents/ce000000-0000-0000-0000-000000000005/seed-sumatriptan-rx.pdf',
-   'Sumatriptan_Prescription.pdf', 190000, 'application/pdf', NOW() - INTERVAL '1 day'),
-  ('ce000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000002', 'lab_report',
-   'Serum Ferritin Report', 'Ferritin level testing results.',
-   'medical-documents/ce000000-0000-0000-0000-000000000005/seed-ferritin-report.pdf',
-   'Serum_Ferritin_Report.pdf', 132000, 'application/pdf', NOW() - INTERVAL '3 days'),
-  ('ce000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'lab_report',
-   'CBC Report - Hasini', 'Complete blood count results showing low hemoglobin.',
-   'medical-documents/ce000000-0000-0000-0000-000000000005/seed-cbc-hasini.pdf',
-   'CBC_Report_Hasini.pdf', 178000, 'application/pdf', NOW() - INTERVAL '4 days'),
-
-  -- Lahiru Gunasekara (ce...006) - medical_record, prescription
-  ('ce000000-0000-0000-0000-000000000006', 'd0000000-0000-0000-0000-000000000003', 'medical_record',
-   'ACL Sprain Assessment', 'Grade 2 ACL sprain assessment with MRI findings.',
-   'medical-documents/ce000000-0000-0000-0000-000000000006/seed-acl-assessment.pdf',
-   'ACL_Sprain_Assessment.pdf', 325000, 'application/pdf', NOW() - INTERVAL '3 days'),
-  ('ce000000-0000-0000-0000-000000000006', 'd0000000-0000-0000-0000-000000000003', 'prescription',
-   'Diclofenac Gel Prescription', 'Topical anti-inflammatory prescription for knee injury.',
-   'medical-documents/ce000000-0000-0000-0000-000000000006/seed-diclofenac-rx.jpg',
-   'Diclofenac_Prescription.jpg', 260000, 'image/jpeg', NOW() - INTERVAL '3 days');
+   'Amlodipine_Prescription.jpg', 350000, 'image/jpeg', NOW() - INTERVAL '2 days');
 
 -- ============================================
 -- VACCINATIONS (immunization history)

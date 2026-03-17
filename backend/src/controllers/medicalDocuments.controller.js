@@ -233,6 +233,21 @@ const upload = async (req, res, next) => {
       throw new AppError('You can only upload documents for yourself.', 403);
     }
 
+    // Only one file allowed per patient for prescription, lab_report, and medical_record categories
+    const ONE_FILE_CATEGORIES = ['prescription', 'lab_report', 'medical_record'];
+    if (ONE_FILE_CATEGORIES.includes(docCategory)) {
+      const existing = await db.query(
+        'SELECT id FROM medical_documents WHERE patient_id = $1 AND category = $2 LIMIT 1',
+        [patientId, docCategory]
+      );
+      if (existing.rows.length > 0) {
+        throw new AppError(
+          `Only one file is allowed per patient for the ${docCategory.replace('_', ' ')} category. Please delete the existing file before uploading a new one.`,
+          409
+        );
+      }
+    }
+
     const fileKey = await uploadDocumentToS3(file, patientId);
 
     const result = await db.query(

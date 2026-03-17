@@ -381,13 +381,15 @@ export default function PatientDetail() {
       <div style={{ marginBottom: 24 }}>
         <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
           <h3>Medical Records ({records.length})</h3>
-          <button
-            onClick={() => setUploadCategory('medical_record')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            Upload
-          </button>
+          {docsByCategory('medical_record').length === 0 && (
+            <button
+              onClick={() => setUploadCategory('medical_record')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Upload
+            </button>
+          )}
         </div>
         <DataTable
           columns={[
@@ -404,13 +406,15 @@ export default function PatientDetail() {
       <div style={{ marginBottom: 24 }}>
         <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
           <h3>Prescriptions ({rxs.length})</h3>
-          <button
-            onClick={() => setUploadCategory('prescription')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            Upload
-          </button>
+          {docsByCategory('prescription').length === 0 && (
+            <button
+              onClick={() => setUploadCategory('prescription')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Upload
+            </button>
+          )}
         </div>
         <DataTable
           columns={[
@@ -427,13 +431,15 @@ export default function PatientDetail() {
       <div style={{ marginBottom: 24 }}>
         <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
           <h3>Lab Reports ({labs.length})</h3>
-          <button
-            onClick={() => setUploadCategory('lab_report')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            Upload
-          </button>
+          {docsByCategory('lab_report').length === 0 && (
+            <button
+              onClick={() => setUploadCategory('lab_report')}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Upload
+            </button>
+          )}
         </div>
         <DataTable
           columns={[
