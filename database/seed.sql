@@ -378,7 +378,19 @@ INSERT INTO medical_documents (patient_id, uploaded_by, category, title, descrip
   ('ce000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000001', 'referral',
    'Dermatology Referral', 'Referral letter for dermatology consultation.',
    'medical-documents/ce000000-0000-0000-0000-000000000005/seed-derm-referral.pdf',
-   'Dermatology_Referral.pdf', 102400, 'application/pdf', NOW() - INTERVAL '5 days');
+   'Dermatology_Referral.pdf', 102400, 'application/pdf', NOW() - INTERVAL '5 days'),
+
+  -- ---- One document per patient per category for medical_record, prescription, lab_report ----
+
+  -- Sarah Fernando (ce...001) - 1 medical_record, 1 prescription, 1 lab_report
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'medical_record',
+   'Hypertension Diagnosis Notes', 'Scanned clinical notes from Stage 1 hypertension diagnosis.',
+   'medical-documents/ce000000-0000-0000-0000-000000000001/seed-hypertension-notes.pdf',
+   'Hypertension_Diagnosis_Notes.pdf', 198000, 'application/pdf', NOW() - INTERVAL '2 days'),
+  ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'prescription',
+   'Amlodipine Prescription Scan', 'Scanned prescription for Amlodipine 5mg daily.',
+   'medical-documents/ce000000-0000-0000-0000-000000000001/seed-amlodipine-rx.jpg',
+   'Amlodipine_Prescription.jpg', 350000, 'image/jpeg', NOW() - INTERVAL '2 days');
 
 -- ============================================
 -- VACCINATIONS (immunization history)

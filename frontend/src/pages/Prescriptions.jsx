@@ -559,7 +559,9 @@ export default function Prescriptions({ embedded = false }) {
                 <input
                   id="rx-search"
                   type="search"
-                  placeholder={tab === 'prescriptions' ? 'Search medications, doctors...' : 'Search refill requests...'}
+                  placeholder={tab === 'prescriptions'
+                    ? (isPatient ? 'Search medications, doctors...' : 'Search patients, medications...')
+                    : 'Search refill requests...'}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
