@@ -4,7 +4,7 @@ import { useAuth } from '../data/AuthContext';
 import api from '../services/api';
 import {
   Bell, LogOut, User, Check, CheckCheck,
-  Calendar, Pill, FlaskConical, FileText, Info, RefreshCw, FolderOpen,
+  Calendar, Pill, FlaskConical, FileText, Info, RefreshCw, FolderOpen, CheckCircle, XCircle,
 } from 'lucide-react';
 
 const NOTIFICATION_ICONS = {
@@ -16,8 +16,8 @@ const NOTIFICATION_ICONS = {
   lab_report_ready: FlaskConical,
   medical_record_created: FileText,
   refill_requested: RefreshCw,
-  refill_approved: RefreshCw,
-  refill_denied: RefreshCw,
+  refill_approved: CheckCircle,
+  refill_denied: XCircle,
   document_uploaded: FolderOpen,
   system: Info,
 };

@@ -275,6 +275,7 @@ INSERT INTO notifications (recipient_id, type, title, message, is_read, referenc
   ('c0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'Your Complete Blood Count (CBC) results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
   ('c0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'Your Lipid Panel results are now available.', false, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
   ('c0000000-0000-0000-0000-000000000001', 'appointment_scheduled', 'Appointment Scheduled', 'Your quarterly cardiac review with Dr. Kamal Perera has been scheduled.', false, NULL, 'appointment', NOW() - INTERVAL '2 days'),
+  ('c0000000-0000-0000-0000-000000000001', 'refill_approved', 'Refill Approved', 'Your refill request for Amlodipine has been approved.', true, NULL, 'refill_request', NOW() - INTERVAL '15 days'),
 
   -- Patient Dinesh Rajapaksa: neurology notifications
   ('c0000000-0000-0000-0000-000000000002', 'appointment_confirmed', 'Appointment Confirmed', 'Your appointment with Dr. Sithara Silva has been confirmed.', true, NULL, 'appointment', NOW() - INTERVAL '26 days'),
@@ -286,6 +287,7 @@ INSERT INTO notifications (recipient_id, type, title, message, is_read, referenc
   -- Patient Kavindi Weerasinghe: orthopedics notifications
   ('c0000000-0000-0000-0000-000000000003', 'lab_report_ready', 'Lab Report Ready', 'Your X-Ray Left Knee results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '18 days'),
   ('c0000000-0000-0000-0000-000000000003', 'prescription_created', 'New Prescription', 'Dr. Ruwan Fernando prescribed Ibuprofen 400mg.', false, NULL, 'prescription', NOW() - INTERVAL '18 days'),
+  ('c0000000-0000-0000-0000-000000000003', 'refill_denied', 'Refill Denied', 'Your refill request for Ibuprofen has been denied.', false, NULL, 'refill_request', NOW() - INTERVAL '10 days'),
 
   -- Patient Nuwan Jayasuriya: cardiac + neurology notifications
   ('c0000000-0000-0000-0000-000000000004', 'medical_record_created', 'New Medical Record', 'Dr. Kamal Perera added a new record: Atrial fibrillation.', true, NULL, 'medical_record', NOW() - INTERVAL '14 days'),
