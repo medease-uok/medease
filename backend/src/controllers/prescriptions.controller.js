@@ -20,7 +20,7 @@ const mapPrescription = (row) => ({
   status: row.status,
   type: row.type || 'digital',
   notes: row.notes,
-  imageUrl: row.image_url || null,
+  imageUrl: row.image_key || null,
   createdAt: row.created_at,
   pendingRefill: row.pending_refill ?? false,
 })
@@ -82,7 +82,8 @@ const getAll = async (req, res, next) => {
     let itemsMap = {}
     if (rxIds.length > 0) {
       const items = await db.query(
-        `SELECT * FROM prescription_items WHERE prescription_id = ANY($1) ORDER BY sort_order`,
+        `SELECT id, prescription_id, medicine_id, medication, dosage, frequency, duration, instructions, sort_order
+         FROM prescription_items WHERE prescription_id = ANY($1) ORDER BY sort_order`,
         [rxIds]
       )
       for (const item of items.rows) {
@@ -229,33 +230,38 @@ const create = async (req, res, next) => {
         }
       }
 
-      // Use first item as the primary prescription record (for backwards compatibility)
       const primary = items[0]
-      const result = await db.query(
-        `INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration, type, notes, chronic_condition_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-        [
-          patientId,
-          doctorId,
-          primary.medication.trim(),
-          primary.dosage.trim(),
-          primary.frequency.trim(),
-          primary.duration?.trim() || null,
-          'digital',
-          notes?.trim() || null,
-          validConditionId,
-        ]
-      )
+      const client = await db.getClient()
+      let prescriptionId
+      try {
+        await client.query('BEGIN')
 
-      const prescriptionId = result.rows[0].id
-
-      // Insert all items (including primary, for consistent querying)
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        await db.query(
-          `INSERT INTO prescription_items (prescription_id, medicine_id, medication, dosage, frequency, duration, instructions, sort_order)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        const result = await client.query(
+          `INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration, type, notes, chronic_condition_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
           [
+            patientId,
+            doctorId,
+            primary.medication.trim(),
+            primary.dosage.trim(),
+            primary.frequency.trim(),
+            primary.duration?.trim() || null,
+            'digital',
+            notes?.trim() || null,
+            validConditionId,
+          ]
+        )
+        prescriptionId = result.rows[0].id
+
+        // Bulk insert all items
+        const values = []
+        const params = []
+        items.forEach((item, i) => {
+          const offset = i * 8
+          values.push(
+            `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`
+          )
+          params.push(
             prescriptionId,
             item.medicineId || null,
             item.medication.trim(),
@@ -263,9 +269,21 @@ const create = async (req, res, next) => {
             item.frequency.trim(),
             item.duration?.trim() || null,
             item.instructions?.trim() || null,
-            i,
-          ]
+            i
+          )
+        })
+        await client.query(
+          `INSERT INTO prescription_items (prescription_id, medicine_id, medication, dosage, frequency, duration, instructions, sort_order)
+           VALUES ${values.join(', ')}`,
+          params
         )
+
+        await client.query('COMMIT')
+      } catch (txErr) {
+        await client.query('ROLLBACK').catch(() => {})
+        throw txErr
+      } finally {
+        client.release()
       }
 
       const medList =
