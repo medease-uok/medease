@@ -1,6 +1,5 @@
 const db = require('../config/database')
 const AppError = require('../utils/AppError')
-const { buildAccessFilter } = require('../utils/abac')
 const { createNotification } = require('./notifications.controller')
 const auditLog = require('../utils/auditLog')
 const { isRefillEligible } = require('../utils/refillEligibility')
@@ -28,21 +27,36 @@ const mapPrescription = (row) => ({
 
 const getAll = async (req, res, next) => {
   try {
-    const subject = {
-      id: req.user.id,
-      role: req.user.role,
-      patientId: req.user.patientId,
-      doctorId: req.user.doctorId,
-      pharmacistId: req.user.pharmacistId,
-    }
+    const { role } = req.user
+    let clause
+    let params
 
-    const columnMap = {
-      patient_id: 'rx.patient_id',
-      doctor_id: 'rx.doctor_id',
-      status: 'rx.status',
+    if (role === 'admin' || role === 'pharmacist') {
+      // Admin and pharmacist see all prescriptions
+      clause = 'TRUE'
+      params = []
+    } else if (role === 'patient') {
+      // Patients see only their own prescriptions
+      clause = 'rx.patient_id = $1'
+      params = [req.user.patientId]
+    } else if (role === 'doctor') {
+      // Doctors see prescriptions for any patient they have treated (via appointments)
+      clause = `(rx.doctor_id = $1 OR rx.patient_id IN (
+        SELECT DISTINCT a.patient_id FROM appointments a WHERE a.doctor_id = $1
+      ))`
+      params = [req.user.doctorId]
+    } else if (role === 'nurse') {
+      // Nurses see prescriptions for patients treated by doctors in their department
+      clause = `rx.patient_id IN (
+        SELECT DISTINCT a.patient_id FROM appointments a
+        JOIN doctors d ON a.doctor_id = d.id
+        WHERE d.department = (SELECT n.department FROM nurses n WHERE n.user_id = $1)
+      )`
+      params = [req.user.id]
+    } else {
+      clause = 'FALSE'
+      params = []
     }
-
-    const { clause, params } = await buildAccessFilter('prescription', subject, columnMap)
 
     const query = `
       SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
