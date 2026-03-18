@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   Pill, AlertCircle, Search, Clock, User, Stethoscope, CalendarDays, X,
-  RefreshCw, CheckCircle, XCircle, MessageSquare, Loader2,
+  RefreshCw, CheckCircle, XCircle, MessageSquare, Loader2, Plus, Image, FileText, Eye,
 } from 'lucide-react';
 import { prescriptionStatuses } from '../constants';
 import { useAuth } from '../data/AuthContext';
@@ -9,6 +9,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import CreatePrescriptionModal from '../components/CreatePrescriptionModal';
 
 const STATUS_STYLES = {
   active: { variant: 'success', label: 'Active' },
@@ -239,28 +240,70 @@ function RespondModal({ request: rr, onClose, onSuccess }) {
   );
 }
 
-function PrescriptionCard({ rx, showPatient, canRequestRefill, onRequestRefill }) {
+function PrescriptionCard({ rx, showPatient, canRequestRefill, onRequestRefill, onViewImage }) {
   const style = STATUS_STYLES[rx.status] ?? { variant: 'outline', label: rx.status ?? 'Unknown' };
   const showRefillButton = canRequestRefill && rx.refillEligible && !rx.pendingRefill;
   const hasPendingRefill = canRequestRefill && rx.pendingRefill;
+  const isHandwritten = rx.type === 'handwritten';
+  const hasItems = rx.items && rx.items.length > 1;
 
   return (
     <div className="group relative rounded-xl border border-slate-200 bg-white p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-            <Pill className="w-5 h-5 text-orange-600" aria-hidden="true" />
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isHandwritten ? 'bg-indigo-100' : 'bg-orange-100'}`}>
+            {isHandwritten
+              ? <Image className="w-5 h-5 text-indigo-600" aria-hidden="true" />
+              : <Pill className="w-5 h-5 text-orange-600" aria-hidden="true" />}
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900">{rx.medication}</h3>
-            <p className="text-sm text-slate-500">{rx.dosage} &middot; {rx.frequency}</p>
+            <h3 className="font-semibold text-slate-900">
+              {isHandwritten ? 'Handwritten Prescription' : rx.medication}
+            </h3>
+            {!isHandwritten && <p className="text-sm text-slate-500">{rx.dosage} &middot; {rx.frequency}</p>}
+            {isHandwritten && rx.notes && <p className="text-sm text-slate-500 line-clamp-1">{rx.notes}</p>}
           </div>
         </div>
-        <Badge variant={style.variant}>{style.label}</Badge>
+        <div className="flex items-center gap-1.5">
+          {isHandwritten && (
+            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-600 rounded">
+              Handwritten
+            </span>
+          )}
+          <Badge variant={style.variant}>{style.label}</Badge>
+        </div>
       </div>
 
+      {/* Multi-medicine items */}
+      {hasItems && (
+        <div className="mb-3 space-y-1.5">
+          {rx.items.map((item, i) => (
+            <div key={item.id || i} className="flex items-center gap-2 text-sm text-slate-600 pl-1">
+              <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                {i + 1}
+              </span>
+              <span className="font-medium">{item.medication}</span>
+              <span className="text-slate-400">{item.dosage} &middot; {item.frequency}</span>
+              {item.duration && <span className="text-slate-400">({item.duration})</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Handwritten image preview */}
+      {isHandwritten && rx.imageUrl && (
+        <button
+          type="button"
+          onClick={() => onViewImage(rx)}
+          className="mb-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+        >
+          <Eye className="w-4 h-4" />
+          View Prescription Image
+        </button>
+      )}
+
       <div className="grid grid-cols-2 gap-3 text-sm">
-        {rx.duration && (
+        {rx.duration && !isHandwritten && (
           <div className="flex items-center gap-2 text-slate-600">
             <Clock className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
             <span>{rx.duration}</span>
@@ -284,6 +327,10 @@ function PrescriptionCard({ rx, showPatient, canRequestRefill, onRequestRefill }
           </div>
         )}
       </div>
+
+      {rx.notes && !isHandwritten && (
+        <p className="mt-2 text-xs text-slate-500 italic line-clamp-2">{rx.notes}</p>
+      )}
 
       {showRefillButton && (
         <button
@@ -387,6 +434,109 @@ function ListSkeleton() {
   );
 }
 
+function ImageViewerModal({ rx, onClose }) {
+  if (!rx || !rx.imageUrl) return null;
+  const isPdf = rx.imageUrl.includes('.pdf');
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Handwritten Prescription</h2>
+            {rx.doctorName && <p className="text-sm text-slate-500">{rx.doctorName}</p>}
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          {isPdf ? (
+            <iframe src={rx.imageUrl} className="w-full h-[70vh] rounded-lg border border-slate-200" title="Prescription" />
+          ) : (
+            <img src={rx.imageUrl} alt="Handwritten prescription" className="w-full rounded-lg shadow-sm" />
+          )}
+          {rx.notes && (
+            <div className="mt-4 p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm font-medium text-slate-700">Notes</p>
+              <p className="text-sm text-slate-600 mt-1">{rx.notes}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PatientSelectModal({ onSelect, onClose }) {
+  const [query, setQuery] = useState('');
+  const [allPatients, setAllPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/patients')
+      .then((res) => setAllPatients(res.data || []))
+      .catch(() => setAllPatients([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const patients = useMemo(() => {
+    if (!query || query.length < 2) return allPatients;
+    const q = query.toLowerCase();
+    return allPatients.filter((p) =>
+      `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
+      p.email?.toLowerCase().includes(q)
+    );
+  }, [allPatients, query]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900">Select Patient</h2>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search patients by name..."
+            className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+            autoFocus
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-200">
+          {loading && (
+            <div className="p-4 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-slate-400" /></div>
+          )}
+          {!loading && patients.length === 0 && (
+            <div className="p-4 text-center text-sm text-slate-500">No patients found.</div>
+          )}
+          {patients.map((p) => (
+            <button
+              key={p.id || p.patientId}
+              type="button"
+              onClick={() => onSelect({ id: p.patientId || p.id, name: `${p.firstName} ${p.lastName}` })}
+              className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3"
+            >
+              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold flex-shrink-0">
+                {p.firstName?.[0]}{p.lastName?.[0]}
+              </div>
+              <div>
+                <div className="font-medium text-slate-900 text-sm">{p.firstName} {p.lastName}</div>
+                {p.email && <div className="text-xs text-slate-500">{p.email}</div>}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Prescriptions({ embedded = false }) {
   const [tab, setTab] = useState('prescriptions');
   const [filter, setFilter] = useState('all');
@@ -400,9 +550,14 @@ export default function Prescriptions({ embedded = false }) {
   const [error, setError] = useState(null);
   const [refillModal, setRefillModal] = useState(null);
   const [respondModal, setRespondModal] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [showPatientSelect, setShowPatientSelect] = useState(false);
+  const [imageViewer, setImageViewer] = useState(null);
   const { currentUser } = useAuth();
   const { can, canAny } = usePermissions();
   const isPatient = currentUser?.role === 'patient';
+  const canCreate = can('create_prescription');
   const canRequestRefill = can('request_refill');
   const canViewRefills = canAny('view_refill_requests', 'view_own_refill_requests');
   const canRespondRefill = can('respond_refill_request');
@@ -492,6 +647,22 @@ export default function Prescriptions({ embedded = false }) {
     fetchRefillRequests();
   };
 
+  const handleCreateClick = () => {
+    setShowPatientSelect(true);
+  };
+
+  const handlePatientSelected = (patient) => {
+    setSelectedPatient(patient);
+    setShowPatientSelect(false);
+    setShowCreate(true);
+  };
+
+  const handleCreateSuccess = () => {
+    setShowCreate(false);
+    setSelectedPatient(null);
+    fetchPrescriptions();
+  };
+
   const handleTabChange = (newTab) => {
     setTab(newTab);
     setFilter('all');
@@ -505,15 +676,26 @@ export default function Prescriptions({ embedded = false }) {
   return (
     <div className="space-y-6">
       {!embedded && (
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-            {isPatient ? 'My Prescriptions' : 'Prescriptions'}
-          </h1>
-          <p className="text-slate-500 mt-1">
-            {isPatient
-              ? 'View your current and past medication prescriptions.'
-              : 'Manage and review patient prescriptions.'}
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
+              {isPatient ? 'My Prescriptions' : 'Prescriptions'}
+            </h1>
+            <p className="text-slate-500 mt-1">
+              {isPatient
+                ? 'View your current and past medication prescriptions.'
+                : 'Manage and review patient prescriptions.'}
+            </p>
+          </div>
+          {canCreate && (
+            <button
+              onClick={handleCreateClick}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              New Prescription
+            </button>
+          )}
         </div>
       )}
 
@@ -717,6 +899,7 @@ export default function Prescriptions({ embedded = false }) {
               showPatient={!isPatient}
               canRequestRefill={canRequestRefill}
               onRequestRefill={setRefillModal}
+              onViewImage={setImageViewer}
             />
           ))}
         </div>
@@ -803,6 +986,26 @@ export default function Prescriptions({ embedded = false }) {
           request={respondModal}
           onClose={() => setRespondModal(null)}
           onSuccess={handleRespondSuccess}
+        />
+      )}
+      {showPatientSelect && (
+        <PatientSelectModal
+          onSelect={handlePatientSelected}
+          onClose={() => setShowPatientSelect(false)}
+        />
+      )}
+      {showCreate && selectedPatient && (
+        <CreatePrescriptionModal
+          patientId={selectedPatient.id}
+          patientName={selectedPatient.name}
+          onClose={() => { setShowCreate(false); setSelectedPatient(null); }}
+          onSuccess={handleCreateSuccess}
+        />
+      )}
+      {imageViewer && (
+        <ImageViewerModal
+          rx={imageViewer}
+          onClose={() => setImageViewer(null)}
         />
       )}
     </div>

@@ -110,4 +110,34 @@ async function uploadDocumentToS3(file, patientId) {
   return key;
 }
 
-module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl, documentUpload, uploadDocumentToS3 };
+const PRESCRIPTION_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const MAX_PRESCRIPTION_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+const prescriptionImageUpload = multer({
+  storage,
+  limits: { fileSize: MAX_PRESCRIPTION_IMAGE_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (PRESCRIPTION_IMAGE_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new AppError('Only JPEG, PNG, WebP, and PDF files are allowed for prescription images.', 400));
+    }
+  },
+});
+
+async function uploadPrescriptionImageToS3(file, patientId) {
+  const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+  const hash = crypto.randomBytes(16).toString('hex');
+  const key = `prescription-images/${patientId}/${hash}${ext}`;
+
+  await s3.send(new PutObjectCommand({
+    Bucket: config.s3.bucket,
+    Key: key,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  }));
+
+  return key;
+}
+
+module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl, documentUpload, uploadDocumentToS3, prescriptionImageUpload, uploadPrescriptionImageToS3 };

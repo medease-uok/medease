@@ -1,11 +1,12 @@
-const db = require('../config/database');
-const AppError = require('../utils/AppError');
-const { buildAccessFilter } = require('../utils/abac');
-const { createNotification } = require('./notifications.controller');
-const auditLog = require('../utils/auditLog');
-const { isRefillEligible } = require('../utils/refillEligibility');
+const db = require('../config/database')
+const AppError = require('../utils/AppError')
+const { buildAccessFilter } = require('../utils/abac')
+const { createNotification } = require('./notifications.controller')
+const auditLog = require('../utils/auditLog')
+const { isRefillEligible } = require('../utils/refillEligibility')
+const { uploadPrescriptionImageToS3, getPresignedImageUrl } = require('../middleware/upload')
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const mapPrescription = (row) => ({
   id: row.id,
@@ -18,9 +19,12 @@ const mapPrescription = (row) => ({
   frequency: row.frequency,
   duration: row.duration,
   status: row.status,
+  type: row.type || 'digital',
+  notes: row.notes,
+  imageUrl: row.image_url || null,
   createdAt: row.created_at,
   pendingRefill: row.pending_refill ?? false,
-});
+})
 
 const getAll = async (req, res, next) => {
   try {
@@ -30,19 +34,19 @@ const getAll = async (req, res, next) => {
       patientId: req.user.patientId,
       doctorId: req.user.doctorId,
       pharmacistId: req.user.pharmacistId,
-    };
+    }
 
     const columnMap = {
       patient_id: 'rx.patient_id',
       doctor_id: 'rx.doctor_id',
       status: 'rx.status',
-    };
+    }
 
-    const { clause, params } = await buildAccessFilter('prescription', subject, columnMap);
+    const { clause, params } = await buildAccessFilter('prescription', subject, columnMap)
 
     const query = `
       SELECT rx.id, rx.patient_id, rx.doctor_id, rx.medication, rx.dosage,
-             rx.frequency, rx.duration, rx.status, rx.created_at,
+             rx.frequency, rx.duration, rx.status, rx.type, rx.notes, rx.image_key, rx.created_at,
              pu.first_name || ' ' || pu.last_name AS patient_name,
              'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name,
              EXISTS (
@@ -55,33 +59,68 @@ const getAll = async (req, res, next) => {
       LEFT JOIN doctors d ON rx.doctor_id = d.id
       LEFT JOIN users du ON d.user_id = du.id
       WHERE ${clause}
-      ORDER BY rx.created_at DESC`;
+      ORDER BY rx.created_at DESC`
 
-    const result = await db.query(query, params);
+    const result = await db.query(query, params)
 
-    const data = result.rows.map((row) => ({
-      ...mapPrescription(row),
-      refillEligible: ['active', 'expired'].includes(row.status) && isRefillEligible(row.created_at, row.duration),
-    }));
+    // Fetch prescription items for digital prescriptions
+    const rxIds = result.rows.map((r) => r.id)
+    let itemsMap = {}
+    if (rxIds.length > 0) {
+      const items = await db.query(
+        `SELECT * FROM prescription_items WHERE prescription_id = ANY($1) ORDER BY sort_order`,
+        [rxIds]
+      )
+      for (const item of items.rows) {
+        if (!itemsMap[item.prescription_id]) itemsMap[item.prescription_id] = []
+        itemsMap[item.prescription_id].push({
+          id: item.id,
+          medicineId: item.medicine_id,
+          medication: item.medication,
+          dosage: item.dosage,
+          frequency: item.frequency,
+          duration: item.duration,
+          instructions: item.instructions,
+          sortOrder: item.sort_order,
+        })
+      }
+    }
 
-    await auditLog({ userId: req.user.id, action: 'VIEW_PRESCRIPTIONS', resourceType: 'prescription', ip: req.ip });
+    // Generate presigned URLs for handwritten prescription images
+    const data = await Promise.all(
+      result.rows.map(async (row) => {
+        const mapped = mapPrescription(row)
+        mapped.items = itemsMap[row.id] || []
+        if (row.image_key) {
+          mapped.imageUrl = await getPresignedImageUrl(row.image_key)
+        }
+        mapped.refillEligible =
+          ['active', 'expired'].includes(row.status) && isRefillEligible(row.created_at, row.duration)
+        return mapped
+      })
+    )
 
-    res.json({ status: 'success', data });
+    await auditLog({
+      userId: req.user.id,
+      action: 'VIEW_PRESCRIPTIONS',
+      resourceType: 'prescription',
+      ip: req.ip,
+    })
+
+    res.json({ status: 'success', data })
   } catch (err) {
-    return next(err);
+    return next(err)
   }
-};
+}
 
 const create = async (req, res, next) => {
   try {
-    const { patientId, medication, dosage, frequency, duration, chronicConditionId } = req.body;
+    const { patientId, type = 'digital', notes, chronicConditionId } = req.body
 
-    if (!patientId || !medication || !dosage || !frequency) {
-      throw new AppError('patientId, medication, dosage, and frequency are required.', 400);
-    }
+    if (!patientId) throw new AppError('patientId is required.', 400)
 
-    const doctorId = req.user.doctorId;
-    if (!doctorId) throw new AppError('Only doctors can create prescriptions.', 403);
+    const doctorId = req.user.doctorId
+    if (!doctorId) throw new AppError('Only doctors can create prescriptions.', 403)
 
     const [patientCheck, doctorInfo] = await Promise.all([
       db.query(
@@ -93,59 +132,166 @@ const create = async (req, res, next) => {
         `SELECT u.first_name, u.last_name FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
         [doctorId]
       ),
-    ]);
-    if (patientCheck.rows.length === 0) throw new AppError('Patient not found.', 404);
-    const patient = patientCheck.rows[0];
+    ])
+    if (patientCheck.rows.length === 0) throw new AppError('Patient not found.', 404)
+    const patient = patientCheck.rows[0]
     const docName = doctorInfo.rows[0]
       ? `Dr. ${doctorInfo.rows[0].first_name} ${doctorInfo.rows[0].last_name}`
-      : 'Your doctor';
+      : 'Your doctor'
 
-    let validConditionId = null;
+    let validConditionId = null
     if (chronicConditionId) {
       if (!UUID_RE.test(chronicConditionId)) {
-        throw new AppError('chronicConditionId must be a valid UUID.', 400);
+        throw new AppError('chronicConditionId must be a valid UUID.', 400)
       }
       const ccCheck = await db.query(
         'SELECT id FROM chronic_conditions WHERE id = $1 AND patient_id = $2',
         [chronicConditionId, patientId]
-      );
+      )
       if (ccCheck.rowCount === 0) {
-        throw new AppError('Chronic condition not found for this patient.', 400);
+        throw new AppError('Chronic condition not found for this patient.', 400)
       }
-      validConditionId = chronicConditionId;
+      validConditionId = chronicConditionId
     }
 
-    const result = await db.query(
-      `INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration, chronic_condition_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [patientId, doctorId, medication, dosage, frequency, duration || null, validConditionId]
-    );
+    if (type === 'handwritten') {
+      // Handwritten mode: photo upload
+      if (!req.file) throw new AppError('Prescription image is required for handwritten prescriptions.', 400)
 
-    createNotification({
-      recipientId: patient.user_id,
-      type: 'prescription_created',
-      title: 'New Prescription',
-      message: `${docName} prescribed ${medication} (${dosage}, ${frequency}).`,
-      referenceId: result.rows[0].id,
-      referenceType: 'prescription',
-    });
+      const imageKey = await uploadPrescriptionImageToS3(req.file, patientId)
 
-    await auditLog({ userId: req.user.id, action: 'CREATE_PRESCRIPTION', resourceType: 'prescription', resourceId: result.rows[0].id, ip: req.ip, details: { patientId, medication } });
+      const result = await db.query(
+        `INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration, type, notes, image_key, chronic_condition_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+        [
+          patientId,
+          doctorId,
+          req.body.medication || 'Handwritten Prescription',
+          req.body.dosage || 'See image',
+          req.body.frequency || 'See image',
+          req.body.duration || null,
+          'handwritten',
+          notes?.trim() || null,
+          imageKey,
+          validConditionId,
+        ]
+      )
 
-    res.status(201).json({ status: 'success', data: { id: result.rows[0].id } });
+      createNotification({
+        recipientId: patient.user_id,
+        type: 'prescription_created',
+        title: 'New Prescription',
+        message: `${docName} wrote you a new prescription.`,
+        referenceId: result.rows[0].id,
+        referenceType: 'prescription',
+      })
+
+      await auditLog({
+        userId: req.user.id,
+        action: 'CREATE_PRESCRIPTION',
+        resourceType: 'prescription',
+        resourceId: result.rows[0].id,
+        ip: req.ip,
+        details: { patientId, type: 'handwritten' },
+      })
+
+      res.status(201).json({ status: 'success', data: { id: result.rows[0].id } })
+    } else {
+      // Digital mode: structured medicines
+      let items
+      try {
+        items = typeof req.body.items === 'string' ? JSON.parse(req.body.items) : req.body.items
+      } catch {
+        items = req.body.items
+      }
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        throw new AppError('At least one medicine item is required for digital prescriptions.', 400)
+      }
+
+      for (const item of items) {
+        if (!item.medication || !item.dosage || !item.frequency) {
+          throw new AppError('Each item requires medication, dosage, and frequency.', 400)
+        }
+      }
+
+      // Use first item as the primary prescription record (for backwards compatibility)
+      const primary = items[0]
+      const result = await db.query(
+        `INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency, duration, type, notes, chronic_condition_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [
+          patientId,
+          doctorId,
+          primary.medication.trim(),
+          primary.dosage.trim(),
+          primary.frequency.trim(),
+          primary.duration?.trim() || null,
+          'digital',
+          notes?.trim() || null,
+          validConditionId,
+        ]
+      )
+
+      const prescriptionId = result.rows[0].id
+
+      // Insert all items (including primary, for consistent querying)
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        await db.query(
+          `INSERT INTO prescription_items (prescription_id, medicine_id, medication, dosage, frequency, duration, instructions, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            prescriptionId,
+            item.medicineId || null,
+            item.medication.trim(),
+            item.dosage.trim(),
+            item.frequency.trim(),
+            item.duration?.trim() || null,
+            item.instructions?.trim() || null,
+            i,
+          ]
+        )
+      }
+
+      const medList =
+        items.length === 1
+          ? `${primary.medication} (${primary.dosage}, ${primary.frequency})`
+          : `${items.length} medicines including ${primary.medication}`
+
+      createNotification({
+        recipientId: patient.user_id,
+        type: 'prescription_created',
+        title: 'New Prescription',
+        message: `${docName} prescribed ${medList}.`,
+        referenceId: prescriptionId,
+        referenceType: 'prescription',
+      })
+
+      await auditLog({
+        userId: req.user.id,
+        action: 'CREATE_PRESCRIPTION',
+        resourceType: 'prescription',
+        resourceId: prescriptionId,
+        ip: req.ip,
+        details: { patientId, medication: primary.medication, itemCount: items.length },
+      })
+
+      res.status(201).json({ status: 'success', data: { id: prescriptionId } })
+    }
   } catch (err) {
-    return next(err);
+    return next(err)
   }
-};
+}
 
 const updateStatus = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { status } = req.body;
+    const { id } = req.params
+    const { status } = req.body
 
-    const validStatuses = ['dispensed', 'cancelled'];
+    const validStatuses = ['dispensed', 'cancelled']
     if (!validStatuses.includes(status)) {
-      throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400);
+      throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400)
     }
 
     const existing = await db.query(
@@ -155,47 +301,54 @@ const updateStatus = async (req, res, next) => {
        LEFT JOIN doctors d ON rx.doctor_id = d.id
        WHERE rx.id = $1`,
       [id]
-    );
-    if (existing.rows.length === 0) throw new AppError('Prescription not found.', 404);
-    const rx = existing.rows[0];
+    )
+    if (existing.rows.length === 0) throw new AppError('Prescription not found.', 404)
+    const rx = existing.rows[0]
 
-    const userId = req.user.id;
-    const isDoctor = userId === rx.doctor_user_id;
+    const userId = req.user.id
+    const isDoctor = userId === rx.doctor_user_id
     if (!isDoctor && !['pharmacist', 'admin'].includes(req.user.role)) {
-      throw new AppError('You do not have permission to update this prescription.', 403);
+      throw new AppError('You do not have permission to update this prescription.', 403)
     }
 
     const result = await db.query(
       `UPDATE prescriptions SET status = $1 WHERE id = $2 RETURNING id, status`,
       [status, id]
-    );
+    )
 
-    const patient = await db.query(
+    const patientResult = await db.query(
       `SELECT u.id AS user_id FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
       [rx.patient_id]
-    );
+    )
 
-    if (patient.rows[0]) {
-      const notifType = status === 'dispensed' ? 'prescription_dispensed' : 'system';
-      const title = status === 'dispensed' ? 'Prescription Dispensed' : 'Prescription Cancelled';
-      const verb = status === 'dispensed' ? 'dispensed' : 'cancelled';
+    if (patientResult.rows[0]) {
+      const notifType = status === 'dispensed' ? 'prescription_dispensed' : 'system'
+      const title = status === 'dispensed' ? 'Prescription Dispensed' : 'Prescription Cancelled'
+      const verb = status === 'dispensed' ? 'dispensed' : 'cancelled'
 
       createNotification({
-        recipientId: patient.rows[0].user_id,
+        recipientId: patientResult.rows[0].user_id,
         type: notifType,
         title,
         message: `Your prescription for ${rx.medication} has been ${verb}.`,
         referenceId: id,
         referenceType: 'prescription',
-      });
+      })
     }
 
-    await auditLog({ userId: req.user.id, action: 'UPDATE_PRESCRIPTION_STATUS', resourceType: 'prescription', resourceId: id, ip: req.ip, details: { status, medication: rx.medication } });
+    await auditLog({
+      userId: req.user.id,
+      action: 'UPDATE_PRESCRIPTION_STATUS',
+      resourceType: 'prescription',
+      resourceId: id,
+      ip: req.ip,
+      details: { status, medication: rx.medication },
+    })
 
-    res.json({ status: 'success', data: { id: result.rows[0].id, status: result.rows[0].status } });
+    res.json({ status: 'success', data: { id: result.rows[0].id, status: result.rows[0].status } })
   } catch (err) {
-    return next(err);
+    return next(err)
   }
-};
+}
 
-module.exports = { getAll, create, updateStatus };
+module.exports = { getAll, create, updateStatus }
