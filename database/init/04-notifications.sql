@@ -7,6 +7,10 @@ CREATE TYPE notification_type AS ENUM (
   'prescription_dispensed',
   'lab_report_ready',
   'medical_record_created',
+  'refill_requested',
+  'refill_approved',
+  'refill_denied',
+  'document_uploaded',
   'system'
 );
 

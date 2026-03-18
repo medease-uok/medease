@@ -4,7 +4,7 @@ import { useAuth } from '../data/AuthContext';
 import api from '../services/api';
 import {
   Bell, LogOut, User, Check, CheckCheck,
-  Calendar, Pill, FlaskConical, FileText, Info,
+  Calendar, Pill, FlaskConical, FileText, Info, RefreshCw, FolderOpen, CheckCircle, XCircle,
 } from 'lucide-react';
 
 const NOTIFICATION_ICONS = {
@@ -15,6 +15,10 @@ const NOTIFICATION_ICONS = {
   prescription_dispensed: Pill,
   lab_report_ready: FlaskConical,
   medical_record_created: FileText,
+  refill_requested: RefreshCw,
+  refill_approved: CheckCircle,
+  refill_denied: XCircle,
+  document_uploaded: FolderOpen,
   system: Info,
 };
 
@@ -26,6 +30,10 @@ const NOTIFICATION_ROUTES = {
   prescription_dispensed: '/prescriptions',
   lab_report_ready: '/lab-reports',
   medical_record_created: '/medical-records',
+  refill_requested: '/prescriptions',
+  refill_approved: '/prescriptions',
+  refill_denied: '/prescriptions',
+  document_uploaded: '/documents',
   system: null,
 };
 
@@ -37,6 +45,10 @@ const NOTIFICATION_COLORS = {
   prescription_dispensed: 'bg-orange-100 text-orange-600',
   lab_report_ready: 'bg-pink-100 text-pink-600',
   medical_record_created: 'bg-green-100 text-green-600',
+  refill_requested: 'bg-amber-100 text-amber-600',
+  refill_approved: 'bg-green-100 text-green-600',
+  refill_denied: 'bg-red-100 text-red-600',
+  document_uploaded: 'bg-indigo-100 text-indigo-600',
   system: 'bg-slate-100 text-slate-600',
 };
 
