@@ -27,8 +27,7 @@ CREATE INDEX idx_medical_documents_created ON medical_documents(created_at);
 
 GRANT ALL PRIVILEGES ON TABLE medical_documents TO medease_app;
 
--- Add notification type for document uploads
-ALTER TYPE notification_type ADD VALUE 'document_uploaded';
+-- Note: document_uploaded notification type is defined in 04-notifications.sql
 
 -- Permissions
 INSERT INTO permissions (name, description, category) VALUES
