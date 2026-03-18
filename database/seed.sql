@@ -307,12 +307,13 @@ INSERT INTO notifications (recipient_id, type, title, message, is_read, referenc
   ('c0000000-0000-0000-0000-000000000006', 'medical_record_created', 'New Medical Record', 'Dr. Ruwan Fernando added a new record: ACL sprain (Grade 2).', false, NULL, 'medical_record', NOW() - INTERVAL '4 days'),
   ('c0000000-0000-0000-0000-000000000006', 'appointment_confirmed', 'Appointment Confirmed', 'Your follow-up with Dr. Ruwan Fernando has been confirmed.', false, NULL, 'appointment', NOW() - INTERVAL '1 day'),
 
-  -- Doctor Kamal Perera: lab report notifications
+  -- Doctor Kamal Perera: lab report + refill notifications
   ('d0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'CBC results for Sarah Fernando are available.', true, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
   ('d0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'Lipid Panel results for Sarah Fernando are available.', true, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
   ('d0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'ECG results for Nuwan Jayasuriya are available.', true, NULL, 'lab_report', NOW() - INTERVAL '14 days'),
   ('d0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Results Updated', 'INR results for Nuwan Jayasuriya are available.', false, NULL, 'lab_report', NOW() - INTERVAL '7 days'),
   ('d0000000-0000-0000-0000-000000000001', 'appointment_scheduled', 'New Appointment', 'Hasini Abeywickrama has scheduled an appointment.', false, NULL, 'appointment', NOW() - INTERVAL '3 days'),
+  ('d0000000-0000-0000-0000-000000000001', 'refill_requested', 'Refill Request', 'Sarah Fernando requested a refill for Amlodipine (5mg).', false, NULL, 'refill_request', NOW() - INTERVAL '5 hours'),
 
   -- Doctor Sithara Silva: notifications
   ('d0000000-0000-0000-0000-000000000002', 'lab_report_ready', 'Lab Report Ready', 'MRI Brain results for Dinesh Rajapaksa are available.', true, NULL, 'lab_report', NOW() - INTERVAL '22 days'),
@@ -322,6 +323,7 @@ INSERT INTO notifications (recipient_id, type, title, message, is_read, referenc
   ('d0000000-0000-0000-0000-000000000003', 'lab_report_ready', 'Lab Report Ready', 'X-Ray results for Kavindi Weerasinghe are available.', true, NULL, 'lab_report', NOW() - INTERVAL '18 days'),
   ('d0000000-0000-0000-0000-000000000003', 'lab_report_ready', 'Lab Report Ready', 'MRI Left Knee results for Lahiru Gunasekara are available.', false, NULL, 'lab_report', NOW() - INTERVAL '5 days'),
   ('d0000000-0000-0000-0000-000000000003', 'appointment_scheduled', 'New Appointment', 'Lahiru Gunasekara has scheduled a follow-up appointment.', false, NULL, 'appointment', NOW() - INTERVAL '2 days'),
+  ('d0000000-0000-0000-0000-000000000003', 'refill_requested', 'Refill Request', 'Kavindi Weerasinghe requested a refill for Ibuprofen (400mg).', false, NULL, 'refill_request', NOW() - INTERVAL '1 day'),
 
   -- Pharmacist Tharindu Gamage: system notification
   ('b0000000-0000-0000-0000-000000000001', 'system', 'System Update', 'Pharmacy inventory module has been updated.', false, NULL, NULL, NOW() - INTERVAL '1 day'),
