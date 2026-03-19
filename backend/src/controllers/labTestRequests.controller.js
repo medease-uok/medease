@@ -3,12 +3,16 @@ const AppError = require('../utils/AppError')
 const { createNotification } = require('./notifications.controller')
 const auditLog = require('../utils/auditLog')
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const VALID_STATUSES = ['pending', 'in_progress', 'completed', 'cancelled']
+const VALID_PRIORITIES = ['urgent', 'normal', 'routine']
+
 const mapRequest = (row) => ({
   id: row.id,
   patientId: row.patient_id,
-  patientName: row.patient_name,
+  patientName: row.patient_name || 'Unknown',
   doctorId: row.doctor_id,
-  doctorName: row.doctor_name,
+  doctorName: row.doctor_name || 'Unknown',
   testName: row.test_name,
   priority: row.priority,
   clinicalNotes: row.clinical_notes,
@@ -51,6 +55,9 @@ const getAll = async (req, res, next) => {
 
     let statusFilter = ''
     if (filterStatus) {
+      if (!VALID_STATUSES.includes(filterStatus)) {
+        throw new AppError(`Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`, 400)
+      }
       params.push(filterStatus)
       statusFilter = ` AND r.status = $${params.length}`
     }
@@ -92,6 +99,18 @@ const create = async (req, res, next) => {
       throw new AppError('patientId and testName are required.', 400)
     }
 
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('patientId must be a valid UUID.', 400)
+    }
+
+    if (testName.trim().length > 255) {
+      throw new AppError('testName must not exceed 255 characters.', 400)
+    }
+
+    if (priority && !VALID_PRIORITIES.includes(priority)) {
+      throw new AppError(`priority must be one of: ${VALID_PRIORITIES.join(', ')}`, 400)
+    }
+
     // Verify patient exists
     const patientCheck = await db.query(
       `SELECT p.id, u.id AS user_id, u.first_name, u.last_name
@@ -123,7 +142,7 @@ const create = async (req, res, next) => {
       message: `${docName} has ordered a ${testName} test for you.`,
       referenceId: result.rows[0].id,
       referenceType: 'lab_test_request',
-    })
+    }).catch((err) => console.error('Failed to notify patient:', err.message))
 
     // Notify all lab technicians
     db.query(`SELECT id FROM users WHERE role = 'lab_technician' AND is_active = true`)
@@ -161,19 +180,36 @@ const create = async (req, res, next) => {
 const updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params
+    if (!UUID_RE.test(id)) throw new AppError('Invalid lab test request ID.', 400)
+
+    const { role } = req.user
+    if (!['lab_technician', 'admin', 'doctor'].includes(role)) {
+      throw new AppError('You do not have permission to update lab test requests.', 403)
+    }
+
     const { status, assignedTo, labReportId } = req.body
 
-    const validStatuses = ['pending', 'in_progress', 'completed', 'cancelled']
-    if (status && !validStatuses.includes(status)) {
-      throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400)
+    if (!status && !assignedTo && !labReportId) {
+      throw new AppError('At least one field (status, assignedTo, labReportId) is required.', 400)
+    }
+
+    if (status && !VALID_STATUSES.includes(status)) {
+      throw new AppError(`status must be one of: ${VALID_STATUSES.join(', ')}`, 400)
+    }
+
+    if (assignedTo && !UUID_RE.test(assignedTo)) {
+      throw new AppError('assignedTo must be a valid UUID.', 400)
+    }
+
+    if (labReportId && !UUID_RE.test(labReportId)) {
+      throw new AppError('labReportId must be a valid UUID.', 400)
     }
 
     const existing = await db.query(
-      `SELECT r.id, r.patient_id, r.doctor_id, r.test_name,
+      `SELECT r.id, r.patient_id, r.doctor_id, r.test_name, r.status,
               p.user_id AS patient_user_id, du.id AS doctor_user_id
        FROM lab_test_requests r
        JOIN patients p ON r.patient_id = p.id
-       JOIN users pu ON p.user_id = pu.id
        JOIN doctors d ON r.doctor_id = d.id
        JOIN users du ON d.user_id = du.id
        WHERE r.id = $1`,
@@ -181,6 +217,22 @@ const updateStatus = async (req, res, next) => {
     )
     if (existing.rows.length === 0) throw new AppError('Lab test request not found.', 404)
     const request = existing.rows[0]
+
+    // Authorization: lab techs can only update requests assigned to them or unassigned
+    if (role === 'lab_technician') {
+      if (request.assigned_to && request.assigned_to !== req.user.id) {
+        throw new AppError('You can only update requests assigned to you.', 403)
+      }
+    }
+    // Doctors can only cancel their own requests
+    if (role === 'doctor') {
+      if (request.doctor_user_id !== req.user.id) {
+        throw new AppError('You can only update your own lab test requests.', 403)
+      }
+      if (status && status !== 'cancelled') {
+        throw new AppError('Doctors can only cancel lab test requests.', 403)
+      }
+    }
 
     const sets = ['updated_at = NOW()']
     const params = []
@@ -217,24 +269,26 @@ const updateStatus = async (req, res, next) => {
         message: `Your ${request.test_name} test is now being processed.`,
         referenceId: id,
         referenceType: 'lab_test_request',
-      })
+      }).catch((err) => console.error('Failed to notify patient:', err.message))
     } else if (status === 'completed') {
-      createNotification({
-        recipientId: request.patient_user_id,
-        type: 'lab_report_ready',
-        title: 'Lab Test Completed',
-        message: `Your ${request.test_name} test has been completed.`,
-        referenceId: id,
-        referenceType: 'lab_test_request',
-      })
-      createNotification({
-        recipientId: request.doctor_user_id,
-        type: 'lab_report_ready',
-        title: 'Lab Test Completed',
-        message: `${request.test_name} results are ready for your patient.`,
-        referenceId: id,
-        referenceType: 'lab_test_request',
-      })
+      Promise.all([
+        createNotification({
+          recipientId: request.patient_user_id,
+          type: 'lab_report_ready',
+          title: 'Lab Test Completed',
+          message: `Your ${request.test_name} test has been completed.`,
+          referenceId: id,
+          referenceType: 'lab_test_request',
+        }),
+        createNotification({
+          recipientId: request.doctor_user_id,
+          type: 'lab_report_ready',
+          title: 'Lab Test Completed',
+          message: `${request.test_name} results are ready for your patient.`,
+          referenceId: id,
+          referenceType: 'lab_test_request',
+        }),
+      ]).catch((err) => console.error('Failed to notify on completion:', err.message))
     }
 
     await auditLog({

@@ -48,6 +48,7 @@ CREATE INDEX idx_lab_test_requests_doctor ON lab_test_requests(doctor_id);
 CREATE INDEX idx_lab_test_requests_status ON lab_test_requests(status);
 CREATE INDEX idx_lab_test_requests_assigned ON lab_test_requests(assigned_to);
 CREATE INDEX idx_lab_test_requests_created ON lab_test_requests(created_at DESC);
+CREATE INDEX idx_lab_test_requests_patient_status ON lab_test_requests(patient_id, status);
 
 GRANT ALL PRIVILEGES ON TABLE lab_test_requests TO medease_app;
 

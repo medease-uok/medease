@@ -3,6 +3,8 @@ const AppError = require('../utils/AppError')
 const { createNotification } = require('./notifications.controller')
 const auditLog = require('../utils/auditLog')
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const mapFeedback = (row) => ({
   id: row.id,
   patientId: row.patient_id,
@@ -202,8 +204,23 @@ const create = async (req, res, next) => {
       throw new AppError('doctorId and rating are required.', 400)
     }
 
+    if (!UUID_RE.test(doctorId)) {
+      throw new AppError('doctorId must be a valid UUID.', 400)
+    }
+
+    if (appointmentId && !UUID_RE.test(appointmentId)) {
+      throw new AppError('appointmentId must be a valid UUID.', 400)
+    }
+
     if (rating < 1 || rating > 5) {
       throw new AppError('Rating must be between 1 and 5.', 400)
+    }
+
+    const subRatings = { communicationRating, waitTimeRating, treatmentRating }
+    for (const [key, val] of Object.entries(subRatings)) {
+      if (val != null && (val < 1 || val > 5)) {
+        throw new AppError(`${key} must be between 1 and 5.`, 400)
+      }
     }
 
     // Verify doctor exists
@@ -243,7 +260,7 @@ const create = async (req, res, next) => {
       message: `You received a ${rating}-star rating from ${isAnonymous ? 'an anonymous patient' : 'a patient'}.`,
       referenceId: result.rows[0].id,
       referenceType: 'feedback',
-    })
+    }).catch((err) => console.error('Failed to notify doctor:', err.message))
 
     await auditLog({
       userId: req.user.id,
