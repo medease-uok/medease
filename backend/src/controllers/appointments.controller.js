@@ -252,7 +252,7 @@ const updateStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['confirmed', 'in_progress', 'completed', 'cancelled'];
+    const validStatuses = ['in_progress', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400);
     }
@@ -299,17 +299,6 @@ const updateStatus = async (req, res, next) => {
 
     const patient = patientInfo.rows[0];
     const doctor = doctorInfo.rows[0];
-
-    if (status === 'confirmed' && patient) {
-      createNotification({
-        recipientId: patient.user_id,
-        type: 'appointment_confirmed',
-        title: 'Appointment Confirmed',
-        message: `Your appointment with Dr. ${doctor?.first_name} ${doctor?.last_name} has been confirmed.`,
-        referenceId: id,
-        referenceType: 'appointment',
-      });
-    }
 
     if (status === 'cancelled') {
       if (patient) {

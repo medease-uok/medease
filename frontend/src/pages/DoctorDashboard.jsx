@@ -15,6 +15,7 @@ import { Badge } from '../components/ui/badge';
 import PatientQueue from '../components/PatientQueue';
 import DoctorScheduleEditor from '../components/DoctorScheduleEditor';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
+import DoctorTaskWidget from '../components/DoctorTaskWidget';
 
 const formatTime = (iso) => {
   const d = new Date(iso);
@@ -26,21 +27,10 @@ const formatDate = (iso) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const formatRelative = (iso) => {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now - d;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  return formatDate(iso);
-};
 
 function StatusBadge({ status }) {
   const config = {
     scheduled: { variant: 'default', label: 'Scheduled' },
-    confirmed: { variant: 'default', label: 'Confirmed' },
     in_progress: { variant: 'warning', label: 'In Progress' },
     completed: { variant: 'success', label: 'Completed' },
     cancelled: { variant: 'destructive', label: 'Cancelled' },
@@ -162,15 +152,15 @@ export default function DoctorDashboard() {
     );
   }
 
-  const { doctorId, stats, todayAppointments, upcomingAppointments, recentPatients, recentPrescriptions } = data;
+  const { doctorId, stats, todayAppointments, upcomingAppointments } = data;
 
   const now = new Date();
   const currentApt = todayAppointments.find((a) => a.status === 'in_progress');
   const nextApt = todayAppointments.find((a) =>
-    ['scheduled', 'confirmed'].includes(a.status) && new Date(a.scheduledAt) > now
+    a.status === 'scheduled' && new Date(a.scheduledAt) > now
   );
   const readyToStart = todayAppointments.find((a) =>
-    ['scheduled', 'confirmed'].includes(a.status) && new Date(a.scheduledAt) <= now
+    a.status === 'scheduled' && new Date(a.scheduledAt) <= now
   );
 
   return (
@@ -412,7 +402,7 @@ export default function DoctorDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {['scheduled', 'confirmed'].includes(apt.status) && new Date(apt.scheduledAt) <= now && (
+                        {apt.status === 'scheduled' && new Date(apt.scheduledAt) <= now && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleStartAppointment(apt.id); }}
                             disabled={loadingApptIds.has(apt.id)}
@@ -429,10 +419,12 @@ export default function DoctorDashboard() {
                             aria-label={`Complete appointment with ${apt.patientName}`}
                             className="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100 disabled:opacity-50 transition-colors"
                           >
-                            {loadingApptIds.has(apt.id) ? 'Completing...' : 'Complete'}
+                            {loadingApptIds.has(apt.id) ? 'Completing...' : 'Mark Complete'}
                           </button>
                         )}
-                        <StatusBadge status={apt.status} />
+                        {!(apt.status === 'scheduled' && new Date(apt.scheduledAt) <= now) && apt.status !== 'in_progress' && (
+                          <StatusBadge status={apt.status} />
+                        )}
                       </div>
                     </div>
                   ))}
@@ -483,8 +475,8 @@ export default function DoctorDashboard() {
         </Card>
       </div>
 
-      {/* Patient Queue + Schedule Editor */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Patient Queue + Schedule Editor + Tasks */}
+      <div className="grid gap-6 lg:grid-cols-3">
         <div ref={patientQueueRef}>
           <PatientQueue isDoctor />
         </div>
@@ -493,92 +485,7 @@ export default function DoctorDashboard() {
             <DoctorScheduleEditor doctorId={doctorId} />
           </div>
         )}
-      </div>
-
-      {/* Bottom Grid: Recent Patients + Recent Prescriptions */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Patients */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-lg">Recent Patients</CardTitle>
-            <button
-              onClick={() => navigate('/patients')}
-              className="text-sm text-primary hover:underline flex items-center gap-1"
-            >
-              View All <ArrowRight className="w-3 h-3" />
-            </button>
-          </CardHeader>
-          <CardContent>
-            {recentPatients.length > 0 ? (
-              <div className="space-y-2">
-                {recentPatients.map((patient) => (
-                  <div
-                    key={patient.patientId}
-                    onClick={() => navigate(`/patients/${patient.patientId}`)}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center text-xs font-semibold text-green-700">
-                        {patient.patientName.split(' ').map((n) => n[0]).join('')}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm text-slate-900">{patient.patientName}</p>
-                        <p className="text-xs text-slate-500">Last visit: {formatRelative(patient.lastVisit)}</p>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-400">
-                <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No recent patients</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Prescriptions */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-lg">Recent Prescriptions</CardTitle>
-            <button
-              onClick={() => navigate('/prescriptions')}
-              className="text-sm text-primary hover:underline flex items-center gap-1"
-            >
-              View All <ArrowRight className="w-3 h-3" />
-            </button>
-          </CardHeader>
-          <CardContent>
-            {recentPrescriptions.length > 0 ? (
-              <div className="space-y-2">
-                {recentPrescriptions.map((rx) => (
-                  <div
-                    key={rx.id}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center">
-                        <Pill className="w-4 h-4 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm text-slate-900">{rx.medication}</p>
-                        <p className="text-xs text-slate-500">{rx.patientName} &middot; {rx.dosage}, {rx.frequency}</p>
-                      </div>
-                    </div>
-                    <StatusBadge status={rx.status} />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-400">
-                <Pill className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No recent prescriptions</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <DoctorTaskWidget />
       </div>
 
       {/* Appointment Detail Modal */}

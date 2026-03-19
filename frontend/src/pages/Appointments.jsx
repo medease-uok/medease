@@ -12,7 +12,6 @@ import ScheduleCalendar from './ScheduleCalendar';
 
 const STATUS_STYLES = {
   scheduled: { variant: 'default', label: 'Scheduled' },
-  confirmed: { variant: 'default', label: 'Confirmed' },
   in_progress: { variant: 'warning', label: 'In Progress' },
   completed: { variant: 'success', label: 'Completed' },
   cancelled: { variant: 'destructive', label: 'Cancelled' },

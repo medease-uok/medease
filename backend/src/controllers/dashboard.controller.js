@@ -191,11 +191,11 @@ const getStats = async (req, res, next) => {
          LIMIT $${limitIdx}`,
         [...filterParams, TODAY_LIMIT]
       ),
-      // Upcoming: future dates only (excludes today), scheduled or confirmed
+      // Upcoming: future dates only (excludes today), scheduled
       db.query(
         `${baseRecent}
          WHERE DATE(a.scheduled_at) > CURRENT_DATE
-           AND a.status IN ('scheduled', 'confirmed')
+           AND a.status = 'scheduled'
            ${roleFilter}
          ORDER BY a.scheduled_at ASC
          LIMIT $${limitIdx}`,
@@ -457,12 +457,12 @@ const getDoctorDashboard = async (req, res, next) => {
     const [statsResult, todayAptsResult, upcomingAptsResult, recentPatientsResult, recentRxResult] = await Promise.all([
       db.query(`
         SELECT
-          (SELECT COUNT(*) FROM appointments a WHERE a.doctor_id = $1 AND a.status IN ('scheduled', 'confirmed', 'in_progress') AND DATE(a.scheduled_at) = CURRENT_DATE) AS today_appointments,
+          (SELECT COUNT(*) FROM appointments a WHERE a.doctor_id = $1 AND a.status IN ('scheduled', 'in_progress') AND DATE(a.scheduled_at) = CURRENT_DATE) AS today_appointments,
           (SELECT COUNT(*) FROM appointments a WHERE a.doctor_id = $1 AND a.status = 'completed' AND DATE(a.scheduled_at) = CURRENT_DATE) AS completed_today,
           (SELECT COUNT(DISTINCT a.patient_id) FROM appointments a WHERE a.doctor_id = $1) AS total_patients,
           (SELECT COUNT(*) FROM prescriptions WHERE doctor_id = $1 AND status = 'active') AS active_prescriptions,
           (SELECT COUNT(*) FROM medical_records WHERE doctor_id = $1) AS total_records,
-          (SELECT COUNT(*) FROM appointments a WHERE a.doctor_id = $1 AND a.status IN ('scheduled', 'confirmed') AND a.scheduled_at > NOW()) AS upcoming_count
+          (SELECT COUNT(*) FROM appointments a WHERE a.doctor_id = $1 AND a.status = 'scheduled' AND a.scheduled_at > NOW()) AS upcoming_count
       `, [doctorId]),
 
       db.query(`

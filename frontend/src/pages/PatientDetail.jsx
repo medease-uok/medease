@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Upload, X, AlertCircle, Eye, Loader2, Download, ExternalLink,
-  Plus, FileText, FlaskConical, Pill, ChevronLeft, CheckCircle2,
+  Plus, FileText, FlaskConical, Pill, ChevronLeft, CheckCircle2, Star,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -589,6 +589,7 @@ export default function PatientDetail() {
   const [activeAppointment, setActiveAppointment] = useState(null);
   const [completingAppt, setCompletingAppt] = useState(false);
   const [initialRecordCount, setInitialRecordCount] = useState(null);
+  const [feedback, setFeedback] = useState([]);
 
   const fetchPatient = useCallback(() => {
     api.get(`/patients/${id}`)
@@ -628,6 +629,18 @@ export default function PatientDetail() {
   }, [id, isDoctor]);
 
   useEffect(() => { fetchLabRequests(); }, [fetchLabRequests]);
+
+  // Fetch patient feedback for this patient (doctor view)
+  const fetchFeedback = useCallback(() => {
+    if (!isDoctor) return;
+    api.get('/patient-feedback')
+      .then((res) => {
+        setFeedback((res.data || []).filter((f) => String(f.patientId) === String(id)));
+      })
+      .catch(() => {});
+  }, [id, isDoctor]);
+
+  useEffect(() => { fetchFeedback(); }, [fetchFeedback]);
 
   // Fetch active (in_progress) appointment for this patient
   const fetchActiveAppointment = useCallback(() => {
@@ -733,8 +746,8 @@ export default function PatientDetail() {
         />
       )}
 
-      {/* Doctor Quick Actions */}
-      {isDoctor && (
+      {/* Doctor Quick Actions (only during active appointment) */}
+      {isDoctor && activeAppointment && (
         <div className="flex items-center gap-3 my-6">
           <button
             onClick={() => setShowAddRecord(true)}
@@ -783,7 +796,7 @@ export default function PatientDetail() {
         <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
           <h3>Medical Records ({records.length})</h3>
           <div className="flex items-center gap-2">
-            {isDoctor && (
+            {isDoctor && activeAppointment && (
               <button
                 onClick={() => setShowAddRecord(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
@@ -818,7 +831,7 @@ export default function PatientDetail() {
         <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
           <h3>Prescriptions ({rxs.length})</h3>
           <div className="flex items-center gap-2">
-            {isDoctor && (
+            {isDoctor && activeAppointment && (
               <button
                 onClick={() => setShowAddRx(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
@@ -853,7 +866,7 @@ export default function PatientDetail() {
         <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
           <h3>Lab Reports ({labs.length})</h3>
           <div className="flex items-center gap-2">
-            {isDoctor && (
+            {isDoctor && activeAppointment && (
               <button
                 onClick={() => setShowLabRequest(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors"
@@ -903,6 +916,50 @@ export default function PatientDetail() {
             ]}
             data={labRequests}
           />
+        </div>
+      )}
+
+      {/* Patient Feedback (Doctor view) */}
+      {isDoctor && feedback.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ marginBottom: 12 }}>Patient Feedback ({feedback.length})</h3>
+          <div className="space-y-3">
+            {feedback.map((fb) => (
+              <div key={fb.id} className="p-4 bg-white border border-slate-200 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`w-4 h-4 ${s <= fb.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`}
+                      />
+                    ))}
+                    <span className="ml-1.5 text-sm font-semibold text-slate-700">{fb.rating}/5</span>
+                  </div>
+                  <span className="text-xs text-slate-400">{formatDate(fb.createdAt)}</span>
+                </div>
+                {(fb.communicationRating || fb.waitTimeRating || fb.treatmentRating) && (
+                  <div className="flex flex-wrap gap-3 mb-2">
+                    {fb.communicationRating && (
+                      <span className="text-xs text-slate-500">Communication: <strong>{fb.communicationRating}/5</strong></span>
+                    )}
+                    {fb.waitTimeRating && (
+                      <span className="text-xs text-slate-500">Wait Time: <strong>{fb.waitTimeRating}/5</strong></span>
+                    )}
+                    {fb.treatmentRating && (
+                      <span className="text-xs text-slate-500">Treatment: <strong>{fb.treatmentRating}/5</strong></span>
+                    )}
+                  </div>
+                )}
+                {fb.comment && (
+                  <p className="text-sm text-slate-600 italic">"{fb.comment}"</p>
+                )}
+                {fb.isAnonymous && (
+                  <span className="inline-block mt-1 text-xs text-slate-400">Anonymous feedback</span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

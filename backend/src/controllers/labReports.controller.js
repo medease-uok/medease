@@ -91,7 +91,7 @@ const create = async (req, res, next) => {
       `SELECT DISTINCT u.id AS user_id FROM (
         SELECT d.user_id FROM appointments a
         JOIN doctors d ON a.doctor_id = d.id
-        WHERE a.patient_id = $1 AND a.status IN ('scheduled', 'confirmed', 'in_progress')
+        WHERE a.patient_id = $1 AND a.status IN ('scheduled', 'in_progress')
         UNION
         SELECT d.user_id FROM lab_test_requests ltr
         JOIN doctors d ON ltr.doctor_id = d.id

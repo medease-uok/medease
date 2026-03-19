@@ -16,7 +16,6 @@ function QueueStatusBadge({ status }) {
   const config = {
     in_progress: { variant: 'warning', label: 'Being Seen' },
     scheduled: { variant: 'default', label: 'Waiting' },
-    confirmed: { variant: 'success', label: 'Checked In' },
   };
   const c = config[status] || { variant: 'default', label: status };
   return <Badge variant={c.variant}>{c.label}</Badge>;
