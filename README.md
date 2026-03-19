@@ -14,6 +14,10 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 
 - Appointment scheduling with real-time doctor availability
 - Electronic medical records, prescriptions, and lab reports
+- Digital structured prescriptions with multi-medicine line items
+- Handwritten prescription photo uploads (JPEG, PNG, WebP, PDF) stored in S3
+- Medicine catalogue search with category and form filtering
+- Doctor prescription templates for reusable medication sets
 - Vaccination records and chronic condition tracking
 - Medical document management (S3-backed with presigned URLs)
 - Prescription refill requests with doctor approval workflow
