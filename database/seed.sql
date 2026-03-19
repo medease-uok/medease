@@ -564,4 +564,41 @@ INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_a
   ('dc000000-0000-0000-0000-000000000004', 4, '08:00', '17:00', false),
   ('dc000000-0000-0000-0000-000000000004', 5, '08:00', '17:00', false);
 
+-- ============================================
+-- PRESCRIPTION TEMPLATES (doctor-specific reusable templates)
+-- ============================================
+
+INSERT INTO prescription_templates (id, doctor_id, name, description) VALUES
+  ('f1000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', 'Hypertension Standard', 'Standard first-line treatment for essential hypertension'),
+  ('f1000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000001', 'Cardiac Post-MI', 'Post-myocardial infarction maintenance therapy'),
+  ('f1000000-0000-0000-0000-000000000003', 'dc000000-0000-0000-0000-000000000002', 'Migraine Prophylaxis', 'Prophylactic treatment for chronic migraine'),
+  ('f1000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000003', 'Musculoskeletal Pain', 'Standard pain management for MSK injuries'),
+  ('f1000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004', 'Iron Deficiency Anemia', 'Standard iron supplementation protocol');
+
+INSERT INTO prescription_template_items (template_id, medication, dosage, frequency, duration, instructions, sort_order) VALUES
+  -- Hypertension Standard
+  ('f1000000-0000-0000-0000-000000000001', 'Amlodipine', '5mg', 'Once daily', '3 months', 'Take in the morning', 0),
+  ('f1000000-0000-0000-0000-000000000001', 'Losartan', '50mg', 'Once daily', '3 months', 'Monitor blood pressure weekly', 1),
+  ('f1000000-0000-0000-0000-000000000001', 'Aspirin', '75mg', 'Once daily', 'Ongoing', 'Take after breakfast', 2),
+
+  -- Cardiac Post-MI
+  ('f1000000-0000-0000-0000-000000000002', 'Aspirin', '75mg', 'Once daily', 'Ongoing', 'Do not stop without medical advice', 0),
+  ('f1000000-0000-0000-0000-000000000002', 'Clopidogrel', '75mg', 'Once daily', '1 year', 'Dual antiplatelet therapy', 1),
+  ('f1000000-0000-0000-0000-000000000002', 'Atorvastatin', '40mg', 'Once daily', 'Ongoing', 'Take at bedtime', 2),
+  ('f1000000-0000-0000-0000-000000000002', 'Metoprolol', '50mg', 'Twice daily', 'Ongoing', 'Do not stop abruptly', 3),
+
+  -- Migraine Prophylaxis
+  ('f1000000-0000-0000-0000-000000000003', 'Amitriptyline', '25mg', 'At bedtime', '3 months', 'Start with 10mg, increase to 25mg after 1 week', 0),
+  ('f1000000-0000-0000-0000-000000000003', 'Sumatriptan', '50mg', 'As needed', 'Ongoing', 'Max 2 tablets per day. Not for prophylaxis.', 1),
+
+  -- Musculoskeletal Pain
+  ('f1000000-0000-0000-0000-000000000004', 'Ibuprofen', '400mg', 'Three times daily', '2 weeks', 'Take after meals', 0),
+  ('f1000000-0000-0000-0000-000000000004', 'Omeprazole', '20mg', 'Once daily', '2 weeks', 'Gastric protection while on NSAIDs', 1),
+  ('f1000000-0000-0000-0000-000000000004', 'Paracetamol', '500mg', 'As needed', '2 weeks', 'Max 4g per day. Use between NSAID doses.', 2),
+
+  -- Iron Deficiency Anemia
+  ('f1000000-0000-0000-0000-000000000005', 'Ferrous Sulfate', '200mg', 'Twice daily', '3 months', 'Take on empty stomach with vitamin C', 0),
+  ('f1000000-0000-0000-0000-000000000005', 'Folic Acid', '5mg', 'Once daily', '3 months', 'Supports red blood cell production', 1),
+  ('f1000000-0000-0000-0000-000000000005', 'Vitamin C', '500mg', 'Once daily', '3 months', 'Enhances iron absorption', 2);
+
 COMMIT;

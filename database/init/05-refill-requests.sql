@@ -21,10 +21,8 @@ CREATE INDEX idx_refill_requests_status ON prescription_refill_requests(status);
 
 GRANT ALL PRIVILEGES ON TABLE prescription_refill_requests TO medease_app;
 
--- Add notification types for refill requests
-ALTER TYPE notification_type ADD VALUE 'refill_requested';
-ALTER TYPE notification_type ADD VALUE 'refill_approved';
-ALTER TYPE notification_type ADD VALUE 'refill_denied';
+-- Note: refill notification types (refill_requested, refill_approved, refill_denied)
+-- are defined in 04-notifications.sql
 
 -- New permissions
 INSERT INTO permissions (name, description, category) VALUES
