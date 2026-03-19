@@ -25,6 +25,7 @@ import ScheduleCalendar from './pages/ScheduleCalendar';
 import DoctorDashboard from './pages/DoctorDashboard';
 import MyRecords from './pages/MyRecords';
 import StaffRecords from './pages/StaffRecords';
+import PatientSatisfaction from './pages/PatientSatisfaction';
 import './App.css';
 
 const R = ({ roles, children }) => <RoleGuard roles={roles}>{children}</RoleGuard>;
@@ -66,6 +67,7 @@ function App() {
             <Route path="documents" element={<R roles={ROLE_GROUPS.PATIENT_CARE.concat(ROLES.LAB_TECHNICIAN)}><MedicalDocuments /></R>} />
             <Route path="vaccinations" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><Vaccinations /></R>} />
             <Route path="chronic-conditions" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><ChronicConditions /></R>} />
+            <Route path="patient-satisfaction" element={<R roles={[ROLES.DOCTOR, ROLES.ADMIN]}><PatientSatisfaction /></R>} />
             <Route path="permissions" element={<R roles={[ROLES.ADMIN]}><PermissionManagement /></R>} />
             <Route path="admin" element={<DashboardRedirect />} />
           </Route>
