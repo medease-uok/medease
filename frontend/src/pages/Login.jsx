@@ -33,7 +33,7 @@ export default function Login() {
       setStep('otp');
       setError('');
     } else if (result.success) {
-      navigate('/dashboard');
+      navigate('/');
     } else if (result.reason === 'unverified') {
       setError('Please verify your email address before logging in. Check your inbox.');
     } else if (result.reason === 'pending') {
@@ -55,7 +55,7 @@ export default function Login() {
     setLoading(false);
 
     if (result.success) {
-      navigate('/dashboard');
+      navigate('/');
     } else {
       setError(result.error || 'Invalid verification code.');
     }
