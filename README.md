@@ -14,12 +14,15 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 
 - Appointment scheduling with real-time doctor availability
 - Electronic medical records, prescriptions, and lab reports
+- Digital structured prescriptions with multi-medicine line items
+- Handwritten prescription photo uploads (JPEG, PNG, WebP, PDF) stored in S3
+- Medicine catalogue search with category and form filtering
+- Doctor prescription templates for reusable medication sets
 - Vaccination records and chronic condition tracking
 - Medical document management (S3-backed with presigned URLs)
 - Prescription refill requests with doctor approval workflow
 - PDF generation for medical records and prescriptions
 - Role-Based Access Control (RBAC) with 26 permissions across 6 roles
-- Attribute-Based Access Control (ABAC) for resource-level filtering
 - Email verification, multi-step login with OTP, and password reset
 - Real-time in-app notifications
 - Profile image uploads with cropping
