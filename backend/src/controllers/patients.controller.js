@@ -781,7 +781,7 @@ const getStatistics = async (req, res, next) => {
         SELECT
           COUNT(*) AS total_appointments,
           COUNT(*) FILTER (WHERE a.status = 'completed') AS completed,
-          COUNT(*) FILTER (WHERE a.status IN ('scheduled', 'confirmed')) AS upcoming,
+          COUNT(*) FILTER (WHERE a.status = 'scheduled') AS upcoming,
           COUNT(*) FILTER (WHERE a.status = 'cancelled') AS cancelled,
           COUNT(DISTINCT a.doctor_id) AS total_doctors
         FROM appointments a

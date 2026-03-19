@@ -39,7 +39,7 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
     }
   }
 
-  const canCancel = appointment && ['scheduled', 'confirmed'].includes(appointment.status)
+  const canCancel = appointment && appointment.status === 'scheduled'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>

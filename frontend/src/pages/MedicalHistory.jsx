@@ -72,7 +72,6 @@ const matchesSearch = (event, query) => {
 function StatusBadge({ status }) {
   const variants = {
     scheduled: 'default',
-    confirmed: 'default',
     in_progress: 'warning',
     completed: 'success',
     cancelled: 'destructive',

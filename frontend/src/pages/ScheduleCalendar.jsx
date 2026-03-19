@@ -10,7 +10,6 @@ import AppointmentDetailModal from '../components/AppointmentDetailModal'
 
 const STATUS_COLORS = {
   scheduled:   { bg: 'bg-blue-100',   text: 'text-blue-800',   border: 'border-blue-200',   dot: 'bg-blue-500' },
-  confirmed:   { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-200', dot: 'bg-indigo-500' },
   in_progress: { bg: 'bg-amber-100',  text: 'text-amber-800',  border: 'border-amber-200',  dot: 'bg-amber-500' },
   completed:   { bg: 'bg-green-100',  text: 'text-green-800',  border: 'border-green-200',  dot: 'bg-green-500' },
   cancelled:   { bg: 'bg-red-50',     text: 'text-red-400',    border: 'border-red-200',    dot: 'bg-red-400' },
@@ -18,7 +17,7 @@ const STATUS_COLORS = {
 }
 
 const STATUS_LABELS = {
-  scheduled: 'Scheduled', confirmed: 'Confirmed', in_progress: 'In Progress',
+  scheduled: 'Scheduled', in_progress: 'In Progress',
   completed: 'Completed', cancelled: 'Cancelled', no_show: 'No Show',
 }
 

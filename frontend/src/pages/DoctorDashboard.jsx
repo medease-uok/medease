@@ -31,7 +31,6 @@ const formatDate = (iso) => {
 function StatusBadge({ status }) {
   const config = {
     scheduled: { variant: 'default', label: 'Scheduled' },
-    confirmed: { variant: 'default', label: 'Confirmed' },
     in_progress: { variant: 'warning', label: 'In Progress' },
     completed: { variant: 'success', label: 'Completed' },
     cancelled: { variant: 'destructive', label: 'Cancelled' },
@@ -158,10 +157,10 @@ export default function DoctorDashboard() {
   const now = new Date();
   const currentApt = todayAppointments.find((a) => a.status === 'in_progress');
   const nextApt = todayAppointments.find((a) =>
-    ['scheduled', 'confirmed'].includes(a.status) && new Date(a.scheduledAt) > now
+    a.status === 'scheduled' && new Date(a.scheduledAt) > now
   );
   const readyToStart = todayAppointments.find((a) =>
-    ['scheduled', 'confirmed'].includes(a.status) && new Date(a.scheduledAt) <= now
+    a.status === 'scheduled' && new Date(a.scheduledAt) <= now
   );
 
   return (
@@ -403,7 +402,7 @@ export default function DoctorDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {['scheduled', 'confirmed'].includes(apt.status) && new Date(apt.scheduledAt) <= now && (
+                        {apt.status === 'scheduled' && new Date(apt.scheduledAt) <= now && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleStartAppointment(apt.id); }}
                             disabled={loadingApptIds.has(apt.id)}
@@ -423,7 +422,7 @@ export default function DoctorDashboard() {
                             {loadingApptIds.has(apt.id) ? 'Completing...' : 'Mark Complete'}
                           </button>
                         )}
-                        {!(['scheduled', 'confirmed'].includes(apt.status) && new Date(apt.scheduledAt) <= now) && apt.status !== 'in_progress' && (
+                        {!(apt.status === 'scheduled' && new Date(apt.scheduledAt) <= now) && apt.status !== 'in_progress' && (
                           <StatusBadge status={apt.status} />
                         )}
                       </div>

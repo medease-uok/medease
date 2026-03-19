@@ -3,7 +3,6 @@ import { Badge } from './ui/badge';
 
 const statusVariants = {
   scheduled: 'default',
-  confirmed: 'success',
   in_progress: 'warning',
   completed: 'success',
   cancelled: 'destructive',

@@ -180,8 +180,8 @@ INSERT INTO appointments (patient_id, doctor_id, scheduled_at, status, notes) VA
   ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000002', (CURRENT_DATE - INTERVAL '10 days') + TIME '15:30', 'completed', 'Neurological assessment. All clear.'),
 
   -- Confirmed appointments (upcoming, with specific clinic hours)
-  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE + INTERVAL '2 days') + TIME '09:30', 'confirmed', 'First cardiac consultation.'),
-  ('ce000000-0000-0000-0000-000000000006', 'dc000000-0000-0000-0000-000000000003', (CURRENT_DATE + INTERVAL '3 days') + TIME '14:00', 'confirmed', 'Sports injury follow-up.'),
+  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE + INTERVAL '2 days') + TIME '09:30', 'scheduled', 'First cardiac consultation.'),
+  ('ce000000-0000-0000-0000-000000000006', 'dc000000-0000-0000-0000-000000000003', (CURRENT_DATE + INTERVAL '3 days') + TIME '14:00', 'scheduled', 'Sports injury follow-up.'),
 
   -- Scheduled appointments (upcoming, with specific clinic hours)
   ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', (CURRENT_DATE + INTERVAL '5 days') + TIME '10:00', 'scheduled', 'MRI results review.'),
@@ -208,11 +208,11 @@ INSERT INTO appointments (patient_id, doctor_id, scheduled_at, status, notes) VA
   ('ce000000-0000-0000-0000-000000000014', 'dc000000-0000-0000-0000-000000000006', (CURRENT_DATE - INTERVAL '3 days') + TIME '14:30', 'completed', 'Prenatal checkup. All vitals normal.'),
 
   -- Upcoming appointments for new patients
-  ('ce000000-0000-0000-0000-000000000007', 'dc000000-0000-0000-0000-000000000005', (CURRENT_DATE + INTERVAL '4 days') + TIME '09:00', 'confirmed', 'Dermatology follow-up for eczema.'),
+  ('ce000000-0000-0000-0000-000000000007', 'dc000000-0000-0000-0000-000000000005', (CURRENT_DATE + INTERVAL '4 days') + TIME '09:00', 'scheduled', 'Dermatology follow-up for eczema.'),
   ('ce000000-0000-0000-0000-000000000009', 'dc000000-0000-0000-0000-000000000007', (CURRENT_DATE + INTERVAL '6 days') + TIME '08:00', 'scheduled', 'Post-surgery follow-up.'),
   ('ce000000-0000-0000-0000-000000000010', 'dc000000-0000-0000-0000-000000000008', (CURRENT_DATE + INTERVAL '8 days') + TIME '11:00', 'scheduled', 'Follow-up counseling session.'),
   ('ce000000-0000-0000-0000-000000000011', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE + INTERVAL '10 days') + TIME '09:30', 'scheduled', 'Cardiac follow-up.'),
-  ('ce000000-0000-0000-0000-000000000013', 'dc000000-0000-0000-0000-000000000002', (CURRENT_DATE + INTERVAL '12 days') + TIME '10:00', 'confirmed', 'Migraine treatment review.'),
+  ('ce000000-0000-0000-0000-000000000013', 'dc000000-0000-0000-0000-000000000002', (CURRENT_DATE + INTERVAL '12 days') + TIME '10:00', 'scheduled', 'Migraine treatment review.'),
 
   -- Today's appointments for new doctors
   ('ce000000-0000-0000-0000-000000000008', 'dc000000-0000-0000-0000-000000000005', CURRENT_DATE + TIME '09:00', 'completed', 'Morning dermatology consultation completed.'),
@@ -234,10 +234,10 @@ INSERT INTO appointments (patient_id, doctor_id, scheduled_at, status, notes) VA
   ('ce000000-0000-0000-0000-000000000020', 'dc000000-0000-0000-0000-000000000011', (CURRENT_DATE - INTERVAL '6 days') + TIME '10:00', 'completed', 'Asthma assessment and management plan.'),
 
   -- More upcoming appointments
-  ('ce000000-0000-0000-0000-000000000015', 'dc000000-0000-0000-0000-000000000011', (CURRENT_DATE + INTERVAL '3 days') + TIME '10:30', 'confirmed', 'COPD follow-up with spirometry.'),
+  ('ce000000-0000-0000-0000-000000000015', 'dc000000-0000-0000-0000-000000000011', (CURRENT_DATE + INTERVAL '3 days') + TIME '10:30', 'scheduled', 'COPD follow-up with spirometry.'),
   ('ce000000-0000-0000-0000-000000000016', 'dc000000-0000-0000-0000-000000000012', (CURRENT_DATE + INTERVAL '5 days') + TIME '09:30', 'scheduled', 'Thyroid results review.'),
   ('ce000000-0000-0000-0000-000000000017', 'dc000000-0000-0000-0000-000000000009', (CURRENT_DATE + INTERVAL '9 days') + TIME '11:00', 'scheduled', 'ENT follow-up.'),
-  ('ce000000-0000-0000-0000-000000000018', 'dc000000-0000-0000-0000-000000000008', (CURRENT_DATE + INTERVAL '7 days') + TIME '10:00', 'confirmed', 'Follow-up counseling session.'),
+  ('ce000000-0000-0000-0000-000000000018', 'dc000000-0000-0000-0000-000000000008', (CURRENT_DATE + INTERVAL '7 days') + TIME '10:00', 'scheduled', 'Follow-up counseling session.'),
   ('ce000000-0000-0000-0000-000000000019', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE + INTERVAL '11 days') + TIME '08:30', 'scheduled', 'Quarterly cardiac monitoring.'),
   ('ce000000-0000-0000-0000-000000000020', 'dc000000-0000-0000-0000-000000000006', (CURRENT_DATE + INTERVAL '15 days') + TIME '14:30', 'scheduled', 'PCOS follow-up and hormone levels.'),
 
@@ -248,7 +248,7 @@ INSERT INTO appointments (patient_id, doctor_id, scheduled_at, status, notes) VA
 
   -- Malith de Silva (gastroenterology via General Surgery)
   ('ce000000-0000-0000-0000-000000000021', 'dc000000-0000-0000-0000-000000000007', (CURRENT_DATE - INTERVAL '17 days') + TIME '09:30', 'completed', 'Epigastric pain evaluation. Endoscopy recommended.'),
-  ('ce000000-0000-0000-0000-000000000021', 'dc000000-0000-0000-0000-000000000007', (CURRENT_DATE + INTERVAL '4 days') + TIME '09:30', 'confirmed', 'Post-endoscopy follow-up.'),
+  ('ce000000-0000-0000-0000-000000000021', 'dc000000-0000-0000-0000-000000000007', (CURRENT_DATE + INTERVAL '4 days') + TIME '09:30', 'scheduled', 'Post-endoscopy follow-up.'),
 
   -- Hiruni Rathnayake (ophthalmology + dermatology)
   ('ce000000-0000-0000-0000-000000000022', 'dc000000-0000-0000-0000-000000000010', (CURRENT_DATE - INTERVAL '14 days') + TIME '10:00', 'completed', 'Diabetic retinopathy screening.'),
@@ -267,12 +267,12 @@ INSERT INTO appointments (patient_id, doctor_id, scheduled_at, status, notes) VA
   -- Roshan Gunawardena (cardiology + ENT)
   ('ce000000-0000-0000-0000-000000000025', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE - INTERVAL '18 days') + TIME '09:00', 'completed', 'Post-MI cardiac rehabilitation check.'),
   ('ce000000-0000-0000-0000-000000000025', 'dc000000-0000-0000-0000-000000000009', (CURRENT_DATE - INTERVAL '7 days') + TIME '15:00', 'completed', 'Hearing loss assessment.'),
-  ('ce000000-0000-0000-0000-000000000025', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE + INTERVAL '12 days') + TIME '09:00', 'confirmed', 'Cardiac stress test follow-up.'),
+  ('ce000000-0000-0000-0000-000000000025', 'dc000000-0000-0000-0000-000000000001', (CURRENT_DATE + INTERVAL '12 days') + TIME '09:00', 'scheduled', 'Cardiac stress test follow-up.'),
 
   -- Imalka Jayathilaka (psychiatry + neurology)
   ('ce000000-0000-0000-0000-000000000026', 'dc000000-0000-0000-0000-000000000008', (CURRENT_DATE - INTERVAL '15 days') + TIME '10:00', 'completed', 'Depression initial assessment.'),
   ('ce000000-0000-0000-0000-000000000026', 'dc000000-0000-0000-0000-000000000002', (CURRENT_DATE - INTERVAL '5 days') + TIME '11:30', 'completed', 'Neurological screening for headaches.'),
-  ('ce000000-0000-0000-0000-000000000026', 'dc000000-0000-0000-0000-000000000008', (CURRENT_DATE + INTERVAL '6 days') + TIME '10:00', 'confirmed', 'Follow-up therapy session.'),
+  ('ce000000-0000-0000-0000-000000000026', 'dc000000-0000-0000-0000-000000000008', (CURRENT_DATE + INTERVAL '6 days') + TIME '10:00', 'scheduled', 'Follow-up therapy session.'),
 
   -- Dilan Wijetunga (orthopedics + general surgery)
   ('ce000000-0000-0000-0000-000000000027', 'dc000000-0000-0000-0000-000000000003', (CURRENT_DATE - INTERVAL '12 days') + TIME '14:00', 'completed', 'Lower back pain with sciatica evaluation.'),
@@ -286,7 +286,7 @@ INSERT INTO appointments (patient_id, doctor_id, scheduled_at, status, notes) VA
   -- Chamika Pathirana (pulmonology + endocrinology)
   ('ce000000-0000-0000-0000-000000000029', 'dc000000-0000-0000-0000-000000000011', (CURRENT_DATE - INTERVAL '16 days') + TIME '09:30', 'completed', 'Obstructive sleep apnea evaluation.'),
   ('ce000000-0000-0000-0000-000000000029', 'dc000000-0000-0000-0000-000000000012', (CURRENT_DATE - INTERVAL '8 days') + TIME '11:00', 'completed', 'Metabolic syndrome assessment.'),
-  ('ce000000-0000-0000-0000-000000000029', 'dc000000-0000-0000-0000-000000000011', (CURRENT_DATE + INTERVAL '5 days') + TIME '09:30', 'confirmed', 'Sleep study results review.'),
+  ('ce000000-0000-0000-0000-000000000029', 'dc000000-0000-0000-0000-000000000011', (CURRENT_DATE + INTERVAL '5 days') + TIME '09:30', 'scheduled', 'Sleep study results review.'),
 
   -- Thisari Weerasekara (neurology + ophthalmology)
   ('ce000000-0000-0000-0000-000000000030', 'dc000000-0000-0000-0000-000000000002', (CURRENT_DATE - INTERVAL '9 days') + TIME '10:00', 'completed', 'Epilepsy medication review.'),
@@ -605,7 +605,7 @@ UPDATE users SET email_verified = TRUE WHERE email LIKE '%@medease.com';
 INSERT INTO notifications (recipient_id, type, title, message, is_read, reference_id, reference_type, created_at) VALUES
   -- Patient Sarah Fernando: appointment and medical record notifications
   ('c0000000-0000-0000-0000-000000000001', 'appointment_scheduled', 'Appointment Scheduled', 'Your appointment with Dr. Kamal Perera has been scheduled.', true, NULL, 'appointment', NOW() - INTERVAL '31 days'),
-  ('c0000000-0000-0000-0000-000000000001', 'appointment_confirmed', 'Appointment Confirmed', 'Your appointment with Dr. Kamal Perera has been confirmed.', true, NULL, 'appointment', NOW() - INTERVAL '30 days'),
+  ('c0000000-0000-0000-0000-000000000001', 'appointment_scheduled', 'Appointment Scheduled', 'Your appointment with Dr. Kamal Perera has been scheduled.', true, NULL, 'appointment', NOW() - INTERVAL '30 days'),
   ('c0000000-0000-0000-0000-000000000001', 'medical_record_created', 'New Medical Record', 'Dr. Kamal Perera added a new record: Mild hypertension (Stage 1).', true, NULL, 'medical_record', NOW() - INTERVAL '29 days'),
   ('c0000000-0000-0000-0000-000000000001', 'prescription_created', 'New Prescription', 'Dr. Kamal Perera prescribed Amlodipine 5mg.', true, NULL, 'prescription', NOW() - INTERVAL '29 days'),
   ('c0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'Your Complete Blood Count (CBC) results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
@@ -614,7 +614,7 @@ INSERT INTO notifications (recipient_id, type, title, message, is_read, referenc
   ('c0000000-0000-0000-0000-000000000001', 'refill_approved', 'Refill Approved', 'Your refill request for Amlodipine has been approved.', true, NULL, 'refill_request', NOW() - INTERVAL '15 days'),
 
   -- Patient Dinesh Rajapaksa: neurology notifications
-  ('c0000000-0000-0000-0000-000000000002', 'appointment_confirmed', 'Appointment Confirmed', 'Your appointment with Dr. Sithara Silva has been confirmed.', true, NULL, 'appointment', NOW() - INTERVAL '26 days'),
+  ('c0000000-0000-0000-0000-000000000002', 'appointment_scheduled', 'Appointment Scheduled', 'Your appointment with Dr. Sithara Silva has been scheduled.', true, NULL, 'appointment', NOW() - INTERVAL '26 days'),
   ('c0000000-0000-0000-0000-000000000002', 'medical_record_created', 'New Medical Record', 'Dr. Sithara Silva added a new record: Tension-type headache.', true, NULL, 'medical_record', NOW() - INTERVAL '24 days'),
   ('c0000000-0000-0000-0000-000000000002', 'lab_report_ready', 'Lab Report Ready', 'Your MRI Brain results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '22 days'),
   ('c0000000-0000-0000-0000-000000000002', 'prescription_dispensed', 'Prescription Dispensed', 'Your Paracetamol 500mg prescription has been dispensed.', false, NULL, 'prescription', NOW() - INTERVAL '20 days'),
@@ -637,13 +637,13 @@ INSERT INTO notifications (recipient_id, type, title, message, is_read, referenc
   ('c0000000-0000-0000-0000-000000000005', 'lab_report_ready', 'Lab Report Ready', 'Your Serum Ferritin results are now available.', true, NULL, 'lab_report', NOW() - INTERVAL '9 days'),
   ('c0000000-0000-0000-0000-000000000005', 'medical_record_created', 'New Medical Record', 'Dr. Anjali Dissanayake added a new record: Iron deficiency anemia.', false, NULL, 'medical_record', NOW() - INTERVAL '8 days'),
   ('c0000000-0000-0000-0000-000000000005', 'prescription_created', 'New Prescription', 'Dr. Anjali Dissanayake prescribed Ferrous Sulfate 200mg.', false, NULL, 'prescription', NOW() - INTERVAL '8 days'),
-  ('c0000000-0000-0000-0000-000000000005', 'appointment_confirmed', 'Appointment Confirmed', 'Your appointment with Dr. Kamal Perera has been confirmed.', false, NULL, 'appointment', NOW() - INTERVAL '1 day'),
+  ('c0000000-0000-0000-0000-000000000005', 'appointment_scheduled', 'Appointment Scheduled', 'Your appointment with Dr. Kamal Perera has been scheduled.', false, NULL, 'appointment', NOW() - INTERVAL '1 day'),
   ('c0000000-0000-0000-0000-000000000005', 'appointment_cancelled', 'Appointment Cancelled', 'Your appointment with Dr. Anjali Dissanayake has been cancelled.', true, NULL, 'appointment', NOW() - INTERVAL '5 days'),
 
   -- Patient Lahiru Gunasekara: sports injury notifications
   ('c0000000-0000-0000-0000-000000000006', 'lab_report_ready', 'Lab Report Ready', 'Your MRI Left Knee results are now available.', false, NULL, 'lab_report', NOW() - INTERVAL '5 days'),
   ('c0000000-0000-0000-0000-000000000006', 'medical_record_created', 'New Medical Record', 'Dr. Ruwan Fernando added a new record: ACL sprain (Grade 2).', false, NULL, 'medical_record', NOW() - INTERVAL '4 days'),
-  ('c0000000-0000-0000-0000-000000000006', 'appointment_confirmed', 'Appointment Confirmed', 'Your follow-up with Dr. Ruwan Fernando has been confirmed.', false, NULL, 'appointment', NOW() - INTERVAL '1 day'),
+  ('c0000000-0000-0000-0000-000000000006', 'appointment_scheduled', 'Appointment Scheduled', 'Your follow-up with Dr. Ruwan Fernando has been scheduled.', false, NULL, 'appointment', NOW() - INTERVAL '1 day'),
 
   -- Doctor Kamal Perera: lab report + refill notifications
   ('d0000000-0000-0000-0000-000000000001', 'lab_report_ready', 'Lab Report Ready', 'CBC results for Sarah Fernando are available.', true, NULL, 'lab_report', NOW() - INTERVAL '28 days'),
@@ -1372,8 +1372,8 @@ INSERT INTO notifications (recipient_id, type, title, message, is_read, referenc
   ('c0000000-0000-0000-0000-000000000019', 'lab_test_requested', 'Lab Test Ordered', 'Dr. Malsha Kulathunga has ordered an urgent HbA1c + Fasting Glucose test.', false, 'lab_test_request', NOW() - INTERVAL '1 day'),
   ('c0000000-0000-0000-0000-000000000016', 'lab_test_requested', 'Lab Test Ordered', 'Dr. Chamari Wijesundara has ordered a Visual Field Test for you.', false, 'lab_test_request', NOW() - INTERVAL '30 minutes'),
   -- Appointment notifications for new patients
-  ('c0000000-0000-0000-0000-000000000015', 'appointment_confirmed', 'Appointment Confirmed', 'Your follow-up with Dr. Asanka Pathirana has been confirmed.', false, 'appointment', NOW() - INTERVAL '1 day'),
-  ('c0000000-0000-0000-0000-000000000018', 'appointment_confirmed', 'Appointment Confirmed', 'Your counseling session with Dr. Dilini Senanayake has been confirmed.', false, 'appointment', NOW() - INTERVAL '1 day'),
+  ('c0000000-0000-0000-0000-000000000015', 'appointment_scheduled', 'Appointment Scheduled', 'Your follow-up with Dr. Asanka Pathirana has been scheduled.', false, 'appointment', NOW() - INTERVAL '1 day'),
+  ('c0000000-0000-0000-0000-000000000018', 'appointment_scheduled', 'Appointment Scheduled', 'Your counseling session with Dr. Dilini Senanayake has been scheduled.', false, 'appointment', NOW() - INTERVAL '1 day'),
   ('c0000000-0000-0000-0000-000000000019', 'medical_record_created', 'New Medical Record', 'Dr. Malsha Kulathunga added a new record: Type 2 Diabetes Mellitus (poorly controlled).', false, 'medical_record', NOW() - INTERVAL '8 days'),
   ('c0000000-0000-0000-0000-000000000020', 'prescription_created', 'New Prescription', 'Dr. Nimasha Gunaratne prescribed Combined OCP (Yasmin).', false, 'prescription', NOW() - INTERVAL '12 days');
 
