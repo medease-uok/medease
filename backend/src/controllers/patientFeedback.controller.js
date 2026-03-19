@@ -260,7 +260,7 @@ const create = async (req, res, next) => {
       message: `You received a ${rating}-star rating from ${isAnonymous ? 'an anonymous patient' : 'a patient'}.`,
       referenceId: result.rows[0].id,
       referenceType: 'feedback',
-    }).catch((err) => console.error('Failed to notify doctor:', err.message))
+    }).catch((err) => console.error('Failed to notify doctor:', err))
 
     await auditLog({
       userId: req.user.id,

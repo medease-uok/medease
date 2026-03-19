@@ -111,7 +111,7 @@ const create = async (req, res, next) => {
           })
         )
       )
-    ).catch((err) => console.error('Failed to notify doctors:', err.message));
+    ).catch((err) => console.error('Failed to notify doctors:', err));
 
     await auditLog({ userId: req.user.id, action: 'CREATE_LAB_REPORT', resourceType: 'lab_report', resourceId: insertResult.rows[0].id, ip: req.ip, details: { patientId, testName } });
 
@@ -149,7 +149,7 @@ const update = async (req, res, next) => {
             referenceType: 'lab_report',
           });
         }
-      }).catch((err) => console.error('Failed to notify patient:', err.message));
+      }).catch((err) => console.error('Failed to notify patient:', err));
     }
 
     await auditLog({ userId: req.user.id, action: 'UPDATE_LAB_REPORT', resourceType: 'lab_report', resourceId: id, ip: req.ip });

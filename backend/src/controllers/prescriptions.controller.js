@@ -217,7 +217,7 @@ const create = async (req, res, next) => {
             )
           )
         )
-        .catch((err) => console.error('Failed to notify pharmacists:', err.message))
+        .catch((err) => console.error('Failed to notify pharmacists:', err))
 
       await auditLog({
         userId: req.user.id,
@@ -334,7 +334,7 @@ const create = async (req, res, next) => {
             )
           )
         )
-        .catch((err) => console.error('Failed to notify pharmacists:', err.message))
+        .catch((err) => console.error('Failed to notify pharmacists:', err))
 
       await auditLog({
         userId: req.user.id,

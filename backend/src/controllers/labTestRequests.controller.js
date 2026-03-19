@@ -7,22 +7,28 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const VALID_STATUSES = ['pending', 'in_progress', 'completed', 'cancelled']
 const VALID_PRIORITIES = ['urgent', 'normal', 'routine']
 
-const mapRequest = (row) => ({
-  id: row.id,
-  patientId: row.patient_id,
-  patientName: row.patient_name || 'Unknown',
-  doctorId: row.doctor_id,
-  doctorName: row.doctor_name || 'Unknown',
-  testName: row.test_name,
-  priority: row.priority,
-  clinicalNotes: row.clinical_notes,
-  status: row.status,
-  assignedTo: row.assigned_to,
-  assignedToName: row.assigned_to_name,
-  labReportId: row.lab_report_id,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-})
+const mapRequest = (row, role) => {
+  const base = {
+    id: row.id,
+    patientId: row.patient_id,
+    patientName: row.patient_name || 'Unknown',
+    doctorId: row.doctor_id,
+    doctorName: row.doctor_name || 'Unknown',
+    testName: row.test_name,
+    priority: row.priority,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+  // Only staff roles see internal fields
+  if (role !== 'patient') {
+    base.clinicalNotes = row.clinical_notes
+    base.assignedTo = row.assigned_to
+    base.assignedToName = row.assigned_to_name
+    base.labReportId = row.lab_report_id
+  }
+  return base
+}
 
 const getAll = async (req, res, next) => {
   try {
@@ -82,7 +88,7 @@ const getAll = async (req, res, next) => {
       params
     )
 
-    res.json({ status: 'success', data: result.rows.map(mapRequest) })
+    res.json({ status: 'success', data: result.rows.map((row) => mapRequest(row, role)) })
   } catch (err) {
     return next(err)
   }
@@ -109,6 +115,10 @@ const create = async (req, res, next) => {
 
     if (priority && !VALID_PRIORITIES.includes(priority)) {
       throw new AppError(`priority must be one of: ${VALID_PRIORITIES.join(', ')}`, 400)
+    }
+
+    if (clinicalNotes && clinicalNotes.trim().length > 1000) {
+      throw new AppError('clinicalNotes must not exceed 1000 characters.', 400)
     }
 
     // Verify patient exists
@@ -142,7 +152,7 @@ const create = async (req, res, next) => {
       message: `${docName} has ordered a ${testName} test for you.`,
       referenceId: result.rows[0].id,
       referenceType: 'lab_test_request',
-    }).catch((err) => console.error('Failed to notify patient:', err.message))
+    }).catch((err) => console.error('Failed to notify patient:', err))
 
     // Notify all lab technicians
     db.query(`SELECT id FROM users WHERE role = 'lab_technician' AND is_active = true`)
@@ -160,7 +170,7 @@ const create = async (req, res, next) => {
           )
         )
       )
-      .catch((err) => console.error('Failed to notify lab technicians:', err.message))
+      .catch((err) => console.error('Failed to notify lab technicians:', err))
 
     await auditLog({
       userId: req.user.id,
@@ -197,8 +207,17 @@ const updateStatus = async (req, res, next) => {
       throw new AppError(`status must be one of: ${VALID_STATUSES.join(', ')}`, 400)
     }
 
-    if (assignedTo && !UUID_RE.test(assignedTo)) {
-      throw new AppError('assignedTo must be a valid UUID.', 400)
+    if (assignedTo) {
+      if (!UUID_RE.test(assignedTo)) {
+        throw new AppError('assignedTo must be a valid UUID.', 400)
+      }
+      const techCheck = await db.query(
+        `SELECT id FROM users WHERE id = $1 AND role = 'lab_technician' AND is_active = true`,
+        [assignedTo]
+      )
+      if (techCheck.rows.length === 0) {
+        throw new AppError('assignedTo must be an active lab technician.', 400)
+      }
     }
 
     if (labReportId && !UUID_RE.test(labReportId)) {
@@ -206,7 +225,7 @@ const updateStatus = async (req, res, next) => {
     }
 
     const existing = await db.query(
-      `SELECT r.id, r.patient_id, r.doctor_id, r.test_name, r.status,
+      `SELECT r.id, r.patient_id, r.doctor_id, r.test_name, r.status, r.assigned_to,
               p.user_id AS patient_user_id, du.id AS doctor_user_id
        FROM lab_test_requests r
        JOIN patients p ON r.patient_id = p.id
@@ -269,7 +288,7 @@ const updateStatus = async (req, res, next) => {
         message: `Your ${request.test_name} test is now being processed.`,
         referenceId: id,
         referenceType: 'lab_test_request',
-      }).catch((err) => console.error('Failed to notify patient:', err.message))
+      }).catch((err) => console.error('Failed to notify patient:', err))
     } else if (status === 'completed') {
       Promise.all([
         createNotification({
@@ -288,7 +307,7 @@ const updateStatus = async (req, res, next) => {
           referenceId: id,
           referenceType: 'lab_test_request',
         }),
-      ]).catch((err) => console.error('Failed to notify on completion:', err.message))
+      ]).catch((err) => console.error('Failed to notify on completion:', err))
     }
 
     await auditLog({
