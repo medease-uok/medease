@@ -201,6 +201,24 @@ const create = async (req, res, next) => {
         referenceType: 'prescription',
       })
 
+      // Notify all active pharmacists
+      db.query(`SELECT id FROM users WHERE role = 'pharmacist' AND is_active = true`)
+        .then((pharmacists) =>
+          Promise.all(
+            pharmacists.rows.map((ph) =>
+              createNotification({
+                recipientId: ph.id,
+                type: 'prescription_created',
+                title: 'New Prescription',
+                message: `${docName} prescribed a handwritten prescription for ${patient.first_name} ${patient.last_name}.`,
+                referenceId: result.rows[0].id,
+                referenceType: 'prescription',
+              })
+            )
+          )
+        )
+        .catch((err) => console.error('Failed to notify pharmacists:', err))
+
       await auditLog({
         userId: req.user.id,
         action: 'CREATE_PRESCRIPTION',
@@ -299,6 +317,24 @@ const create = async (req, res, next) => {
         referenceId: prescriptionId,
         referenceType: 'prescription',
       })
+
+      // Notify all active pharmacists
+      db.query(`SELECT id FROM users WHERE role = 'pharmacist' AND is_active = true`)
+        .then((pharmacists) =>
+          Promise.all(
+            pharmacists.rows.map((ph) =>
+              createNotification({
+                recipientId: ph.id,
+                type: 'prescription_created',
+                title: 'New Prescription',
+                message: `${docName} prescribed ${medList} for ${patient.first_name} ${patient.last_name}.`,
+                referenceId: prescriptionId,
+                referenceType: 'prescription',
+              })
+            )
+          )
+        )
+        .catch((err) => console.error('Failed to notify pharmacists:', err))
 
       await auditLog({
         userId: req.user.id,

@@ -121,14 +121,14 @@ INSERT INTO appointments (patient_id, doctor_id, scheduled_at, status, notes) VA
 -- ============================================
 
 INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes) VALUES
-  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', 'Mild hypertension (Stage 1)', 'Prescribed Amlodipine 5mg daily. Lifestyle modifications recommended.', 'Patient advised to reduce sodium intake, exercise 30 min/day. Follow-up in 3 months.'),
-  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', 'Tension-type headache', 'Prescribed Paracetamol 500mg as needed. Stress management recommended.', 'MRI brain normal. No neurological deficits. Likely stress-related.'),
-  ('ce000000-0000-0000-0000-000000000003', 'dc000000-0000-0000-0000-000000000003', 'Patellofemoral pain syndrome', 'Physical therapy 2x/week for 6 weeks. NSAIDs for pain management.', 'X-ray shows no fracture. Likely overuse injury. Avoid strenuous activity.'),
-  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001', 'Atrial fibrillation', 'Prescribed Warfarin 5mg daily. Monthly INR monitoring required.', 'ECG confirmed AF. Echocardiogram shows normal ejection fraction. Referral to anticoagulation clinic.'),
-  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000002', 'Peripheral neuropathy', 'Gabapentin 300mg twice daily. Vitamin B12 supplementation.', 'Nerve conduction study shows mild sensory neuropathy. HbA1c elevated - refer to endocrinology.'),
-  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000002', 'Normal neurological examination', 'No treatment required.', 'Routine neurological screen. All reflexes normal. No further action needed.'),
-  ('ce000000-0000-0000-0000-000000000006', 'dc000000-0000-0000-0000-000000000003', 'ACL sprain (Grade 2)', 'Knee brace, rest, ice. Physical therapy after 2 weeks.', 'Sports injury during cricket match. MRI confirms partial ACL tear. No surgery needed at this stage.'),
-  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004', 'Iron deficiency anemia', 'Ferrous sulfate 200mg twice daily. Dietary counseling provided.', 'Hemoglobin 9.2 g/dL. Serum ferritin low. Repeat CBC in 6 weeks.');
+  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', 'Mild hypertension (Stage 1)', 'Lifestyle modifications: reduce sodium intake, increase potassium-rich foods. Exercise 30 min/day, 5 days/week. Monitor BP daily at home. Follow-up in 3 months.', 'BP reading 142/92 mmHg. No signs of end-organ damage. BMI 27.3 — weight management recommended.'),
+  ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', 'Tension-type headache', 'Stress management: regular sleep schedule, relaxation techniques. Limit screen time to 8 hours. Ergonomic workspace assessment recommended. Keep headache diary.', 'MRI brain normal. No neurological deficits. Likely stress-related. Triggers: poor sleep, prolonged screen use.'),
+  ('ce000000-0000-0000-0000-000000000003', 'dc000000-0000-0000-0000-000000000003', 'Patellofemoral pain syndrome', 'Physical therapy 2x/week for 6 weeks. RICE protocol (Rest, Ice, Compression, Elevation). Avoid strenuous activity and deep squats. Gradually return to normal activity after 4 weeks.', 'X-ray shows no fracture. Likely overuse injury from athletics. Crepitus noted on knee flexion.'),
+  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001', 'Atrial fibrillation', 'Monthly INR monitoring required (target 2.0-3.0). Referral to anticoagulation clinic. Avoid excessive alcohol and caffeine. Regular cardiac follow-up every 2 months.', 'ECG confirmed AF with controlled ventricular rate. Echocardiogram shows normal ejection fraction (55%). CHA2DS2-VASc score: 2.'),
+  ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000002', 'Peripheral neuropathy', 'Refer to endocrinology for diabetes management. Annual nerve conduction study. Foot care education: daily inspection, proper footwear. Report any new numbness or tingling.', 'Nerve conduction study shows mild sensory neuropathy in bilateral lower limbs. HbA1c 7.8% — glycemic control needs improvement.'),
+  ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000002', 'Normal neurological examination', 'No treatment required. Annual neurological screen recommended. Continue current health maintenance.', 'Routine neurological screen. All cranial nerves intact. Reflexes normal. No focal deficits. Motor and sensory examination normal.'),
+  ('ce000000-0000-0000-0000-000000000006', 'dc000000-0000-0000-0000-000000000003', 'ACL sprain (Grade 2)', 'Knee brace for 4-6 weeks. RICE protocol. Physical therapy starting after 2 weeks. Avoid contact sports for 3 months. Gradual return to cricket with protective gear.', 'Sports injury during cricket match. MRI confirms partial ACL tear. No meniscal damage. Conservative management appropriate — surgery not indicated at this stage.'),
+  ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004', 'Iron deficiency anemia', 'Dietary counseling: increase iron-rich foods (spinach, lentils, red meat). Take iron with vitamin C for better absorption. Avoid tea/coffee with meals. Repeat CBC in 6 weeks.', 'Hemoglobin 9.2 g/dL. Serum ferritin 8 ng/mL. MCV 72 fL (microcytic). No signs of GI bleeding. Menstrual history — heavy periods reported.');
 
 -- ============================================
 -- PRESCRIPTIONS (mixed statuses)
@@ -224,43 +224,10 @@ WHERE rx.medication = 'Ferrous Sulfate' AND rx.status = 'active'
 LIMIT 1;
 
 -- ============================================
--- Mark all seeded users as email-verified (they are test accounts)
+-- Mark all seeded users as email-verified
 -- ============================================
 
-UPDATE users SET email_verified = TRUE
-WHERE id IN (
-  'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002',
-  'd0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002',
-  'd0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000004',
-  'e0000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000002',
-  'e0000000-0000-0000-0000-000000000003',
-  '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002',
-  'b0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000002',
-  'c0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002',
-  'c0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000004',
-  'c0000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000006'
-);
-
--- ============================================
--- AUDIT LOGS
--- ============================================
-
-INSERT INTO audit_logs (user_id, action, resource_type, resource_id, ip_address, success) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '192.168.1.10', true),
-  ('d0000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '192.168.1.20', true),
-  ('d0000000-0000-0000-0000-000000000001', 'VIEW', 'patient', 'ce000000-0000-0000-0000-000000000001', '192.168.1.20', true),
-  ('d0000000-0000-0000-0000-000000000001', 'CREATE', 'medical_record', NULL, '192.168.1.20', true),
-  ('d0000000-0000-0000-0000-000000000001', 'CREATE', 'prescription', NULL, '192.168.1.20', true),
-  ('d0000000-0000-0000-0000-000000000002', 'LOGIN', 'session', NULL, '192.168.1.21', true),
-  ('d0000000-0000-0000-0000-000000000002', 'VIEW', 'patient', 'ce000000-0000-0000-0000-000000000002', '192.168.1.21', true),
-  ('10000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '192.168.1.30', true),
-  ('10000000-0000-0000-0000-000000000001', 'CREATE', 'lab_report', NULL, '192.168.1.30', true),
-  ('b0000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '192.168.1.40', true),
-  ('b0000000-0000-0000-0000-000000000001', 'UPDATE', 'prescription', NULL, '192.168.1.40', true),
-  ('c0000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '10.0.0.50', true),
-  ('c0000000-0000-0000-0000-000000000001', 'VIEW', 'appointment', NULL, '10.0.0.50', true),
-  ('c0000000-0000-0000-0000-000000000003', 'LOGIN', 'session', NULL, '10.0.0.51', false),
-  ('a0000000-0000-0000-0000-000000000001', 'UPDATE', 'user', 'd0000000-0000-0000-0000-000000000004', '192.168.1.10', true);
+UPDATE users SET email_verified = TRUE WHERE email LIKE '%@medease.com';
 
 -- ============================================
 -- NOTIFICATIONS (sample notifications for seeded users)
@@ -384,9 +351,7 @@ INSERT INTO medical_documents (patient_id, uploaded_by, category, title, descrip
    'medical-documents/ce000000-0000-0000-0000-000000000005/seed-derm-referral.pdf',
    'Dermatology_Referral.pdf', 102400, 'application/pdf', NOW() - INTERVAL '5 days'),
 
-  -- ---- One document per patient per category for medical_record, prescription, lab_report ----
-
-  -- Sarah Fernando (ce...001) - 1 medical_record, 1 prescription, 1 lab_report
+  -- Sarah Fernando — additional document categories
   ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'medical_record',
    'Hypertension Diagnosis Notes', 'Scanned clinical notes from Stage 1 hypertension diagnosis.',
    'medical-documents/ce000000-0000-0000-0000-000000000001/seed-hypertension-notes.pdf',
@@ -500,64 +465,58 @@ INSERT INTO prescriptions (patient_id, doctor_id, medication, dosage, frequency,
 INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes, chronic_condition_id) VALUES
   -- Sarah: Asthma diagnosis
   ('ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001',
-   'Bronchial Asthma (moderate persistent)', 'Inhaler therapy: Salbutamol PRN + Fluticasone BD. Trigger avoidance counseling.',
-   'Spirometry: FEV1 78% predicted. Reversibility test positive. Peak flow diary initiated.',
+   'Bronchial Asthma (moderate persistent)', 'Trigger avoidance counseling: avoid dust, smoke, cold air. Peak flow diary to be maintained daily. Annual spirometry review. Flu vaccination recommended annually.',
+   'Spirometry: FEV1 78% predicted. Reversibility test positive (+15%). No wheeze at rest. Good inhaler technique demonstrated.',
    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000001' AND condition_name = 'Asthma')),
 
   -- Dinesh: Type 2 Diabetes diagnosis
   ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002',
-   'Type 2 Diabetes Mellitus', 'Started Metformin 500mg BD, Gliclazide 80mg OD. Diabetic diet plan provided.',
-   'FBS 186 mg/dL. HbA1c 8.1%. Referred for diabetic eye screening and foot assessment.',
+   'Type 2 Diabetes Mellitus', 'Diabetic diet plan provided. Refer for diabetic eye screening and foot assessment. Self-monitor blood glucose twice daily. HbA1c target <7%. Quarterly follow-up.',
+   'FBS 186 mg/dL. HbA1c 8.1%. BMI 29.4. No diabetic retinopathy on fundoscopy. Peripheral pulses intact.',
    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000002' AND condition_name = 'Type 2 Diabetes Mellitus')),
 
   -- Dinesh: Essential Hypertension diagnosis
   ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002',
-   'Essential Hypertension (Stage 2)', 'Started Amlodipine 5mg + Losartan 50mg. Lifestyle modifications: low-salt diet, regular exercise.',
-   'BP 158/96 on 3 separate readings. Renal function normal. ECG shows no LVH.',
+   'Essential Hypertension (Stage 2)', 'Lifestyle modifications: DASH diet, reduce sodium to <2g/day, regular aerobic exercise 150 min/week. Home BP monitoring twice daily. Monthly clinic review.',
+   'BP 158/96 on 3 separate readings. Renal function normal (eGFR 95). ECG shows no LVH. Fundoscopy: no hypertensive retinopathy.',
    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000002' AND condition_name = 'Essential Hypertension')),
 
   -- Nuwan: Chronic Low Back Pain diagnosis
   ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001',
-   'Chronic Low Back Pain (L4-L5 disc protrusion)', 'Physiotherapy referral. NSAIDs for pain. PPI cover for gastroprotection.',
-   'MRI lumbar spine: L4-L5 posterolateral disc protrusion with mild nerve root compression. No cauda equina symptoms.',
+   'Chronic Low Back Pain (L4-L5 disc protrusion)', 'Physiotherapy referral: core strengthening and McKenzie exercises. Ergonomic workplace assessment. Avoid heavy lifting >10kg. Hot pack application for pain relief. Review in 6 weeks.',
+   'MRI lumbar spine: L4-L5 posterolateral disc protrusion with mild nerve root compression. Straight leg raise positive at 60 degrees. No cauda equina symptoms. Power 5/5 all muscle groups.',
    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000004' AND condition_name = 'Chronic Low Back Pain')),
 
   -- Hasini: Migraine diagnosis
   ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004',
-   'Migraine without Aura (episodic)', 'Abortive: Sumatriptan 50mg PRN. Prophylaxis: Propranolol 40mg BD. Trigger diary initiated.',
-   'Headache frequency 4/month, duration 8-12 hours. CT brain normal. Meets ICHD-3 criteria for migraine without aura.',
+   'Migraine without Aura (episodic)', 'Trigger diary to identify patterns. Sleep hygiene: regular schedule, 7-8 hours/night. Adequate hydration (2L/day). Stress management techniques. Avoid known dietary triggers. Follow-up in 4 weeks.',
+   'Headache frequency 4/month, duration 8-12 hours. CT brain normal. Meets ICHD-3 criteria for migraine without aura. No papilledema. Neurological exam normal.',
    (SELECT id FROM chronic_conditions WHERE patient_id = 'ce000000-0000-0000-0000-000000000005' AND condition_name = 'Migraine without Aura'));
 
 -- ============================================
 -- DOCTOR SCHEDULES (Mon-Fri 08:00-17:00)
 -- ============================================
 
--- Dr. Kamal Perera (Cardiology)
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  -- Dr. Kamal Perera (Cardiology)
   ('dc000000-0000-0000-0000-000000000001', 1, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000001', 2, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000001', 3, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000001', 4, '08:00', '17:00', true),
-  ('dc000000-0000-0000-0000-000000000001', 5, '08:00', '17:00', true);
-
--- Dr. Sithara Silva (Neurology)
-INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000001', 5, '08:00', '17:00', true),
+  -- Dr. Sithara Silva (Neurology)
   ('dc000000-0000-0000-0000-000000000002', 1, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000002', 2, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000002', 3, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000002', 4, '08:00', '17:00', true),
-  ('dc000000-0000-0000-0000-000000000002', 5, '08:00', '17:00', true);
-
--- Dr. Ruwan Fernando (Orthopedics)
-INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000002', 5, '08:00', '17:00', true),
+  -- Dr. Ruwan Fernando (Orthopedics)
   ('dc000000-0000-0000-0000-000000000003', 1, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000003', 2, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000003', 3, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000003', 4, '08:00', '17:00', true),
-  ('dc000000-0000-0000-0000-000000000003', 5, '08:00', '17:00', true);
-
--- Dr. Anjali Dissanayake (Pediatrics) — inactive (doctor not available)
-INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000003', 5, '08:00', '17:00', true),
+  -- Dr. Anjali Dissanayake (Pediatrics) — inactive
   ('dc000000-0000-0000-0000-000000000004', 1, '08:00', '17:00', false),
   ('dc000000-0000-0000-0000-000000000004', 2, '08:00', '17:00', false),
   ('dc000000-0000-0000-0000-000000000004', 3, '08:00', '17:00', false),
@@ -600,5 +559,122 @@ INSERT INTO prescription_template_items (template_id, medication, dosage, freque
   ('f1000000-0000-0000-0000-000000000005', 'Ferrous Sulfate', '200mg', 'Twice daily', '3 months', 'Take on empty stomach with vitamin C', 0),
   ('f1000000-0000-0000-0000-000000000005', 'Folic Acid', '5mg', 'Once daily', '3 months', 'Supports red blood cell production', 1),
   ('f1000000-0000-0000-0000-000000000005', 'Vitamin C', '500mg', 'Once daily', '3 months', 'Enhances iron absorption', 2);
+
+-- ============================================
+-- PATIENT FEEDBACK (satisfaction ratings)
+-- ============================================
+
+-- Sarah Fernando rated Dr. Kamal Perera (Cardiology) — completed appointment 30 days ago
+INSERT INTO patient_feedback (patient_id, doctor_id, appointment_id, rating, communication_rating, wait_time_rating, treatment_rating, comment, is_anonymous, created_at)
+SELECT 'ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001', a.id,
+       5, 5, 4, 5, 'Dr. Perera was very thorough and explained my condition clearly. Excellent cardiac care.', false, NOW() - INTERVAL '29 days'
+FROM appointments a WHERE a.patient_id = 'ce000000-0000-0000-0000-000000000001' AND a.doctor_id = 'dc000000-0000-0000-0000-000000000001' AND a.status = 'completed' LIMIT 1;
+
+-- Dinesh Rajapaksa rated Dr. Sithara Silva (Neurology) — completed appointment 25 days ago
+INSERT INTO patient_feedback (patient_id, doctor_id, appointment_id, rating, communication_rating, wait_time_rating, treatment_rating, comment, is_anonymous, created_at)
+SELECT 'ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002', a.id,
+       4, 4, 3, 5, 'Good neurological assessment. Wait time was a bit long but the consultation was thorough.', false, NOW() - INTERVAL '24 days'
+FROM appointments a WHERE a.patient_id = 'ce000000-0000-0000-0000-000000000002' AND a.doctor_id = 'dc000000-0000-0000-0000-000000000002' AND a.status = 'completed' LIMIT 1;
+
+-- Kavindi Weerasinghe rated Dr. Ruwan Fernando (Orthopedics) — completed appointment 20 days ago
+INSERT INTO patient_feedback (patient_id, doctor_id, appointment_id, rating, communication_rating, wait_time_rating, treatment_rating, comment, is_anonymous, created_at)
+SELECT 'ce000000-0000-0000-0000-000000000003', 'dc000000-0000-0000-0000-000000000003', a.id,
+       5, 5, 5, 5, 'Dr. Fernando was fantastic. He explained my knee injury very clearly and the physical therapy plan is working well.', false, NOW() - INTERVAL '19 days'
+FROM appointments a WHERE a.patient_id = 'ce000000-0000-0000-0000-000000000003' AND a.doctor_id = 'dc000000-0000-0000-0000-000000000003' AND a.status = 'completed' LIMIT 1;
+
+-- Nuwan Jayasuriya rated Dr. Kamal Perera (Cardiology) — completed appointment 15 days ago
+INSERT INTO patient_feedback (patient_id, doctor_id, appointment_id, rating, communication_rating, wait_time_rating, treatment_rating, comment, is_anonymous, created_at)
+SELECT 'ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001', a.id,
+       4, 5, 3, 4, 'Dr. Perera managed my AF well. Had to wait 30 minutes but the consultation was worth it.', false, NOW() - INTERVAL '14 days'
+FROM appointments a WHERE a.patient_id = 'ce000000-0000-0000-0000-000000000004' AND a.doctor_id = 'dc000000-0000-0000-0000-000000000001' AND a.status = 'completed' LIMIT 1;
+
+-- Nuwan Jayasuriya rated Dr. Sithara Silva (Neurology) — anonymous
+INSERT INTO patient_feedback (patient_id, doctor_id, rating, communication_rating, wait_time_rating, treatment_rating, comment, is_anonymous, created_at)
+VALUES ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000002',
+        3, 3, 2, 4, 'The treatment was good but I had to wait over an hour for my appointment.', true, NOW() - INTERVAL '11 days');
+
+-- Sarah Fernando rated Dr. Sithara Silva (Neurology) — completed appointment 10 days ago
+INSERT INTO patient_feedback (patient_id, doctor_id, appointment_id, rating, communication_rating, wait_time_rating, treatment_rating, comment, is_anonymous, created_at)
+SELECT 'ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000002', a.id,
+       5, 5, 4, 5, 'Very professional neurological screening. Everything was explained well.', false, NOW() - INTERVAL '9 days'
+FROM appointments a WHERE a.patient_id = 'ce000000-0000-0000-0000-000000000001' AND a.doctor_id = 'dc000000-0000-0000-0000-000000000002' AND a.status = 'completed' LIMIT 1;
+
+-- Hasini Abeywickrama rated Dr. Anjali Dissanayake (Pediatrics)
+INSERT INTO patient_feedback (patient_id, doctor_id, rating, communication_rating, wait_time_rating, treatment_rating, comment, is_anonymous, created_at)
+VALUES ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004',
+        4, 5, 4, 4, 'Dr. Dissanayake was very caring and patient. Good follow-up on my anemia treatment.', false, NOW() - INTERVAL '7 days');
+
+-- Lahiru Gunasekara rated Dr. Ruwan Fernando (Orthopedics)
+INSERT INTO patient_feedback (patient_id, doctor_id, rating, communication_rating, wait_time_rating, treatment_rating, comment, is_anonymous, created_at)
+VALUES ('ce000000-0000-0000-0000-000000000006', 'dc000000-0000-0000-0000-000000000003',
+        5, 5, 5, 5, 'Excellent sports injury care. Dr. Fernando understood my concerns about returning to cricket.', false, NOW() - INTERVAL '4 days');
+
+-- ============================================
+-- LAB TEST REQUESTS (doctor-initiated)
+-- ============================================
+
+-- Dr. Kamal Perera requests INR follow-up for Nuwan Jayasuriya (completed — linked to existing lab report)
+INSERT INTO lab_test_requests (patient_id, doctor_id, test_name, priority, clinical_notes, status, assigned_to, created_at, updated_at)
+VALUES ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001',
+        'INR (Prothrombin Time)', 'normal', 'Monthly INR monitoring for Warfarin therapy. Target range 2.0-3.0.',
+        'completed', '10000000-0000-0000-0000-000000000001', NOW() - INTERVAL '8 days', NOW() - INTERVAL '7 days');
+
+-- Dr. Sithara Silva requests MRI for Dinesh Rajapaksa (completed)
+INSERT INTO lab_test_requests (patient_id, doctor_id, test_name, priority, clinical_notes, status, assigned_to, created_at, updated_at)
+VALUES ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002',
+        'MRI Brain', 'normal', 'Follow-up for recurring headaches. Previous MRI was normal, recheck after 6 months.',
+        'completed', '10000000-0000-0000-0000-000000000001', NOW() - INTERVAL '25 days', NOW() - INTERVAL '22 days');
+
+-- Dr. Anjali Dissanayake requests CBC for Hasini Abeywickrama (in_progress)
+INSERT INTO lab_test_requests (patient_id, doctor_id, test_name, priority, clinical_notes, status, assigned_to, created_at, updated_at)
+VALUES ('ce000000-0000-0000-0000-000000000005', 'dc000000-0000-0000-0000-000000000004',
+        'Complete Blood Count (CBC)', 'normal', 'Follow-up CBC to check hemoglobin improvement after 6 weeks of iron supplementation.',
+        'in_progress', '10000000-0000-0000-0000-000000000002', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day');
+
+-- Dr. Kamal Perera requests Echocardiogram for Nuwan Jayasuriya (pending)
+INSERT INTO lab_test_requests (patient_id, doctor_id, test_name, priority, clinical_notes, status, created_at)
+VALUES ('ce000000-0000-0000-0000-000000000004', 'dc000000-0000-0000-0000-000000000001',
+        'Echocardiogram', 'normal', 'Annual cardiac assessment. Check ejection fraction and valve function.',
+        'pending', NOW() - INTERVAL '1 day');
+
+-- Dr. Ruwan Fernando requests MRI knee for Lahiru Gunasekara (pending, urgent)
+INSERT INTO lab_test_requests (patient_id, doctor_id, test_name, priority, clinical_notes, status, created_at)
+VALUES ('ce000000-0000-0000-0000-000000000006', 'dc000000-0000-0000-0000-000000000003',
+        'MRI Left Knee (Follow-up)', 'urgent', 'Re-evaluate ACL healing progress at 3-month mark. Compare with previous MRI.',
+        'pending', NOW() - INTERVAL '6 hours');
+
+-- Dr. Sithara Silva requests HbA1c for Dinesh Rajapaksa (pending)
+INSERT INTO lab_test_requests (patient_id, doctor_id, test_name, priority, clinical_notes, status, created_at)
+VALUES ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002',
+        'HbA1c', 'normal', 'Quarterly diabetic monitoring. Target HbA1c <7%. Last was 7.2%.',
+        'pending', NOW() - INTERVAL '3 hours');
+
+-- Lab test request notifications (both lab technicians get notified for each pending request)
+INSERT INTO notifications (recipient_id, type, title, message, is_read, reference_type, created_at) VALUES
+  -- Echocardiogram for Nuwan (pending) → patient + both lab techs
+  ('c0000000-0000-0000-0000-000000000004', 'lab_test_requested', 'Lab Test Ordered', 'Dr. Kamal Perera has ordered an Echocardiogram test for you.', false, 'lab_test_request', NOW() - INTERVAL '1 day'),
+  ('10000000-0000-0000-0000-000000000001', 'lab_test_requested', 'New Lab Test Request', 'Dr. Kamal Perera ordered Echocardiogram for Nuwan Jayasuriya.', false, 'lab_test_request', NOW() - INTERVAL '1 day'),
+  ('10000000-0000-0000-0000-000000000002', 'lab_test_requested', 'New Lab Test Request', 'Dr. Kamal Perera ordered Echocardiogram for Nuwan Jayasuriya.', false, 'lab_test_request', NOW() - INTERVAL '1 day'),
+
+  -- MRI Left Knee for Lahiru (pending, urgent) → patient + both lab techs
+  ('c0000000-0000-0000-0000-000000000006', 'lab_test_requested', 'Lab Test Ordered', 'Dr. Ruwan Fernando has ordered a MRI Left Knee (Follow-up) test for you.', false, 'lab_test_request', NOW() - INTERVAL '6 hours'),
+  ('10000000-0000-0000-0000-000000000001', 'lab_test_requested', 'New Lab Test Request', 'Dr. Ruwan Fernando ordered MRI Left Knee (Follow-up) for Lahiru Gunasekara. (URGENT)', false, 'lab_test_request', NOW() - INTERVAL '6 hours'),
+  ('10000000-0000-0000-0000-000000000002', 'lab_test_requested', 'New Lab Test Request', 'Dr. Ruwan Fernando ordered MRI Left Knee (Follow-up) for Lahiru Gunasekara. (URGENT)', false, 'lab_test_request', NOW() - INTERVAL '6 hours'),
+
+  -- HbA1c for Dinesh (pending) → patient + both lab techs
+  ('c0000000-0000-0000-0000-000000000002', 'lab_test_requested', 'Lab Test Ordered', 'Dr. Sithara Silva has ordered a HbA1c test for you.', false, 'lab_test_request', NOW() - INTERVAL '3 hours'),
+  ('10000000-0000-0000-0000-000000000001', 'lab_test_requested', 'New Lab Test Request', 'Dr. Sithara Silva ordered HbA1c for Dinesh Rajapaksa.', false, 'lab_test_request', NOW() - INTERVAL '3 hours'),
+  ('10000000-0000-0000-0000-000000000002', 'lab_test_requested', 'New Lab Test Request', 'Dr. Sithara Silva ordered HbA1c for Dinesh Rajapaksa.', false, 'lab_test_request', NOW() - INTERVAL '3 hours');
+
+-- Feedback notifications for doctors
+INSERT INTO notifications (recipient_id, type, title, message, is_read, reference_type, created_at) VALUES
+  ('d0000000-0000-0000-0000-000000000001', 'feedback_received', 'New Patient Feedback', 'You received a 5-star rating from a patient.', true, 'feedback', NOW() - INTERVAL '29 days'),
+  ('d0000000-0000-0000-0000-000000000002', 'feedback_received', 'New Patient Feedback', 'You received a 4-star rating from a patient.', true, 'feedback', NOW() - INTERVAL '24 days'),
+  ('d0000000-0000-0000-0000-000000000003', 'feedback_received', 'New Patient Feedback', 'You received a 5-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '19 days'),
+  ('d0000000-0000-0000-0000-000000000001', 'feedback_received', 'New Patient Feedback', 'You received a 4-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '14 days'),
+  ('d0000000-0000-0000-0000-000000000002', 'feedback_received', 'New Patient Feedback', 'You received a 3-star rating from an anonymous patient.', false, 'feedback', NOW() - INTERVAL '11 days'),
+  ('d0000000-0000-0000-0000-000000000002', 'feedback_received', 'New Patient Feedback', 'You received a 5-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '9 days'),
+  ('d0000000-0000-0000-0000-000000000004', 'feedback_received', 'New Patient Feedback', 'You received a 4-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '7 days'),
+  ('d0000000-0000-0000-0000-000000000003', 'feedback_received', 'New Patient Feedback', 'You received a 5-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '4 days');
 
 COMMIT;

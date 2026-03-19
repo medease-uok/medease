@@ -86,12 +86,17 @@ const create = async (req, res, next) => {
       referenceType: 'lab_report',
     });
 
+    // Notify doctors with active appointments OR who requested lab tests for this patient
     db.query(
-      `SELECT DISTINCT u.id AS user_id
-       FROM appointments a
-       JOIN doctors d ON a.doctor_id = d.id
-       JOIN users u ON d.user_id = u.id
-       WHERE a.patient_id = $1 AND a.status IN ('scheduled', 'confirmed', 'in_progress')`,
+      `SELECT DISTINCT u.id AS user_id FROM (
+        SELECT d.user_id FROM appointments a
+        JOIN doctors d ON a.doctor_id = d.id
+        WHERE a.patient_id = $1 AND a.status IN ('scheduled', 'confirmed', 'in_progress')
+        UNION
+        SELECT d.user_id FROM lab_test_requests ltr
+        JOIN doctors d ON ltr.doctor_id = d.id
+        WHERE ltr.patient_id = $1 AND ltr.status IN ('pending', 'in_progress')
+      ) sub JOIN users u ON sub.user_id = u.id`,
       [patientId]
     ).then((doctors) =>
       Promise.all(
@@ -106,7 +111,7 @@ const create = async (req, res, next) => {
           })
         )
       )
-    ).catch((err) => console.error('Failed to notify doctors:', err.message));
+    ).catch((err) => console.error('Failed to notify doctors:', err));
 
     await auditLog({ userId: req.user.id, action: 'CREATE_LAB_REPORT', resourceType: 'lab_report', resourceId: insertResult.rows[0].id, ip: req.ip, details: { patientId, testName } });
 
@@ -144,7 +149,7 @@ const update = async (req, res, next) => {
             referenceType: 'lab_report',
           });
         }
-      }).catch((err) => console.error('Failed to notify patient:', err.message));
+      }).catch((err) => console.error('Failed to notify patient:', err));
     }
 
     await auditLog({ userId: req.user.id, action: 'UPDATE_LAB_REPORT', resourceType: 'lab_report', resourceId: id, ip: req.ip });

@@ -19,6 +19,8 @@ const nurseRoutes = require('./nurses.routes');
 const scheduleRoutes = require('./schedules.routes');
 const medicineRoutes = require('./medicines.routes');
 const prescriptionTemplateRoutes = require('./prescriptionTemplates.routes');
+const patientFeedbackRoutes = require('./patientFeedback.routes');
+const labTestRequestRoutes = require('./labTestRequests.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -47,5 +49,7 @@ router.use('/nurses', nurseRoutes);
 router.use('/schedules', scheduleRoutes);
 router.use('/medicines', medicineRoutes);
 router.use('/prescription-templates', prescriptionTemplateRoutes);
+router.use('/patient-feedback', patientFeedbackRoutes);
+router.use('/lab-test-requests', labTestRequestRoutes);
 
 module.exports = router;

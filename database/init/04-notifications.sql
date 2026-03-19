@@ -11,6 +11,8 @@ CREATE TYPE notification_type AS ENUM (
   'refill_approved',
   'refill_denied',
   'document_uploaded',
+  'lab_test_requested',
+  'feedback_received',
   'system'
 );
 
