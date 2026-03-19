@@ -224,43 +224,10 @@ WHERE rx.medication = 'Ferrous Sulfate' AND rx.status = 'active'
 LIMIT 1;
 
 -- ============================================
--- Mark all seeded users as email-verified (they are test accounts)
+-- Mark all seeded users as email-verified
 -- ============================================
 
-UPDATE users SET email_verified = TRUE
-WHERE id IN (
-  'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002',
-  'd0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002',
-  'd0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000004',
-  'e0000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000002',
-  'e0000000-0000-0000-0000-000000000003',
-  '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002',
-  'b0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000002',
-  'c0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002',
-  'c0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000004',
-  'c0000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000006'
-);
-
--- ============================================
--- AUDIT LOGS
--- ============================================
-
-INSERT INTO audit_logs (user_id, action, resource_type, resource_id, ip_address, success) VALUES
-  ('a0000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '192.168.1.10', true),
-  ('d0000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '192.168.1.20', true),
-  ('d0000000-0000-0000-0000-000000000001', 'VIEW', 'patient', 'ce000000-0000-0000-0000-000000000001', '192.168.1.20', true),
-  ('d0000000-0000-0000-0000-000000000001', 'CREATE', 'medical_record', NULL, '192.168.1.20', true),
-  ('d0000000-0000-0000-0000-000000000001', 'CREATE', 'prescription', NULL, '192.168.1.20', true),
-  ('d0000000-0000-0000-0000-000000000002', 'LOGIN', 'session', NULL, '192.168.1.21', true),
-  ('d0000000-0000-0000-0000-000000000002', 'VIEW', 'patient', 'ce000000-0000-0000-0000-000000000002', '192.168.1.21', true),
-  ('10000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '192.168.1.30', true),
-  ('10000000-0000-0000-0000-000000000001', 'CREATE', 'lab_report', NULL, '192.168.1.30', true),
-  ('b0000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '192.168.1.40', true),
-  ('b0000000-0000-0000-0000-000000000001', 'UPDATE', 'prescription', NULL, '192.168.1.40', true),
-  ('c0000000-0000-0000-0000-000000000001', 'LOGIN', 'session', NULL, '10.0.0.50', true),
-  ('c0000000-0000-0000-0000-000000000001', 'VIEW', 'appointment', NULL, '10.0.0.50', true),
-  ('c0000000-0000-0000-0000-000000000003', 'LOGIN', 'session', NULL, '10.0.0.51', false),
-  ('a0000000-0000-0000-0000-000000000001', 'UPDATE', 'user', 'd0000000-0000-0000-0000-000000000004', '192.168.1.10', true);
+UPDATE users SET email_verified = TRUE WHERE email LIKE '%@medease.com';
 
 -- ============================================
 -- NOTIFICATIONS (sample notifications for seeded users)
@@ -384,9 +351,7 @@ INSERT INTO medical_documents (patient_id, uploaded_by, category, title, descrip
    'medical-documents/ce000000-0000-0000-0000-000000000005/seed-derm-referral.pdf',
    'Dermatology_Referral.pdf', 102400, 'application/pdf', NOW() - INTERVAL '5 days'),
 
-  -- ---- One document per patient per category for medical_record, prescription, lab_report ----
-
-  -- Sarah Fernando (ce...001) - 1 medical_record, 1 prescription, 1 lab_report
+  -- Sarah Fernando — additional document categories
   ('ce000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'medical_record',
    'Hypertension Diagnosis Notes', 'Scanned clinical notes from Stage 1 hypertension diagnosis.',
    'medical-documents/ce000000-0000-0000-0000-000000000001/seed-hypertension-notes.pdf',
@@ -532,32 +497,26 @@ INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes,
 -- DOCTOR SCHEDULES (Mon-Fri 08:00-17:00)
 -- ============================================
 
--- Dr. Kamal Perera (Cardiology)
 INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  -- Dr. Kamal Perera (Cardiology)
   ('dc000000-0000-0000-0000-000000000001', 1, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000001', 2, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000001', 3, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000001', 4, '08:00', '17:00', true),
-  ('dc000000-0000-0000-0000-000000000001', 5, '08:00', '17:00', true);
-
--- Dr. Sithara Silva (Neurology)
-INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000001', 5, '08:00', '17:00', true),
+  -- Dr. Sithara Silva (Neurology)
   ('dc000000-0000-0000-0000-000000000002', 1, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000002', 2, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000002', 3, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000002', 4, '08:00', '17:00', true),
-  ('dc000000-0000-0000-0000-000000000002', 5, '08:00', '17:00', true);
-
--- Dr. Ruwan Fernando (Orthopedics)
-INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000002', 5, '08:00', '17:00', true),
+  -- Dr. Ruwan Fernando (Orthopedics)
   ('dc000000-0000-0000-0000-000000000003', 1, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000003', 2, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000003', 3, '08:00', '17:00', true),
   ('dc000000-0000-0000-0000-000000000003', 4, '08:00', '17:00', true),
-  ('dc000000-0000-0000-0000-000000000003', 5, '08:00', '17:00', true);
-
--- Dr. Anjali Dissanayake (Pediatrics) — inactive (doctor not available)
-INSERT INTO doctor_schedules (doctor_id, day_of_week, start_time, end_time, is_active) VALUES
+  ('dc000000-0000-0000-0000-000000000003', 5, '08:00', '17:00', true),
+  -- Dr. Anjali Dissanayake (Pediatrics) — inactive
   ('dc000000-0000-0000-0000-000000000004', 1, '08:00', '17:00', false),
   ('dc000000-0000-0000-0000-000000000004', 2, '08:00', '17:00', false),
   ('dc000000-0000-0000-0000-000000000004', 3, '08:00', '17:00', false),
