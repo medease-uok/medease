@@ -33,7 +33,7 @@ const navConfig = [
   { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: [ROLES.ADMIN] },
   { path: '/patients', label: 'Patients', icon: Users, roles: ROLE_GROUPS.CLINICAL },
   { path: '/permissions', label: 'Permissions', icon: Shield, roles: [ROLES.ADMIN] },
-  { path: '/patient-satisfaction', label: 'Patient Feedback', icon: Star, roles: [ROLES.DOCTOR, ROLES.ADMIN] },
+  { path: '/patient-satisfaction', label: 'Patient Feedback', icon: Star, roles: [ROLES.ADMIN] },
   { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: [ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN] },
   { path: '/records', label: 'Records', icon: FileText, roles: [...ROLE_GROUPS.CLINICAL, ROLES.LAB_TECHNICIAN] },
 ];
