@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Upload, X, AlertCircle, Eye, Loader2, Download, ExternalLink,
-  Plus, FileText, FlaskConical, Pill, ChevronLeft,
+  Plus, FileText, FlaskConical, Pill, ChevronLeft, CheckCircle2,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -586,6 +586,9 @@ export default function PatientDetail() {
   const [showAddRecord, setShowAddRecord] = useState(false);
   const [showAddRx, setShowAddRx] = useState(false);
   const [showLabRequest, setShowLabRequest] = useState(false);
+  const [activeAppointment, setActiveAppointment] = useState(null);
+  const [completingAppt, setCompletingAppt] = useState(false);
+  const [initialRecordCount, setInitialRecordCount] = useState(null);
 
   const fetchPatient = useCallback(() => {
     api.get(`/patients/${id}`)
@@ -595,6 +598,8 @@ export default function PatientDetail() {
         setRecords(res.data.medicalRecords);
         setRxs(res.data.prescriptions);
         setLabs(res.data.labReports);
+        // Capture initial record count on first load
+        setInitialRecordCount((prev) => prev === null ? res.data.medicalRecords.length : prev);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -623,6 +628,35 @@ export default function PatientDetail() {
   }, [id, isDoctor]);
 
   useEffect(() => { fetchLabRequests(); }, [fetchLabRequests]);
+
+  // Fetch active (in_progress) appointment for this patient
+  const fetchActiveAppointment = useCallback(() => {
+    if (!isDoctor) return;
+    api.get('/appointments')
+      .then((res) => {
+        const appts = res.data || [];
+        const active = appts.find(
+          (a) => String(a.patientId) === String(id) && a.status === 'in_progress'
+        );
+        setActiveAppointment(active || null);
+      })
+      .catch(() => {});
+  }, [id, isDoctor]);
+
+  useEffect(() => { fetchActiveAppointment(); }, [fetchActiveAppointment]);
+
+  const handleCompleteAppointment = async () => {
+    if (!activeAppointment) return;
+    setCompletingAppt(true);
+    try {
+      await api.patch(`/appointments/${activeAppointment.id}/status`, { status: 'completed' });
+      setActiveAppointment(null);
+    } catch (err) {
+      console.error('Failed to complete appointment:', err.message);
+    } finally {
+      setCompletingAppt(false);
+    }
+  };
 
   const docsByCategory = (cat) => documents.filter((d) => d.category === cat);
 
@@ -871,6 +905,49 @@ export default function PatientDetail() {
           />
         </div>
       )}
+
+      {/* Complete Appointment Banner */}
+      {isDoctor && activeAppointment && (() => {
+        const hasNewRecord = initialRecordCount !== null && records.length > initialRecordCount;
+        return (
+          <div className={`mt-8 p-5 border rounded-xl flex items-center justify-between ${
+            hasNewRecord
+              ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+              : 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200'
+          }`}>
+            <div>
+              <p className={`font-semibold ${hasNewRecord ? 'text-green-900' : 'text-amber-900'}`}>
+                Appointment In Progress
+              </p>
+              <p className={`text-sm mt-0.5 ${hasNewRecord ? 'text-green-700' : 'text-amber-700'}`}>
+                {hasNewRecord
+                  ? 'Done with this visit? Mark the appointment as completed.'
+                  : 'Please add a medical record before completing this appointment.'}
+              </p>
+            </div>
+            {hasNewRecord ? (
+              <button
+                onClick={handleCompleteAppointment}
+                disabled={completingAppt}
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {completingAppt ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Completing...</>
+                ) : (
+                  <><CheckCircle2 className="w-4 h-4" /> Complete Appointment</>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowAddRecord(true)}
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors shadow-sm"
+              >
+                <FileText className="w-4 h-4" /> Add Medical Record
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Modals */}
       <QuickUploadModal
