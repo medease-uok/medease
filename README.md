@@ -18,6 +18,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Handwritten prescription photo uploads (JPEG, PNG, WebP, PDF) stored in S3
 - Medicine catalogue search with category and form filtering
 - Doctor prescription templates for reusable medication sets
+- Doctor personal task list with priority ordering and due dates
 - Vaccination records and chronic condition tracking
 - Medical document management (S3-backed with presigned URLs)
 - Prescription refill requests with doctor approval workflow
@@ -100,7 +101,7 @@ Password is saved to `.vault-password` (gitignored) for subsequent runs.
 
 ### 4. Test Accounts
 
-When seeding, 19 sample users are created. All use password **`Password@123`**.
+When seeding, sample users across all roles are created. All use password **`Password@123`**.
 
 | Role | Email |
 |------|-------|
