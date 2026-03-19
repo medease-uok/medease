@@ -690,18 +690,32 @@ VALUES ('ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-0000000
         'HbA1c', 'normal', 'Quarterly diabetic monitoring. Target HbA1c <7%. Last was 7.2%.',
         'pending', NOW() - INTERVAL '3 hours');
 
--- Notifications for lab test requests
+-- Lab test request notifications (both lab technicians get notified for each pending request)
 INSERT INTO notifications (recipient_id, type, title, message, is_read, reference_type, created_at) VALUES
-  ('10000000-0000-0000-0000-000000000001', 'lab_test_requested', 'New Lab Test Request', 'Dr. Kamal Perera ordered Echocardiogram for Nuwan Jayasuriya.', false, 'lab_test_request', NOW() - INTERVAL '1 day'),
-  ('10000000-0000-0000-0000-000000000002', 'lab_test_requested', 'New Lab Test Request', 'Dr. Ruwan Fernando ordered MRI Left Knee (Follow-up) for Lahiru Gunasekara. (URGENT)', false, 'lab_test_request', NOW() - INTERVAL '6 hours'),
-  ('10000000-0000-0000-0000-000000000001', 'lab_test_requested', 'New Lab Test Request', 'Dr. Sithara Silva ordered HbA1c for Dinesh Rajapaksa.', false, 'lab_test_request', NOW() - INTERVAL '3 hours'),
+  -- Echocardiogram for Nuwan (pending) → patient + both lab techs
   ('c0000000-0000-0000-0000-000000000004', 'lab_test_requested', 'Lab Test Ordered', 'Dr. Kamal Perera has ordered an Echocardiogram test for you.', false, 'lab_test_request', NOW() - INTERVAL '1 day'),
+  ('10000000-0000-0000-0000-000000000001', 'lab_test_requested', 'New Lab Test Request', 'Dr. Kamal Perera ordered Echocardiogram for Nuwan Jayasuriya.', false, 'lab_test_request', NOW() - INTERVAL '1 day'),
+  ('10000000-0000-0000-0000-000000000002', 'lab_test_requested', 'New Lab Test Request', 'Dr. Kamal Perera ordered Echocardiogram for Nuwan Jayasuriya.', false, 'lab_test_request', NOW() - INTERVAL '1 day'),
+
+  -- MRI Left Knee for Lahiru (pending, urgent) → patient + both lab techs
   ('c0000000-0000-0000-0000-000000000006', 'lab_test_requested', 'Lab Test Ordered', 'Dr. Ruwan Fernando has ordered a MRI Left Knee (Follow-up) test for you.', false, 'lab_test_request', NOW() - INTERVAL '6 hours'),
+  ('10000000-0000-0000-0000-000000000001', 'lab_test_requested', 'New Lab Test Request', 'Dr. Ruwan Fernando ordered MRI Left Knee (Follow-up) for Lahiru Gunasekara. (URGENT)', false, 'lab_test_request', NOW() - INTERVAL '6 hours'),
+  ('10000000-0000-0000-0000-000000000002', 'lab_test_requested', 'New Lab Test Request', 'Dr. Ruwan Fernando ordered MRI Left Knee (Follow-up) for Lahiru Gunasekara. (URGENT)', false, 'lab_test_request', NOW() - INTERVAL '6 hours'),
+
+  -- HbA1c for Dinesh (pending) → patient + both lab techs
   ('c0000000-0000-0000-0000-000000000002', 'lab_test_requested', 'Lab Test Ordered', 'Dr. Sithara Silva has ordered a HbA1c test for you.', false, 'lab_test_request', NOW() - INTERVAL '3 hours'),
-  -- Feedback notifications for doctors
+  ('10000000-0000-0000-0000-000000000001', 'lab_test_requested', 'New Lab Test Request', 'Dr. Sithara Silva ordered HbA1c for Dinesh Rajapaksa.', false, 'lab_test_request', NOW() - INTERVAL '3 hours'),
+  ('10000000-0000-0000-0000-000000000002', 'lab_test_requested', 'New Lab Test Request', 'Dr. Sithara Silva ordered HbA1c for Dinesh Rajapaksa.', false, 'lab_test_request', NOW() - INTERVAL '3 hours');
+
+-- Feedback notifications for doctors
+INSERT INTO notifications (recipient_id, type, title, message, is_read, reference_type, created_at) VALUES
   ('d0000000-0000-0000-0000-000000000001', 'feedback_received', 'New Patient Feedback', 'You received a 5-star rating from a patient.', true, 'feedback', NOW() - INTERVAL '29 days'),
   ('d0000000-0000-0000-0000-000000000002', 'feedback_received', 'New Patient Feedback', 'You received a 4-star rating from a patient.', true, 'feedback', NOW() - INTERVAL '24 days'),
   ('d0000000-0000-0000-0000-000000000003', 'feedback_received', 'New Patient Feedback', 'You received a 5-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '19 days'),
-  ('d0000000-0000-0000-0000-000000000001', 'feedback_received', 'New Patient Feedback', 'You received a 4-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '14 days');
+  ('d0000000-0000-0000-0000-000000000001', 'feedback_received', 'New Patient Feedback', 'You received a 4-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '14 days'),
+  ('d0000000-0000-0000-0000-000000000002', 'feedback_received', 'New Patient Feedback', 'You received a 3-star rating from an anonymous patient.', false, 'feedback', NOW() - INTERVAL '11 days'),
+  ('d0000000-0000-0000-0000-000000000002', 'feedback_received', 'New Patient Feedback', 'You received a 5-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '9 days'),
+  ('d0000000-0000-0000-0000-000000000004', 'feedback_received', 'New Patient Feedback', 'You received a 4-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '7 days'),
+  ('d0000000-0000-0000-0000-000000000003', 'feedback_received', 'New Patient Feedback', 'You received a 5-star rating from a patient.', false, 'feedback', NOW() - INTERVAL '4 days');
 
 COMMIT;
