@@ -21,6 +21,8 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Vaccination records and chronic condition tracking
 - Medical document management (S3-backed with presigned URLs)
 - Prescription refill requests with doctor approval workflow
+- Lab test request workflow with priority levels and lab technician assignment
+- Patient satisfaction and feedback system with per-doctor ratings and analytics
 - PDF generation for medical records and prescriptions
 - Role-Based Access Control (RBAC) with 26 permissions across 6 roles
 - Attribute-Based Access Control (ABAC) for resource-level filtering
