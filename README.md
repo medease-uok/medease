@@ -23,6 +23,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Prescription refill requests with doctor approval workflow
 - PDF generation for medical records and prescriptions
 - Role-Based Access Control (RBAC) with 26 permissions across 6 roles
+- Attribute-Based Access Control (ABAC) for resource-level filtering
 - Email verification, multi-step login with OTP, and password reset
 - Real-time in-app notifications
 - Profile image uploads with cropping
