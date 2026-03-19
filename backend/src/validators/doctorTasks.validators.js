@@ -1,7 +1,5 @@
 const { body, param } = require('express-validator')
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 const createTaskValidation = [
   body('title')
     .trim()
@@ -14,7 +12,7 @@ const createTaskValidation = [
 
 const updateTaskValidation = [
   param('id')
-    .matches(UUID_REGEX).withMessage('Invalid task ID format.'),
+    .isUUID().withMessage('Invalid task ID format.'),
   body('title')
     .optional()
     .trim()
@@ -25,7 +23,7 @@ const updateTaskValidation = [
     .isBoolean().withMessage('isCompleted must be true or false.'),
   body('priority')
     .optional()
-    .isInt({ min: 0 }).withMessage('priority must be a non-negative integer.'),
+    .isInt({ min: 0, max: 9999 }).withMessage('priority must be an integer between 0 and 9999.'),
   body('dueDate')
     .optional({ nullable: true })
     .isISO8601().withMessage('dueDate must be a valid date (YYYY-MM-DD).'),
@@ -33,14 +31,14 @@ const updateTaskValidation = [
 
 const taskIdValidation = [
   param('id')
-    .matches(UUID_REGEX).withMessage('Invalid task ID format.'),
+    .isUUID().withMessage('Invalid task ID format.'),
 ]
 
 const reorderValidation = [
   body('orderedIds')
-    .isArray({ min: 1 }).withMessage('orderedIds must be a non-empty array.'),
+    .isArray({ min: 1, max: 500 }).withMessage('orderedIds must be an array with 1-500 items.'),
   body('orderedIds.*')
-    .matches(UUID_REGEX).withMessage('Each ID must be a valid UUID.'),
+    .isUUID().withMessage('Each ID must be a valid UUID.'),
 ]
 
 module.exports = {

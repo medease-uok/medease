@@ -1,17 +1,19 @@
 const db = require('../config/database')
 const AppError = require('../utils/AppError')
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-const resolveDoctorId = async (userId) => {
-  const result = await db.query('SELECT id FROM doctors WHERE user_id = $1', [userId])
-  if (result.rows.length === 0) throw new AppError('Not a doctor account.', 403)
-  return result.rows[0].id
-}
+const formatTask = (r) => ({
+  id: r.id,
+  title: r.title,
+  isCompleted: r.is_completed,
+  priority: r.priority,
+  dueDate: r.due_date,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+})
 
 const getAll = async (req, res, next) => {
   try {
-    const doctorId = await resolveDoctorId(req.user.id)
+    const doctorId = req.doctorId
 
     const result = await db.query(
       `SELECT id, title, is_completed, priority, due_date, created_at, updated_at
@@ -23,24 +25,16 @@ const getAll = async (req, res, next) => {
 
     res.json({
       status: 'success',
-      data: result.rows.map((r) => ({
-        id: r.id,
-        title: r.title,
-        isCompleted: r.is_completed,
-        priority: r.priority,
-        dueDate: r.due_date,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      })),
+      data: result.rows.map(formatTask),
     })
   } catch (err) {
-    return next(err)
+    next(err)
   }
 }
 
 const create = async (req, res, next) => {
   try {
-    const doctorId = await resolveDoctorId(req.user.id)
+    const doctorId = req.doctorId
     const { title, dueDate } = req.body
 
     const result = await db.query(
@@ -50,39 +44,31 @@ const create = async (req, res, next) => {
       [doctorId, title.trim(), dueDate || null]
     )
 
-    const r = result.rows[0]
     res.status(201).json({
       status: 'success',
-      data: {
-        id: r.id,
-        title: r.title,
-        isCompleted: r.is_completed,
-        priority: r.priority,
-        dueDate: r.due_date,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      },
+      data: formatTask(result.rows[0]),
     })
   } catch (err) {
-    return next(err)
+    next(err)
   }
 }
 
 const update = async (req, res, next) => {
   try {
-    const doctorId = await resolveDoctorId(req.user.id)
+    const doctorId = req.doctorId
     const { id } = req.params
-
-    if (!UUID_RE.test(id)) throw new AppError('Invalid task ID.', 400)
-
     const { title, isCompleted, priority, dueDate } = req.body
+
+    if (title === undefined && isCompleted === undefined && priority === undefined && dueDate === undefined) {
+      throw new AppError('No updatable fields provided.', 400)
+    }
 
     // Verify ownership
     const existing = await db.query(
       'SELECT id FROM doctor_tasks WHERE id = $1 AND doctor_id = $2',
       [id, doctorId]
     )
-    if (existing.rows.length === 0) throw new AppError('Task not found.', 404)
+    if (existing.rows.length === 0) throw new AppError('Task not found or access denied.', 404)
 
     const sets = ['updated_at = NOW()']
     const params = []
@@ -116,78 +102,70 @@ const update = async (req, res, next) => {
       params
     )
 
-    const r = result.rows[0]
     res.json({
       status: 'success',
-      data: {
-        id: r.id,
-        title: r.title,
-        isCompleted: r.is_completed,
-        priority: r.priority,
-        dueDate: r.due_date,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      },
+      data: formatTask(result.rows[0]),
     })
   } catch (err) {
-    return next(err)
+    next(err)
   }
 }
 
 const remove = async (req, res, next) => {
   try {
-    const doctorId = await resolveDoctorId(req.user.id)
+    const doctorId = req.doctorId
     const { id } = req.params
-
-    if (!UUID_RE.test(id)) throw new AppError('Invalid task ID.', 400)
 
     const result = await db.query(
       'DELETE FROM doctor_tasks WHERE id = $1 AND doctor_id = $2 RETURNING id',
       [id, doctorId]
     )
-    if (result.rows.length === 0) throw new AppError('Task not found.', 404)
+    if (result.rows.length === 0) throw new AppError('Task not found or access denied.', 404)
 
     res.json({ status: 'success', data: { id } })
   } catch (err) {
-    return next(err)
+    next(err)
   }
 }
 
 const reorder = async (req, res, next) => {
   try {
-    const doctorId = await resolveDoctorId(req.user.id)
+    const doctorId = req.doctorId
     const { orderedIds } = req.body
 
-    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
-      throw new AppError('orderedIds must be a non-empty array of task IDs.', 400)
+    // Verify all tasks belong to this doctor before reordering
+    const ownership = await db.query(
+      'SELECT id FROM doctor_tasks WHERE doctor_id = $1 AND id = ANY($2::uuid[])',
+      [doctorId, orderedIds]
+    )
+    if (ownership.rows.length !== orderedIds.length) {
+      throw new AppError('One or more tasks not found or access denied.', 404)
     }
 
-    for (const taskId of orderedIds) {
-      if (!UUID_RE.test(taskId)) {
-        throw new AppError(`Invalid task ID: ${taskId}`, 400)
-      }
-    }
+    // Bulk update using unnest for performance
+    await db.query(
+      `UPDATE doctor_tasks AS dt
+       SET priority = v.priority, updated_at = NOW()
+       FROM (SELECT unnest($1::uuid[]) AS id, generate_subscripts($1::uuid[], 1) - 1 AS priority) v
+       WHERE dt.id = v.id AND dt.doctor_id = $2`,
+      [orderedIds, doctorId]
+    )
 
-    const client = await db.getClient()
-    try {
-      await client.query('BEGIN')
-      for (let i = 0; i < orderedIds.length; i++) {
-        await client.query(
-          'UPDATE doctor_tasks SET priority = $1, updated_at = NOW() WHERE id = $2 AND doctor_id = $3',
-          [i, orderedIds[i], doctorId]
-        )
-      }
-      await client.query('COMMIT')
-    } catch (err) {
-      await client.query('ROLLBACK')
-      throw err
-    } finally {
-      client.release()
-    }
+    // Return updated task list
+    const result = await db.query(
+      `SELECT id, title, is_completed, priority, due_date, created_at, updated_at
+       FROM doctor_tasks
+       WHERE doctor_id = $1
+       ORDER BY is_completed ASC, priority ASC, created_at DESC`,
+      [doctorId]
+    )
 
-    res.json({ status: 'success' })
+    res.json({
+      status: 'success',
+      data: result.rows.map(formatTask),
+    })
   } catch (err) {
-    return next(err)
+    next(err)
   }
 }
 
