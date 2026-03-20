@@ -1,20 +1,20 @@
-const { ADMIN, DOCTOR, PATIENT, NURSE, PHARMACIST, LAB_TECH } = require('./fixtures/rbac.fixtures');
+const { ADMIN, DOCTOR, PATIENT, NURSE, PHARMACIST, LAB_TECH } = require('../fixtures/rbac.fixtures');
 
 const mockRedisGet = jest.fn();
 const mockRedisSet = jest.fn();
 
-jest.mock('../config/redis', () => ({
+jest.mock('../../config/redis', () => ({
   get: (...args) => mockRedisGet(...args),
   set: (...args) => mockRedisSet(...args),
   del: jest.fn(),
 }));
 
 const mockDbQuery = jest.fn();
-jest.mock('../config/database', () => ({
+jest.mock('../../config/database', () => ({
   query: (...args) => mockDbQuery(...args),
 }));
 
-const resolveSubject = require('../middleware/resolveSubject');
+const resolveSubject = require('../../middleware/resolveSubject');
 
 function runMiddleware(user) {
   return new Promise((resolve) => {

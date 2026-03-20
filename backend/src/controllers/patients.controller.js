@@ -743,20 +743,22 @@ const getStatistics = async (req, res, next) => {
       `),
 
       db.query(`
-        SELECT
-          CASE
-            WHEN p.date_of_birth IS NULL THEN 'Unknown'
-            WHEN AGE(p.date_of_birth) < INTERVAL '18 years' THEN 'Under 18'
-            WHEN AGE(p.date_of_birth) < INTERVAL '30 years' THEN '18-29'
-            WHEN AGE(p.date_of_birth) < INTERVAL '45 years' THEN '30-44'
-            WHEN AGE(p.date_of_birth) < INTERVAL '60 years' THEN '45-59'
-            ELSE '60+'
-          END AS age_group,
-          COUNT(*) AS count
-        FROM patients p
-        JOIN users u ON p.user_id = u.id
-        WHERE u.is_active = true
-        GROUP BY age_group
+        SELECT age_group, "count" FROM (
+          SELECT
+            CASE
+              WHEN p.date_of_birth IS NULL THEN 'Unknown'
+              WHEN AGE(p.date_of_birth) < INTERVAL '18 years' THEN 'Under 18'
+              WHEN AGE(p.date_of_birth) < INTERVAL '30 years' THEN '18-29'
+              WHEN AGE(p.date_of_birth) < INTERVAL '45 years' THEN '30-44'
+              WHEN AGE(p.date_of_birth) < INTERVAL '60 years' THEN '45-59'
+              ELSE '60+'
+            END AS age_group,
+            COUNT(*) AS "count"
+          FROM patients p
+          JOIN users u ON p.user_id = u.id
+          WHERE u.is_active = true
+          GROUP BY 1
+        ) sub
         ORDER BY
           CASE age_group
             WHEN 'Under 18' THEN 1

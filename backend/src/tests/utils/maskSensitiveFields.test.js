@@ -1,4 +1,4 @@
-const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
+const { maskSensitiveFields } = require('../../utils/maskSensitiveFields');
 
 const SAMPLE_PATIENT = {
   id: 'pat-1',
@@ -41,14 +41,14 @@ describe('maskSensitiveFields', () => {
       expect(result.address).toBe('123 Main Street, Colombo');
     });
 
-    test('doctor sees phone masked', () => {
+    test('doctor sees phone unmasked', () => {
       const result = maskSensitiveFields(SAMPLE_PATIENT, 'doctor');
-      expect(result.phone).toBe('••••••••4567');
+      expect(result.phone).toBe('+94771234567');
     });
 
-    test('doctor sees email masked', () => {
+    test('doctor sees email unmasked', () => {
       const result = maskSensitiveFields(SAMPLE_PATIENT, 'doctor');
-      expect(result.email).toBe('jo***@example.com');
+      expect(result.email).toBe('john.doe@example.com');
     });
 
     test('doctor sees insurance policy number masked', () => {

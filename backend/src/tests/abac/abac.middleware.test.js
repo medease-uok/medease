@@ -1,16 +1,16 @@
-const { ADMIN, DOCTOR, PATIENT, PHARMACIST, APPOINTMENT } = require('./fixtures/rbac.fixtures');
+const { ADMIN, DOCTOR, PATIENT, PHARMACIST, APPOINTMENT } = require('../fixtures/rbac.fixtures');
 
 const mockDbQuery = jest.fn();
-jest.mock('../config/database', () => ({
+jest.mock('../../config/database', () => ({
   query: (...args) => mockDbQuery(...args),
 }));
 
 const mockEvaluateAccess = jest.fn();
-jest.mock('../utils/abac', () => ({
+jest.mock('../../utils/abac', () => ({
   evaluateAccess: (...args) => mockEvaluateAccess(...args),
 }));
 
-const { checkResourceAccess } = require('../middleware/abac');
+const { checkResourceAccess } = require('../../middleware/abac');
 
 function runMiddleware(resourceType, user, params = {}) {
   return new Promise((resolve) => {

@@ -47,6 +47,10 @@ app.get('/health', async (req, res) => {
 
 app.use('/api', routes);
 
+app.all('/api/*path', (req, res) => {
+  res.status(404).json({ status: 'error', statusCode: 404, message: `${req.method} ${req.path} not found.` });
+});
+
 app.use(errorHandler);
 
 const PORT = config.port || 3000;
