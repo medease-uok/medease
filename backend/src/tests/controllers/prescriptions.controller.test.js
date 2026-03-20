@@ -40,7 +40,8 @@ beforeEach(() => {
   mockQuery.mockReset()
   mockClientQuery.mockReset()
   mockClientRelease.mockReset()
-  jest.clearAllMocks()
+  mockGetClient.mockReset()
+  mockGetClient.mockImplementation(() => ({ query: mockClientQuery, release: mockClientRelease }))
 })
 
 // ──────────────────────────────────────────────────────────────

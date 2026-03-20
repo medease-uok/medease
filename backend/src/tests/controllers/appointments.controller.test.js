@@ -39,7 +39,8 @@ beforeEach(() => {
   mockQuery.mockReset()
   mockClientQuery.mockReset()
   mockClientRelease.mockReset()
-  jest.clearAllMocks()
+  mockGetClient.mockReset()
+  mockGetClient.mockImplementation(() => ({ query: mockClientQuery, release: mockClientRelease }))
 })
 
 // ──────────────────────────────────────────────────────────────
@@ -324,6 +325,70 @@ describe('create', () => {
     await create(req, res, next)
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }))
+  })
+
+  test('returns 404 when patient not found in database', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // doctorCheck succeeds
+      .mockResolvedValueOnce({ rows: [] })             // patientCheck empty
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: 'doc-1' },
+      body: { doctorId: 'doc-1', patientId: 'pat-nonexistent', scheduledAt: VALID_SCHEDULED_AT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await create(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }))
+  })
+
+  test('returns error and issues ROLLBACK when INSERT fails (overlapping slot)', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] })
+      .mockResolvedValueOnce({ rows: [PATIENT_ROW] })
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)               // BEGIN
+      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] }) // schedule check
+      .mockRejectedValueOnce(new Error('duplicate key value violates unique constraint')) // INSERT fails
+      .mockResolvedValueOnce(undefined)               // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: 'doc-1' },
+      body: { doctorId: 'doc-1', patientId: 'pat-1', scheduledAt: VALID_SCHEDULED_AT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await create(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error))
+    // ROLLBACK must have been issued (4th client.query call)
+    const clientCalls = mockClientQuery.mock.calls.map((c) => c[0])
+    expect(clientCalls).toContain('ROLLBACK')
+  })
+
+  test('releases client even when unexpected DB error occurs', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] })
+      .mockResolvedValueOnce({ rows: [PATIENT_ROW] })
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)               // BEGIN
+      .mockRejectedValueOnce(new Error('connection reset')) // schedule query fails
+      .mockResolvedValueOnce(undefined)               // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: 'doc-1' },
+      body: { doctorId: 'doc-1', patientId: 'pat-1', scheduledAt: VALID_SCHEDULED_AT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await create(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error))
+    expect(mockClientRelease).toHaveBeenCalled()
   })
 })
 

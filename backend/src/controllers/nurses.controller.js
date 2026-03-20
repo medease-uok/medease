@@ -24,7 +24,7 @@ const getStatistics = async (req, res, next) => {
       `),
 
       db.query(`
-        SELECT age_group, count FROM (
+        SELECT age_group, "count" FROM (
           SELECT
             CASE
               WHEN u.date_of_birth IS NULL THEN 'Not specified'
@@ -37,7 +37,7 @@ const getStatistics = async (req, res, next) => {
                   ELSE '55+'
                 END
             END AS age_group,
-            COUNT(*) AS count
+            COUNT(*) AS "count"
           FROM nurses n
           JOIN users u ON n.user_id = u.id
           WHERE u.is_active = true
