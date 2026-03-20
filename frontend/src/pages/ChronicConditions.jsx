@@ -8,6 +8,7 @@ import { useAuth } from '../data/AuthContext'
 import api from '../services/api'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
+import VoiceNoteButton from '../components/VoiceNoteButton'
 
 const SKELETON_COUNT = 6
 const STATUSES = ['active', 'managed', 'resolved', 'monitoring']
@@ -290,7 +291,10 @@ function ConditionModal({ condition, patients, onClose, onSave, saving }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Treatment</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700">Treatment</label>
+              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, treatment: f.treatment ? `${f.treatment} ${t}` : t }))} disabled={saving} />
+            </div>
             <textarea value={form.treatment} onChange={handleChange('treatment')} maxLength={1000} rows={2}
               placeholder="Treatment plan details..."
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" />
@@ -298,7 +302,10 @@ function ConditionModal({ condition, patients, onClose, onSave, saving }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Medications</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700">Medications</label>
+              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, medications: f.medications ? `${f.medications} ${t}` : t }))} disabled={saving} />
+            </div>
             <textarea value={form.medications} onChange={handleChange('medications')} maxLength={1000} rows={2}
               placeholder="Current medications for this condition..."
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" />
@@ -306,7 +313,10 @@ function ConditionModal({ condition, patients, onClose, onSave, saving }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700">Notes</label>
+              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, notes: f.notes ? `${f.notes} ${t}` : t }))} disabled={saving} />
+            </div>
             <textarea value={form.notes} onChange={handleChange('notes')} maxLength={1000} rows={2}
               placeholder="Additional clinical notes..."
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" />

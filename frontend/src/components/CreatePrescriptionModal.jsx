@@ -4,6 +4,7 @@ import {
   AlertCircle, BookTemplate, ChevronDown, Save, Stethoscope,
 } from 'lucide-react'
 import api from '../services/api'
+import VoiceNoteButton from './VoiceNoteButton'
 
 const FREQUENCIES = [
   'Once daily',
@@ -549,7 +550,10 @@ export default function CreatePrescriptionModal({ patientId, patientName, onClos
 
             {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Notes (optional)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-slate-700">Notes (optional)</label>
+                <VoiceNoteButton onTranscript={(t) => setNotes((v) => v ? `${v} ${t}` : t)} />
+              </div>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}

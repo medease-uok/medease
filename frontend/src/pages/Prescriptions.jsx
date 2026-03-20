@@ -10,6 +10,7 @@ import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import CreatePrescriptionModal from '../components/CreatePrescriptionModal';
+import VoiceNoteButton from '../components/VoiceNoteButton';
 
 const STATUS_STYLES = {
   active: { variant: 'success', label: 'Active' },
@@ -99,9 +100,12 @@ function RefillModal({ rx, onClose, onSuccess }) {
         )}
 
         <form onSubmit={handleSubmit}>
-          <label htmlFor="refill-reason" className="block text-sm font-medium text-slate-700 mb-1">
-            Reason (optional)
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="refill-reason" className="block text-sm font-medium text-slate-700">
+              Reason (optional)
+            </label>
+            <VoiceNoteButton onTranscript={(t) => setReason((v) => v ? `${v} ${t}` : t)} disabled={submitting} />
+          </div>
           <textarea
             id="refill-reason"
             value={reason}
@@ -191,9 +195,12 @@ function RespondModal({ request: rr, onClose, onSuccess }) {
         )}
 
         <div>
-          <label htmlFor="doctor-note" className="block text-sm font-medium text-slate-700 mb-1">
-            Note (optional)
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="doctor-note" className="block text-sm font-medium text-slate-700">
+              Note (optional)
+            </label>
+            <VoiceNoteButton onTranscript={(t) => setDoctorNote((v) => v ? `${v} ${t}` : t)} disabled={submitting} />
+          </div>
           <textarea
             id="doctor-note"
             value={doctorNote}

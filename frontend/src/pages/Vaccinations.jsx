@@ -8,6 +8,7 @@ import { useAuth } from '../data/AuthContext'
 import api from '../services/api'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
+import VoiceNoteButton from '../components/VoiceNoteButton'
 
 const SKELETON_COUNT = 6
 const STATUSES = ['scheduled', 'completed', 'missed', 'cancelled']
@@ -267,7 +268,10 @@ function VaccinationModal({ vaccination, patients, onClose, onSave, saving }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700">Notes</label>
+              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, notes: f.notes ? `${f.notes} ${t}` : t }))} disabled={saving} />
+            </div>
             <textarea value={form.notes} onChange={handleChange('notes')} maxLength={1000} rows={3}
               placeholder="Any additional notes..."
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" />
