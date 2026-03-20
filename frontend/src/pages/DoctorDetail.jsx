@@ -177,7 +177,7 @@ function BookingModal({ doctor, onClose, onBooked }) {
               <label htmlFor="appt-notes" className="block text-sm font-medium text-slate-700">
                 Notes <span className="text-slate-400">(optional)</span>
               </label>
-              <VoiceNoteButton onTranscript={(t) => setNotes((v) => v ? `${v} ${t}` : t)} />
+              <VoiceNoteButton onTranscript={(t) => setNotes((v) => v ? `${v} ${t}` : t)} maxLength={500} currentLength={notes.length} />
             </div>
             <textarea
               id="appt-notes"

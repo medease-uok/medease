@@ -270,7 +270,7 @@ function VaccinationModal({ vaccination, patients, onClose, onSave, saving }) {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-slate-700">Notes</label>
-              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, notes: f.notes ? `${f.notes} ${t}` : t }))} disabled={saving} />
+              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, notes: f.notes ? `${f.notes} ${t}` : t }))} disabled={saving} maxLength={1000} currentLength={form.notes.length} />
             </div>
             <textarea value={form.notes} onChange={handleChange('notes')} maxLength={1000} rows={3}
               placeholder="Any additional notes..."

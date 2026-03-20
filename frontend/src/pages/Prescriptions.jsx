@@ -104,7 +104,7 @@ function RefillModal({ rx, onClose, onSuccess }) {
             <label htmlFor="refill-reason" className="block text-sm font-medium text-slate-700">
               Reason (optional)
             </label>
-            <VoiceNoteButton onTranscript={(t) => setReason((v) => v ? `${v} ${t}` : t)} disabled={submitting} />
+            <VoiceNoteButton onTranscript={(t) => setReason((v) => v ? `${v} ${t}` : t)} disabled={submitting} maxLength={500} currentLength={reason.length} />
           </div>
           <textarea
             id="refill-reason"
@@ -199,7 +199,7 @@ function RespondModal({ request: rr, onClose, onSuccess }) {
             <label htmlFor="doctor-note" className="block text-sm font-medium text-slate-700">
               Note (optional)
             </label>
-            <VoiceNoteButton onTranscript={(t) => setDoctorNote((v) => v ? `${v} ${t}` : t)} disabled={submitting} />
+            <VoiceNoteButton onTranscript={(t) => setDoctorNote((v) => v ? `${v} ${t}` : t)} disabled={submitting} maxLength={500} currentLength={doctorNote.length} />
           </div>
           <textarea
             id="doctor-note"

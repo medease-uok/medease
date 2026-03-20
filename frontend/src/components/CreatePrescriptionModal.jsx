@@ -552,7 +552,7 @@ export default function CreatePrescriptionModal({ patientId, patientName, onClos
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-sm font-medium text-slate-700">Notes (optional)</label>
-                <VoiceNoteButton onTranscript={(t) => setNotes((v) => v ? `${v} ${t}` : t)} />
+                <VoiceNoteButton onTranscript={(t) => setNotes((v) => v ? `${v} ${t}` : t)} maxLength={1000} currentLength={notes.length} />
               </div>
               <textarea
                 value={notes}

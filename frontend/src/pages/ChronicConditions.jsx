@@ -293,7 +293,7 @@ function ConditionModal({ condition, patients, onClose, onSave, saving }) {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-slate-700">Treatment</label>
-              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, treatment: f.treatment ? `${f.treatment} ${t}` : t }))} disabled={saving} />
+              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, treatment: f.treatment ? `${f.treatment} ${t}` : t }))} disabled={saving} maxLength={1000} currentLength={form.treatment.length} />
             </div>
             <textarea value={form.treatment} onChange={handleChange('treatment')} maxLength={1000} rows={2}
               placeholder="Treatment plan details..."
@@ -304,7 +304,7 @@ function ConditionModal({ condition, patients, onClose, onSave, saving }) {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-slate-700">Medications</label>
-              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, medications: f.medications ? `${f.medications} ${t}` : t }))} disabled={saving} />
+              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, medications: f.medications ? `${f.medications} ${t}` : t }))} disabled={saving} maxLength={1000} currentLength={form.medications.length} />
             </div>
             <textarea value={form.medications} onChange={handleChange('medications')} maxLength={1000} rows={2}
               placeholder="Current medications for this condition..."
@@ -315,7 +315,7 @@ function ConditionModal({ condition, patients, onClose, onSave, saving }) {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-slate-700">Notes</label>
-              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, notes: f.notes ? `${f.notes} ${t}` : t }))} disabled={saving} />
+              <VoiceNoteButton onTranscript={(t) => setForm((f) => ({ ...f, notes: f.notes ? `${f.notes} ${t}` : t }))} disabled={saving} maxLength={1000} currentLength={form.notes.length} />
             </div>
             <textarea value={form.notes} onChange={handleChange('notes')} maxLength={1000} rows={2}
               placeholder="Additional clinical notes..."
