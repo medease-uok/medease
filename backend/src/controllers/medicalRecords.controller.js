@@ -13,6 +13,8 @@ const mapRecord = (row) => ({
   patientName: row.patient_name,
   doctorName: row.doctor_name,
   diagnosis: row.diagnosis,
+  icdCode: row.icd_code || null,
+  icdDescription: row.icd_description || null,
   treatment: row.treatment,
   notes: row.notes,
   createdAt: row.created_at,
@@ -35,7 +37,9 @@ const getAll = async (req, res, next) => {
     const { clause, params } = await buildAccessFilter('medical_record', subject, columnMap);
 
     const query = `
-      SELECT mr.id, mr.patient_id, mr.doctor_id, mr.diagnosis, mr.treatment, mr.notes, mr.created_at,
+      SELECT mr.id, mr.patient_id, mr.doctor_id, mr.diagnosis, mr.icd_code,
+             ic.description AS icd_description,
+             mr.treatment, mr.notes, mr.created_at,
              pu.first_name || ' ' || pu.last_name AS patient_name,
              'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
       FROM medical_records mr
@@ -43,6 +47,7 @@ const getAll = async (req, res, next) => {
       JOIN users pu ON p.user_id = pu.id
       LEFT JOIN doctors d ON mr.doctor_id = d.id
       LEFT JOIN users du ON d.user_id = du.id
+      LEFT JOIN icd10_codes ic ON mr.icd_code = ic.code
       WHERE ${clause}
       ORDER BY mr.created_at DESC`;
 
@@ -58,7 +63,7 @@ const getAll = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    const { patientId, diagnosis, treatment, notes, chronicConditionId } = req.body;
+    const { patientId, diagnosis, treatment, notes, chronicConditionId, icdCode } = req.body;
 
     if (!patientId || !diagnosis) {
       throw new AppError('patientId and diagnosis are required.', 400);
@@ -99,10 +104,20 @@ const create = async (req, res, next) => {
       validConditionId = chronicConditionId;
     }
 
+    // Validate ICD-10 code if provided
+    let validIcdCode = null;
+    if (icdCode && icdCode.trim()) {
+      const icdCheck = await db.query('SELECT code FROM icd10_codes WHERE code = $1', [icdCode.trim()]);
+      if (icdCheck.rowCount === 0) {
+        throw new AppError('Invalid ICD-10 code.', 400);
+      }
+      validIcdCode = icdCode.trim();
+    }
+
     const result = await db.query(
-      `INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes, chronic_condition_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [patientId, doctorId, diagnosis, treatment || null, notes || null, validConditionId]
+      `INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes, chronic_condition_id, icd_code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [patientId, doctorId, diagnosis, treatment || null, notes || null, validConditionId, validIcdCode]
     );
 
     createNotification({
