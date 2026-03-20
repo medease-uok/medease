@@ -144,7 +144,7 @@ export default function PatientSatisfaction() {
         api.get('/patient-feedback/overview').then((r) => setOverview(r.data)),
         api.get('/patient-feedback').then((r) => setFeedback(r.data || []))
       );
-    } else if (isDoctor) {
+    } else if (isDoctor && currentUser?.doctorId) {
       promises.push(
         api.get(`/patient-feedback/doctor/${currentUser.doctorId}`).then((r) => setDoctorStats(r.data)),
         api.get('/patient-feedback').then((r) => setFeedback(r.data || []))

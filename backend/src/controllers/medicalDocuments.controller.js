@@ -44,10 +44,12 @@ function buildDocumentAccessFilter(user) {
   }
 
   if (role === 'patient') {
+    if (!user.patientId) return { clause: 'FALSE', params: [] };
     return { clause: 'md.patient_id = $1', params: [user.patientId] };
   }
 
   if (role === 'doctor') {
+    if (!user.doctorId) return { clause: 'FALSE', params: [] };
     return {
       clause: `md.patient_id IN (
         SELECT mr.patient_id FROM medical_records mr WHERE mr.doctor_id = $1

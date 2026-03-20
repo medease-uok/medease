@@ -99,6 +99,10 @@ function FeedbackTab({ currentUser }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!currentUser?.doctorId) {
+      setLoading(false);
+      return;
+    }
     api.get(`/patient-feedback/doctor/${currentUser.doctorId}`)
       .then((r) => setDoctorStats(r.data))
       .catch(console.error)
