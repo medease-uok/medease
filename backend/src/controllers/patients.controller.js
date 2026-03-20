@@ -5,6 +5,7 @@ const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
 const auditLog = require('../utils/auditLog');
 const generateMedicalPdf = require('../utils/generateMedicalPdf');
 const { buildPatientAccessFilter, assertPatientAccess } = require('../utils/patientAccess');
+const { buildPatientSearchClause } = require('../utils/searchUtils');
 
 const TRACK_FIELDS = {
   first_name: 'First Name', last_name: 'Last Name', phone: 'Phone',
@@ -36,9 +37,14 @@ const getAll = async (req, res, next) => {
   try {
     const { clause, params } = buildPatientAccessFilter(req.user);
 
+    if (req.query.search && req.query.search.length > 100) {
+      throw new AppError('Search term must be under 100 characters.', 400);
+    }
+    const searchClause = buildPatientSearchClause(req.query.search, params);
+
     const result = await db.query(
       `${PATIENT_SELECT}
-       WHERE u.is_active = true AND ${clause}
+       WHERE u.is_active = true AND ${clause}${searchClause}
        ORDER BY u.last_name, u.first_name`,
       params
     );

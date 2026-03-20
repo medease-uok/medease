@@ -2,6 +2,7 @@ const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
 const { getPresignedImageUrl } = require('../middleware/upload');
+const { buildPatientSearchClause } = require('../utils/searchUtils');
 
 const getAll = async (req, res, next) => {
   try {
@@ -304,9 +305,17 @@ const getAssignedPatients = async (req, res, next) => {
     }
     if (!doctorId) throw new AppError('Doctor profile not found.', 403);
 
-    const { limit = 50, offset = 0 } = req.query;
+    const { limit = 50, offset = 0, search } = req.query;
     const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
     const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
+
+    if (search && search.length > 100) {
+      throw new AppError('Search term must be under 100 characters.', 400);
+    }
+
+    const queryParams = [doctorId];
+    const searchClause = buildPatientSearchClause(search, queryParams);
+    queryParams.push(safeLimit, safeOffset);
 
     const result = await db.query(
       `SELECT
@@ -354,10 +363,10 @@ const getAssignedPatients = async (req, res, next) => {
          FROM medical_records mr
          WHERE mr.doctor_id = $1 AND mr.patient_id = p.id
        ) rec_stats ON true
-       WHERE u.is_active = true
+       WHERE u.is_active = true${searchClause}
        ORDER BY upcoming.next_appointment ASC NULLS LAST, latest_apt.scheduled_at DESC NULLS LAST
-       LIMIT $2 OFFSET $3`,
-      [doctorId, safeLimit, safeOffset]
+       LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`,
+      queryParams
     );
 
     const patients = await Promise.all(result.rows.map(async (row) => ({

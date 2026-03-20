@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Search, Users, Star, MessageSquare, Clock, Heart, Stethoscope,
@@ -168,12 +168,28 @@ export default function PatientsEnhanced() {
   const isDoctor = currentUser?.role === 'doctor';
   const [tab, setTab] = useState('patients');
   const [patients, setPatients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debounceRef = useRef(null);
+
+  const handleSearchChange = useCallback((value) => {
+    setSearch(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(value), 300);
+  }, []);
 
   useEffect(() => {
+    return () => clearTimeout(debounceRef.current);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setSearching(true);
     const endpoint = isDoctor ? '/doctors/me/patients' : '/patients';
-    api.get(endpoint)
+    const params = debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {};
+    api.get(endpoint, { params, signal: controller.signal })
       .then((res) => {
         const enhancedPatients = res.data.map(patient => ({
           ...patient,
@@ -190,17 +206,14 @@ export default function PatientsEnhanced() {
         }));
         setPatients(enhancedPatients);
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [isDoctor]);
+      .catch((err) => {
+        if (err.name !== 'CanceledError') console.error(err);
+      })
+      .finally(() => { setSearching(false); setInitialLoad(false); });
+    return () => controller.abort();
+  }, [isDoctor, debouncedSearch]);
 
-  const filteredPatients = patients.filter(patient =>
-    patient.name.toLowerCase().includes(search.toLowerCase()) ||
-    patient.email?.toLowerCase().includes(search.toLowerCase()) ||
-    patient.id?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  if (loading) {
+  if (initialLoad) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -281,9 +294,10 @@ export default function PatientsEnhanced() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search by name, email, or ID..."
+                  placeholder="Search by name, email, or patient ID..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  maxLength={100}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="
                     w-full pl-11 pr-4 py-3
                     border border-slate-200 rounded-lg
@@ -291,13 +305,18 @@ export default function PatientsEnhanced() {
                     transition-all
                   "
                 />
+                {searching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {filteredPatients.length > 0 ? (
+          {patients.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredPatients.map((patient) => (
+              {patients.map((patient) => (
                 <PatientCard
                   key={patient.id}
                   patient={patient}

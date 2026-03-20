@@ -77,13 +77,24 @@ function flushRefreshQueue(success) {
 }
 
 async function request(endpoint, options = {}) {
-  const { body, ...rest } = options;
+  const { body, params, signal, ...rest } = options;
 
-  let res = await fetch(`${API_URL}/api${endpoint}`, {
+  let url = `${API_URL}/api${endpoint}`;
+  if (params && typeof params === 'object') {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    ).toString();
+    if (qs) url += `?${qs}`;
+  }
+
+  const fetchOpts = {
     headers: getAuthHeaders(),
     ...rest,
     ...(body ? { body: JSON.stringify(body) } : {}),
-  });
+    ...(signal ? { signal } : {}),
+  };
+
+  let res = await fetch(url, fetchOpts);
 
   if (res.status === 401 && localStorage.getItem('medease_refresh_token')) {
     let refreshed;
@@ -98,10 +109,9 @@ async function request(endpoint, options = {}) {
     }
 
     if (refreshed) {
-      res = await fetch(`${API_URL}/api${endpoint}`, {
+      res = await fetch(url, {
+        ...fetchOpts,
         headers: getAuthHeaders(),
-        ...rest,
-        ...(body ? { body: JSON.stringify(body) } : {}),
       });
     }
   }
@@ -149,7 +159,7 @@ async function uploadRequest(endpoint, formData) {
 }
 
 const api = {
-  get: (endpoint) => request(endpoint, { method: 'GET' }),
+  get: (endpoint, options = {}) => request(endpoint, { method: 'GET', ...options }),
   post: (endpoint, body) => request(endpoint, { method: 'POST', body }),
   put: (endpoint, body) => request(endpoint, { method: 'PUT', body }),
   patch: (endpoint, body) => request(endpoint, { method: 'PATCH', body }),
