@@ -125,9 +125,9 @@ const getAvailableSlots = async (req, res, next) => {
       throw new AppError('Doctor not found.', 404)
     }
 
-    // Get day of week for the requested date (0=Sun, 6=Sat)
-    const requestedDate = new Date(date)
-    const dayOfWeek = requestedDate.getDay()
+    // Get day of week for the requested date (0=Sun, 6=Sat) — use UTC consistently
+    const requestedDate = new Date(date + 'T00:00:00Z')
+    const dayOfWeek = requestedDate.getUTCDay()
 
     // Get schedule for this day
     const scheduleResult = await db.query(
@@ -170,18 +170,18 @@ const getAvailableSlots = async (req, res, next) => {
 
     const bookedTimes = new Set(bookingsResult.rows.map((r) => r.slot_time))
 
-    // Filter out past slots if the date is today
+    // Filter out past slots if the date is today (UTC)
     const now = new Date()
-    const isToday = requestedDate.toDateString() === now.toDateString()
+    const todayUTC = now.toISOString().split('T')[0]
+    const isToday = date === todayUTC
 
     const slots = allSlots.map((time) => {
       const isBooked = bookedTimes.has(time)
       let isPast = false
       if (isToday) {
         const [h, m] = time.split(':').map(Number)
-        const slotDate = new Date(requestedDate)
-        slotDate.setHours(h, m, 0, 0)
-        isPast = slotDate <= now
+        const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes()
+        isPast = (h * 60 + m) <= nowMinutes
       }
       return {
         time,

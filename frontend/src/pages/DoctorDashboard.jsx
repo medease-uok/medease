@@ -125,7 +125,8 @@ export default function DoctorDashboard() {
       await api.patch(`/appointments/${aptId}/status`, { status: 'completed' });
       loadDashboard();
     } catch (err) {
-      setActionError('Failed to complete appointment.');
+      const msg = err?.response?.data?.message || err?.data?.message || 'Failed to complete appointment.'
+      setActionError(msg);
     } finally {
       setApptLoading(aptId, false);
     }

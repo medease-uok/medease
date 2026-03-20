@@ -293,4 +293,86 @@ const getStatistics = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, getStatistics };
+const getAssignedPatients = async (req, res, next) => {
+  try {
+    const doctorId = req.user.doctorId;
+    if (!doctorId) throw new AppError('Doctor profile not found.', 403);
+
+    const result = await db.query(
+      `SELECT
+         p.id,
+         p.user_id,
+         u.first_name,
+         u.last_name,
+         u.email,
+         u.phone,
+         p.date_of_birth,
+         p.gender,
+         p.blood_type,
+         p.profile_image_url,
+         latest_apt.scheduled_at AS last_visit,
+         latest_apt.status AS last_visit_status,
+         upcoming.next_appointment,
+         COALESCE(stats.total_appointments, 0) AS total_appointments,
+         COALESCE(stats.total_records, 0) AS total_records
+       FROM patients p
+       JOIN users u ON p.user_id = u.id
+       JOIN (
+         SELECT DISTINCT patient_id FROM appointments WHERE doctor_id = $1
+         UNION SELECT DISTINCT patient_id FROM medical_records WHERE doctor_id = $1
+         UNION SELECT DISTINCT patient_id FROM prescriptions WHERE doctor_id = $1
+       ) linked ON linked.patient_id = p.id
+       LEFT JOIN LATERAL (
+         SELECT a.scheduled_at, a.status
+         FROM appointments a
+         WHERE a.doctor_id = $1 AND a.patient_id = p.id AND a.status NOT IN ('cancelled', 'no_show')
+         ORDER BY a.scheduled_at DESC LIMIT 1
+       ) latest_apt ON true
+       LEFT JOIN LATERAL (
+         SELECT MIN(a.scheduled_at) AS next_appointment
+         FROM appointments a
+         WHERE a.doctor_id = $1 AND a.patient_id = p.id
+           AND a.status = 'scheduled' AND a.scheduled_at > NOW()
+       ) upcoming ON true
+       LEFT JOIN LATERAL (
+         SELECT
+           COUNT(DISTINCT a.id) AS total_appointments,
+           COUNT(DISTINCT mr.id) AS total_records
+         FROM appointments a
+         LEFT JOIN medical_records mr ON mr.patient_id = p.id AND mr.doctor_id = $1
+         WHERE a.doctor_id = $1 AND a.patient_id = p.id
+       ) stats ON true
+       WHERE u.is_active = true
+       ORDER BY upcoming.next_appointment ASC NULLS LAST, latest_apt.scheduled_at DESC NULLS LAST`,
+      [doctorId]
+    );
+
+    const { getPresignedImageUrl } = require('../middleware/upload');
+
+    const patients = await Promise.all(result.rows.map(async (row) => ({
+      id: row.id,
+      userId: row.user_id,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      email: row.email,
+      phone: row.phone,
+      dateOfBirth: row.date_of_birth,
+      gender: row.gender,
+      bloodType: row.blood_type,
+      profileImageUrl: await getPresignedImageUrl(row.profile_image_url),
+      lastVisit: row.last_visit,
+      lastVisitStatus: row.last_visit_status,
+      nextAppointment: row.next_appointment,
+      totalAppointments: parseInt(row.total_appointments, 10),
+      totalRecords: parseInt(row.total_records, 10),
+    })));
+
+    const masked = maskSensitiveFields(patients, req.user.role, false);
+
+    res.json({ status: 'success', data: masked });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, getStatistics, getAssignedPatients };

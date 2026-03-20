@@ -43,7 +43,7 @@ const getAll = async (req, res, next) => {
       JOIN doctors d ON a.doctor_id = d.id
       JOIN users du ON d.user_id = du.id
       WHERE ${clause}
-      ORDER BY a.scheduled_at DESC`;
+      ORDER BY a.scheduled_at ASC`;
 
     const result = await db.query(query, params);
 
@@ -277,6 +277,22 @@ const updateStatus = async (req, res, next) => {
 
     if (req.user.role === 'patient' && status !== 'cancelled') {
       throw new AppError('Patients can only cancel appointments.', 403);
+    }
+
+    // Doctors must attach a medical record before completing an appointment
+    if (status === 'completed') {
+      const recordCheck = await db.query(
+        `SELECT id FROM medical_records
+         WHERE patient_id = $1 AND doctor_id = $2
+           AND created_at::date = CURRENT_DATE`,
+        [appt.patient_id, appt.doctor_id]
+      );
+      if (recordCheck.rows.length === 0) {
+        throw new AppError(
+          'Cannot complete appointment without a medical record. Please add a medical record for this patient first.',
+          400
+        );
+      }
     }
 
     const result = await db.query(
