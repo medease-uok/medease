@@ -7,6 +7,7 @@ import { useAuth } from '../data/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
+import VoiceNoteButton from '../components/VoiceNoteButton';
 
 const SKELETON_COUNT = 6;
 const MAX_TITLE_LENGTH = 255;
@@ -256,9 +257,12 @@ function UploadModal({ open, onClose, onSubmit, patients, isPatient }) {
           </div>
 
           <div>
-            <label htmlFor="doc-desc" className="block text-sm font-medium text-slate-700 mb-1">
-              Description <span className="text-slate-400 font-normal">(optional)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="doc-desc" className="block text-sm font-medium text-slate-700">
+                Description <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
+              <VoiceNoteButton onTranscript={(t) => setDescription((v) => v ? `${v} ${t}` : t)} />
+            </div>
             <textarea
               id="doc-desc"
               value={description}

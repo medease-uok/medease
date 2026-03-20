@@ -9,6 +9,7 @@ import { useAuth } from '../data/AuthContext';
 import DetailCard from '../components/DetailCard';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
+import VoiceNoteButton from '../components/VoiceNoteButton';
 
 const SEVERITY_COLORS = {
   severe: 'bg-red-100 text-red-700',
@@ -255,7 +256,10 @@ function AddMedicalRecordModal({ open, onClose, onSuccess, patientId }) {
     <Modal open={open} onClose={onClose} title="Add Medical Record" wide>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Diagnosis *</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-slate-700">Diagnosis *</label>
+            <VoiceNoteButton onTranscript={(t) => setDiagnosis((v) => v ? `${v} ${t}` : t)} disabled={saving} />
+          </div>
           <input
             type="text"
             value={diagnosis}
@@ -266,7 +270,10 @@ function AddMedicalRecordModal({ open, onClose, onSuccess, patientId }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Plan / Steps to Follow</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-slate-700">Plan / Steps to Follow</label>
+            <VoiceNoteButton onTranscript={(t) => setTreatment((v) => v ? `${v} ${t}` : t)} disabled={saving} />
+          </div>
           <textarea
             value={treatment}
             onChange={(e) => setTreatment(e.target.value)}
@@ -277,7 +284,10 @@ function AddMedicalRecordModal({ open, onClose, onSuccess, patientId }) {
           <p className="text-xs text-slate-400 mt-1">Patient status and steps to follow. Do not include medicines — use prescriptions instead.</p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Clinical Notes</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-slate-700">Clinical Notes</label>
+            <VoiceNoteButton onTranscript={(t) => setNotes((v) => v ? `${v} ${t}` : t)} disabled={saving} />
+          </div>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -420,7 +430,10 @@ function AddPrescriptionModal({ open, onClose, onSuccess, patientId }) {
           <Plus className="w-4 h-4" /> Add another medicine
         </button>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-slate-700">Notes</label>
+            <VoiceNoteButton onTranscript={(t) => setNotes((v) => v ? `${v} ${t}` : t)} disabled={saving} maxLength={1000} currentLength={notes.length} />
+          </div>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -534,7 +547,10 @@ function RequestLabTestModal({ open, onClose, onSuccess, patientId }) {
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Clinical Notes</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-slate-700">Clinical Notes</label>
+            <VoiceNoteButton onTranscript={(t) => setClinicalNotes((v) => v ? `${v} ${t}` : t)} disabled={saving} />
+          </div>
           <textarea
             value={clinicalNotes}
             onChange={(e) => setClinicalNotes(e.target.value)}

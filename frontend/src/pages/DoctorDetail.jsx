@@ -8,6 +8,7 @@ import {
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
 import { Card, CardContent } from '../components/ui/card';
+import VoiceNoteButton from '../components/VoiceNoteButton';
 import { Badge } from '../components/ui/badge';
 import StatusBadge from '../components/StatusBadge';
 import DataTable from '../components/DataTable';
@@ -172,9 +173,12 @@ function BookingModal({ doctor, onClose, onBooked }) {
           )}
 
           <div>
-            <label htmlFor="appt-notes" className="block text-sm font-medium text-slate-700 mb-1">
-              Notes <span className="text-slate-400">(optional)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="appt-notes" className="block text-sm font-medium text-slate-700">
+                Notes <span className="text-slate-400">(optional)</span>
+              </label>
+              <VoiceNoteButton onTranscript={(t) => setNotes((v) => v ? `${v} ${t}` : t)} maxLength={500} currentLength={notes.length} />
+            </div>
             <textarea
               id="appt-notes"
               rows={3}
