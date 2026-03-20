@@ -2,6 +2,7 @@ const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
 const { getPresignedImageUrl } = require('../middleware/upload');
+const { buildPatientSearchClause } = require('../utils/searchUtils');
 
 const getAll = async (req, res, next) => {
   try {
@@ -308,18 +309,12 @@ const getAssignedPatients = async (req, res, next) => {
     const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
     const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
 
-    let searchClause = '';
-    const queryParams = [doctorId];
-    if (search && search.trim()) {
-      const searchTerm = `%${search.trim().toLowerCase()}%`;
-      queryParams.push(searchTerm);
-      searchClause = ` AND (
-        LOWER(u.first_name || ' ' || u.last_name) LIKE $${queryParams.length}
-        OR LOWER(u.email) LIKE $${queryParams.length}
-        OR LOWER(p.id::text) LIKE $${queryParams.length}
-      )`;
+    if (search && search.length > 100) {
+      throw new AppError('Search term must be under 100 characters.', 400);
     }
 
+    const queryParams = [doctorId];
+    const searchClause = buildPatientSearchClause(search, queryParams);
     queryParams.push(safeLimit, safeOffset);
 
     const result = await db.query(

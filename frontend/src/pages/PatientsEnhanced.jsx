@@ -168,7 +168,8 @@ export default function PatientsEnhanced() {
   const isDoctor = currentUser?.role === 'doctor';
   const [tab, setTab] = useState('patients');
   const [patients, setPatients] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const debounceRef = useRef(null);
@@ -184,10 +185,11 @@ export default function PatientsEnhanced() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
+    const controller = new AbortController();
+    setSearching(true);
     const endpoint = isDoctor ? '/doctors/me/patients' : '/patients';
     const params = debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {};
-    api.get(endpoint, { params })
+    api.get(endpoint, { params, signal: controller.signal })
       .then((res) => {
         const enhancedPatients = res.data.map(patient => ({
           ...patient,
@@ -204,11 +206,14 @@ export default function PatientsEnhanced() {
         }));
         setPatients(enhancedPatients);
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (err.name !== 'CanceledError') console.error(err);
+      })
+      .finally(() => { setSearching(false); setInitialLoad(false); });
+    return () => controller.abort();
   }, [isDoctor, debouncedSearch]);
 
-  if (loading) {
+  if (initialLoad) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -291,6 +296,7 @@ export default function PatientsEnhanced() {
                   type="text"
                   placeholder="Search by name, email, or patient ID..."
                   value={search}
+                  maxLength={100}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="
                     w-full pl-11 pr-4 py-3
@@ -299,6 +305,11 @@ export default function PatientsEnhanced() {
                     transition-all
                   "
                 />
+                {searching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
