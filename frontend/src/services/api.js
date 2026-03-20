@@ -58,6 +58,7 @@ async function attemptRefresh() {
     localStorage.setItem('medease_token', data.data.token);
     localStorage.setItem('medease_refresh_token', data.data.refreshToken);
     localStorage.setItem('medease_user', JSON.stringify(data.data.user));
+    window.dispatchEvent(new CustomEvent('medease:user-updated', { detail: data.data.user }));
     return true;
   } catch {
     return false;

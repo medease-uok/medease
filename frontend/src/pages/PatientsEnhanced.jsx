@@ -99,6 +99,10 @@ function FeedbackTab({ currentUser }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!currentUser?.doctorId) {
+      setLoading(false);
+      return;
+    }
     api.get(`/patient-feedback/doctor/${currentUser.doctorId}`)
       .then((r) => setDoctorStats(r.data))
       .catch(console.error)
@@ -168,14 +172,19 @@ export default function PatientsEnhanced() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    api.get('/patients')
+    const endpoint = isDoctor ? '/doctors/me/patients' : '/patients';
+    api.get(endpoint)
       .then((res) => {
         const enhancedPatients = res.data.map(patient => ({
           ...patient,
           name: `${patient.firstName} ${patient.lastName}`,
           id: patient.id,
           status: 'active',
-          lastVisit: patient.lastVisit || new Date().toISOString(),
+          lastVisit: patient.lastVisit || null,
+          lastVisitStatus: patient.lastVisitStatus || null,
+          nextAppointment: patient.nextAppointment || null,
+          totalAppointments: patient.totalAppointments || 0,
+          totalRecords: patient.totalRecords || 0,
           conditions: patient.conditions || [],
           avatarUrl: patient.profileImageUrl || null,
         }));
@@ -183,7 +192,7 @@ export default function PatientsEnhanced() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [isDoctor]);
 
   const filteredPatients = patients.filter(patient =>
     patient.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -207,10 +216,10 @@ export default function PatientsEnhanced() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 font-heading">
-            Patients
+            {isDoctor ? 'My Patients' : 'Patients'}
           </h2>
           <p className="text-slate-500 mt-1">
-            {patients.length} registered patients
+            {patients.length} {isDoctor ? 'assigned' : 'registered'} patients
           </p>
         </div>
 

@@ -31,6 +31,13 @@ export function AuthProvider({ children }) {
     }
   }, [currentUser, fetchPermissions]);
 
+  // Sync currentUser when api.js refreshes the token
+  useEffect(() => {
+    const handler = (e) => setCurrentUser(e.detail);
+    window.addEventListener('medease:user-updated', handler);
+    return () => window.removeEventListener('medease:user-updated', handler);
+  }, []);
+
   const login = async (email, password) => {
     try {
       const data = await api.post('/auth/login', { email, password });

@@ -62,7 +62,7 @@ function BookingModal({ doctor, onClose, onBooked }) {
     setError(null);
 
     try {
-      const scheduledAt = new Date(`${date}T${selectedSlot}:00`).toISOString();
+      const scheduledAt = `${date}T${selectedSlot}:00Z`;
       await api.post('/appointments', {
         doctorId: doctor.id,
         scheduledAt,
@@ -70,7 +70,7 @@ function BookingModal({ doctor, onClose, onBooked }) {
       });
       onBooked();
     } catch (err) {
-      setError(err.data?.message || err.message || 'Failed to book appointment.');
+      setError(err?.response?.data?.message || err?.data?.message || err.message || 'Failed to book appointment.');
     } finally {
       setSubmitting(false);
     }

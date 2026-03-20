@@ -22,6 +22,29 @@ const otpKey = (userId) => `login_otp:${userId}`;
 const pwdResetOtpKey = (userId) => `pwd_reset_otp:${userId}`;
 const pwdResetTokenKey = (userId) => `pwd_reset_token:${userId}`;
 
+const PROFILE_TABLE_MAP = {
+  doctor: { table: 'doctors', field: 'doctorId' },
+  patient: { table: 'patients', field: 'patientId' },
+  nurse: { table: 'nurses', field: 'nurseId' },
+  pharmacist: { table: 'pharmacists', field: 'pharmacistId' },
+  lab_technician: { table: 'lab_technicians', field: 'labTechnicianId' },
+};
+
+async function resolveProfileId(user) {
+  const mapping = PROFILE_TABLE_MAP[user.role];
+  if (!mapping) return {};
+  try {
+    const result = await db.query(
+      `SELECT id FROM ${mapping.table} WHERE user_id = $1 LIMIT 1`,
+      [user.id]
+    );
+    if (result.rows.length > 0) return { [mapping.field]: result.rows[0].id };
+  } catch (err) {
+    console.error(`[resolveProfileId] Failed for role=${user.role}:`, err.message);
+  }
+  return {};
+}
+
 const SALT_ROUNDS = 12;
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -413,6 +436,7 @@ const verifyOtp = async (req, res, next) => {
 
     const token = signAccessToken(user);
     const refreshToken = await createRefreshToken(user.id);
+    const profileIds = await resolveProfileId(user);
 
     return res.json({
       status: 'success',
@@ -426,6 +450,7 @@ const verifyOtp = async (req, res, next) => {
           lastName: user.last_name,
           role: user.role,
           isActive: user.is_active,
+          ...profileIds,
         },
       },
     });
@@ -700,6 +725,7 @@ const refresh = async (req, res, next) => {
     await redis.del(key);
     const newAccessToken = signAccessToken(user);
     const newRefreshToken = await createRefreshToken(user.id);
+    const profileIds = await resolveProfileId(user);
 
     res.json({
       status: 'success',
@@ -713,6 +739,7 @@ const refresh = async (req, res, next) => {
           lastName: user.last_name,
           role: user.role,
           isActive: user.is_active,
+          ...profileIds,
         },
       },
     });

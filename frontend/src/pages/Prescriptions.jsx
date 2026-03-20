@@ -891,18 +891,56 @@ export default function Prescriptions({ embedded = false }) {
 
       {/* Prescription cards */}
       {tab === 'prescriptions' && !loading && !error && filtered.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((rx) => (
-            <PrescriptionCard
-              key={rx.id}
-              rx={rx}
-              showPatient={!isPatient}
-              canRequestRefill={canRequestRefill}
-              onRequestRefill={setRefillModal}
-              onViewImage={setImageViewer}
-            />
-          ))}
-        </div>
+        isPatient ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((rx) => (
+              <PrescriptionCard
+                key={rx.id}
+                rx={rx}
+                showPatient={false}
+                canRequestRefill={canRequestRefill}
+                onRequestRefill={setRefillModal}
+                onViewImage={setImageViewer}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {(() => {
+              const grouped = filtered.reduce((acc, rx) => {
+                const key = rx.patientId || 'unknown'
+                if (!acc[key]) acc[key] = { name: rx.patientName || 'Unknown Patient', items: [] }
+                acc[key].items.push(rx)
+                return acc
+              }, {})
+              return Object.entries(grouped).map(([patientId, group]) => (
+                <div key={patientId}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold text-blue-700">
+                      {group.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">{group.name}</h3>
+                      <p className="text-xs text-slate-500">{group.items.length} {group.items.length === 1 ? 'prescription' : 'prescriptions'}</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {group.items.map((rx) => (
+                      <PrescriptionCard
+                        key={rx.id}
+                        rx={rx}
+                        showPatient={false}
+                        canRequestRefill={canRequestRefill}
+                        onRequestRefill={setRefillModal}
+                        onViewImage={setImageViewer}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))
+            })()}
+          </div>
+        )
       )}
 
       {/* Refill request cards */}
