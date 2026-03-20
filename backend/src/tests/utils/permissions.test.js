@@ -2,14 +2,14 @@ const mockRedisGet = jest.fn();
 const mockRedisSet = jest.fn();
 const mockRedisDel = jest.fn();
 
-jest.mock('../config/redis', () => ({
+jest.mock('../../config/redis', () => ({
   get: (...args) => mockRedisGet(...args),
   set: (...args) => mockRedisSet(...args),
   del: (...args) => mockRedisDel(...args),
 }));
 
 const mockDbQuery = jest.fn();
-jest.mock('../config/database', () => ({
+jest.mock('../../config/database', () => ({
   query: (...args) => mockDbQuery(...args),
 }));
 
@@ -19,7 +19,7 @@ const {
   hasAllPermissions,
   hasAnyPermission,
   invalidatePermissionCache,
-} = require('../utils/permissions');
+} = require('../../utils/permissions');
 
 beforeEach(() => {
   mockRedisGet.mockReset();
@@ -52,8 +52,8 @@ describe('getUserPermissions', () => {
   test('falls back to users.role column when user_roles returns empty', async () => {
     mockRedisGet.mockResolvedValue(null);
     mockDbQuery
-      .mockResolvedValueOnce({ rows: [] }) // first CTE returns empty
-      .mockResolvedValueOnce({ rows: [{ name: 'view_own_profile' }] }); // fallback CTE
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ name: 'view_own_profile' }] });
 
     const result = await getUserPermissions('user-1');
     expect(result).toEqual(['view_own_profile']);

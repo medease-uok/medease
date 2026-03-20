@@ -1,21 +1,21 @@
-const { ADMIN, DOCTOR, NURSE, PATIENT, PHARMACIST, LAB_TECH, APPOINTMENT, MEDICAL_RECORD, PRESCRIPTION, LAB_REPORT } = require('./fixtures/rbac.fixtures');
+const { ADMIN, DOCTOR, NURSE, PATIENT, PHARMACIST, LAB_TECH, APPOINTMENT, MEDICAL_RECORD, PRESCRIPTION, LAB_REPORT } = require('../fixtures/rbac.fixtures');
 
 const mockRedisGet = jest.fn();
 const mockRedisSet = jest.fn();
 const mockRedisDel = jest.fn();
 
-jest.mock('../config/redis', () => ({
+jest.mock('../../config/redis', () => ({
   get: (...args) => mockRedisGet(...args),
   set: (...args) => mockRedisSet(...args),
   del: (...args) => mockRedisDel(...args),
 }));
 
 const mockDbQuery = jest.fn();
-jest.mock('../config/database', () => ({
+jest.mock('../../config/database', () => ({
   query: (...args) => mockDbQuery(...args),
 }));
 
-const { evaluateAccess, evaluateCondition, buildAccessFilter, loadPolicies, invalidatePolicyCache } = require('../utils/abac');
+const { evaluateAccess, evaluateCondition, buildAccessFilter, loadPolicies, invalidatePolicyCache } = require('../../utils/abac');
 
 const POLICIES = [
   {

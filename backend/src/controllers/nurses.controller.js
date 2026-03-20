@@ -24,23 +24,25 @@ const getStatistics = async (req, res, next) => {
       `),
 
       db.query(`
-        SELECT
-          CASE
-            WHEN u.date_of_birth IS NULL THEN 'Not specified'
-            ELSE
-              CASE
-                WHEN AGE(u.date_of_birth) < INTERVAL '25 years' THEN 'Under 25'
-                WHEN AGE(u.date_of_birth) < INTERVAL '35 years' THEN '25-34'
-                WHEN AGE(u.date_of_birth) < INTERVAL '45 years' THEN '35-44'
-                WHEN AGE(u.date_of_birth) < INTERVAL '55 years' THEN '45-54'
-                ELSE '55+'
-              END
-          END AS age_group,
-          COUNT(*) AS count
-        FROM nurses n
-        JOIN users u ON n.user_id = u.id
-        WHERE u.is_active = true
-        GROUP BY age_group
+        SELECT age_group, count FROM (
+          SELECT
+            CASE
+              WHEN u.date_of_birth IS NULL THEN 'Not specified'
+              ELSE
+                CASE
+                  WHEN AGE(u.date_of_birth) < INTERVAL '25 years' THEN 'Under 25'
+                  WHEN AGE(u.date_of_birth) < INTERVAL '35 years' THEN '25-34'
+                  WHEN AGE(u.date_of_birth) < INTERVAL '45 years' THEN '35-44'
+                  WHEN AGE(u.date_of_birth) < INTERVAL '55 years' THEN '45-54'
+                  ELSE '55+'
+                END
+            END AS age_group,
+            COUNT(*) AS count
+          FROM nurses n
+          JOIN users u ON n.user_id = u.id
+          WHERE u.is_active = true
+          GROUP BY 1
+        ) sub
         ORDER BY
           CASE age_group
             WHEN 'Under 25' THEN 1

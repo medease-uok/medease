@@ -1,7 +1,7 @@
-const { ADMIN, DOCTOR, NURSE, PATIENT, PHARMACIST, LAB_TECH } = require('./fixtures/rbac.fixtures');
+const { ADMIN, DOCTOR, NURSE, PATIENT, PHARMACIST, LAB_TECH } = require('../fixtures/rbac.fixtures');
 
 const mockGetUserPermissions = jest.fn();
-jest.mock('../utils/permissions', () => ({
+jest.mock('../../utils/permissions', () => ({
   getUserPermissions: (...args) => mockGetUserPermissions(...args),
   hasPermission: jest.fn(),
   hasAllPermissions: jest.fn(),
@@ -12,8 +12,8 @@ jest.mock('../utils/permissions', () => ({
   invalidatePermissionCache: jest.fn(),
 }));
 
-const authorize = require('../middleware/authorize');
-const { requirePermission } = require('../middleware/authorize');
+const authorize = require('../../middleware/authorize');
+const { requirePermission } = require('../../middleware/authorize');
 
 function runAuthorize(roles, user) {
   return new Promise((resolve) => {

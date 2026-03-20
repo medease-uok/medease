@@ -1,11 +1,11 @@
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET, makeToken, ADMIN, DOCTOR, PATIENT } = require('./fixtures/rbac.fixtures');
+const { JWT_SECRET, makeToken, ADMIN, DOCTOR, PATIENT } = require('../fixtures/rbac.fixtures');
 
-jest.mock('../config', () => ({
+jest.mock('../../config', () => ({
   jwtSecret: 'test-secret',
 }));
 
-const authenticate = require('../middleware/authenticate');
+const authenticate = require('../../middleware/authenticate');
 
 function runMiddleware(req) {
   return new Promise((resolve) => {

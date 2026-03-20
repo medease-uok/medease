@@ -23,6 +23,7 @@ const DOCTOR_BODY = {
   role: 'doctor',
   password: 'Str0ng@Pass',
   confirmPassword: 'Str0ng@Pass',
+  gender: 'male',
   specialization: 'Cardiology',
   licenseNumber: 'SLMC-12345',
   department: 'Cardiology',

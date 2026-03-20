@@ -1,6 +1,6 @@
-const { PATIENT_BODY, DOCTOR_BODY, NURSE_BODY, PHARMACIST_BODY, LAB_TECH_BODY } = require('./fixtures/register.fixtures');
-const { registerValidation } = require('../validators/auth.validators');
-const validate = require('../middleware/validate');
+const { PATIENT_BODY, DOCTOR_BODY, NURSE_BODY, PHARMACIST_BODY, LAB_TECH_BODY } = require('../fixtures/register.fixtures');
+const { registerValidation } = require('../../validators/auth.validators');
+const validate = require('../../middleware/validate');
 
 function runValidation(body) {
   return new Promise((resolve) => {

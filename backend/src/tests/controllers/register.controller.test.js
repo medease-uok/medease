@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { PATIENT_BODY, DOCTOR_BODY, NURSE_BODY, PHARMACIST_BODY, LAB_TECH_BODY, USER_ROW } = require('./fixtures/register.fixtures');
+const { PATIENT_BODY, DOCTOR_BODY, NURSE_BODY, PHARMACIST_BODY, LAB_TECH_BODY, USER_ROW } = require('../fixtures/register.fixtures');
 
 const mockQuery = jest.fn();
 const mockClientQuery = jest.fn();
@@ -9,34 +9,34 @@ const mockGetClient = jest.fn(() => ({
   release: mockClientRelease,
 }));
 
-jest.mock('../config/database', () => ({
+jest.mock('../../config/database', () => ({
   query: (...args) => mockQuery(...args),
   getClient: () => mockGetClient(),
 }));
 
-jest.mock('../config/redis', () => ({
+jest.mock('../../config/redis', () => ({
   get: jest.fn(),
   set: jest.fn(),
   del: jest.fn(),
 }));
 
-jest.mock('../config', () => ({
+jest.mock('../../config', () => ({
   jwtSecret: 'test-secret',
   jwtExpiresIn: '1h',
   refreshTokenTTL: 604800,
   otp: { ttlSeconds: 600, maxAttempts: 3 },
 }));
 
-jest.mock('../utils/auditLog', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('../../utils/auditLog', () => jest.fn().mockResolvedValue(undefined));
 
-jest.mock('../utils/emailService', () => ({
+jest.mock('../../utils/emailService', () => ({
   sendLoginOtpEmail: jest.fn().mockResolvedValue(undefined),
   sendRegistrationVerificationEmail: jest.fn().mockResolvedValue(undefined),
   sendPasswordResetOtpEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
-const { register } = require('../controllers/auth.controller');
-const auditLog = require('../utils/auditLog');
+const { register } = require('../../controllers/auth.controller');
+const auditLog = require('../../utils/auditLog');
 
 function mockReq(body = {}) {
   return { body, ip: '127.0.0.1' };
@@ -64,6 +64,7 @@ function setupSuccessfulRegistration(userRow = USER_ROW) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockClientQuery.mockReset();
 });
 
 describe('register controller', () => {
@@ -99,13 +100,13 @@ describe('register controller', () => {
 
     test('registers a doctor with specialization and license', async () => {
       const doctorRow = { ...USER_ROW, email: 'kamal@example.com', first_name: 'Kamal', last_name: 'Perera', role: 'doctor' };
-      mockClientQuery.mockResolvedValueOnce({ rows: [] });
-      mockClientQuery.mockResolvedValueOnce({ rows: [] });
-      mockClientQuery.mockResolvedValueOnce(undefined);
-      mockClientQuery.mockResolvedValueOnce({ rows: [doctorRow] });
-      mockClientQuery.mockResolvedValueOnce({ rows: [] });
-      mockClientQuery.mockResolvedValueOnce({ rows: [] });
-      mockClientQuery.mockResolvedValueOnce(undefined);
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });          // email check
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });          // license check
+      mockClientQuery.mockResolvedValueOnce(undefined);             // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [doctorRow] }); // INSERT users
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ id: 'dc-test-uuid' }] }); // INSERT doctors RETURNING id
+      mockClientQuery.mockResolvedValueOnce(undefined);             // INSERT schedule day 1
+      mockClientQuery.mockResolvedValueOnce(undefined);             // INSERT schedule day 2
 
       const req = mockReq(DOCTOR_BODY);
       const res = mockRes();
