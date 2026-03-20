@@ -36,9 +36,21 @@ const getAll = async (req, res, next) => {
   try {
     const { clause, params } = buildPatientAccessFilter(req.user);
 
+    let searchClause = '';
+    if (req.query.search && req.query.search.trim()) {
+      const searchTerm = `%${req.query.search.trim().toLowerCase()}%`;
+      params.push(searchTerm);
+      const idx = params.length;
+      searchClause = ` AND (
+        LOWER(u.first_name || ' ' || u.last_name) LIKE $${idx}
+        OR LOWER(u.email) LIKE $${idx}
+        OR LOWER(p.id::text) LIKE $${idx}
+      )`;
+    }
+
     const result = await db.query(
       `${PATIENT_SELECT}
-       WHERE u.is_active = true AND ${clause}
+       WHERE u.is_active = true AND ${clause}${searchClause}
        ORDER BY u.last_name, u.first_name`,
       params
     );

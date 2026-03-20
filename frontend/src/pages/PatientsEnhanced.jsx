@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Search, Users, Star, MessageSquare, Clock, Heart, Stethoscope,
@@ -170,10 +170,24 @@ export default function PatientsEnhanced() {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debounceRef = useRef(null);
+
+  const handleSearchChange = useCallback((value) => {
+    setSearch(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(value), 300);
+  }, []);
 
   useEffect(() => {
+    return () => clearTimeout(debounceRef.current);
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
     const endpoint = isDoctor ? '/doctors/me/patients' : '/patients';
-    api.get(endpoint)
+    const params = debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {};
+    api.get(endpoint, { params })
       .then((res) => {
         const enhancedPatients = res.data.map(patient => ({
           ...patient,
@@ -192,13 +206,7 @@ export default function PatientsEnhanced() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [isDoctor]);
-
-  const filteredPatients = patients.filter(patient =>
-    patient.name.toLowerCase().includes(search.toLowerCase()) ||
-    patient.email?.toLowerCase().includes(search.toLowerCase()) ||
-    patient.id?.toLowerCase().includes(search.toLowerCase())
-  );
+  }, [isDoctor, debouncedSearch]);
 
   if (loading) {
     return (
@@ -281,9 +289,9 @@ export default function PatientsEnhanced() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search by name, email, or ID..."
+                  placeholder="Search by name, email, or patient ID..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="
                     w-full pl-11 pr-4 py-3
                     border border-slate-200 rounded-lg
@@ -295,9 +303,9 @@ export default function PatientsEnhanced() {
             </CardContent>
           </Card>
 
-          {filteredPatients.length > 0 ? (
+          {patients.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredPatients.map((patient) => (
+              {patients.map((patient) => (
                 <PatientCard
                   key={patient.id}
                   patient={patient}
