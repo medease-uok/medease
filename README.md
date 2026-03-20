@@ -25,6 +25,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Lab test request workflow with priority levels and lab technician assignment
 - Patient satisfaction and feedback system with per-doctor ratings and analytics
 - PDF generation for medical records and prescriptions
+- Voice input (speech-to-text) for clinical notes, diagnoses, prescriptions, and other text fields
 - Role-Based Access Control (RBAC) with 26 permissions across 6 roles
 - Attribute-Based Access Control (ABAC) for resource-level filtering
 - Email verification, multi-step login with OTP, and password reset
