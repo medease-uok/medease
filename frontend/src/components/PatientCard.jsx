@@ -1,4 +1,4 @@
-import { User, Calendar, Droplet, Phone } from 'lucide-react'
+import { User, Calendar, Droplet, Phone, Clock, FileText } from 'lucide-react'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
 
@@ -13,10 +13,17 @@ export function PatientCard({ patient, onClick }) {
   }
 
   const getDaysSinceVisit = (date) => {
+    if (!date) return null
     const days = Math.floor((new Date() - new Date(date)) / (1000 * 60 * 60 * 24))
     if (days === 0) return 'Today'
     if (days === 1) return 'Yesterday'
     return `${days} days ago`
+  }
+
+  const formatUpcoming = (date) => {
+    if (!date) return null
+    const d = new Date(date)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
   }
 
   return (
@@ -133,6 +140,30 @@ export function PatientCard({ patient, onClick }) {
                 </div>
               )}
             </div>
+
+            {/* Doctor-specific summary stats */}
+            {(patient.nextAppointment || patient.totalAppointments > 0) && (
+              <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
+                {patient.nextAppointment && (
+                  <span className="flex items-center gap-1 text-primary font-medium">
+                    <Clock className="w-3 h-3" />
+                    Next: {formatUpcoming(patient.nextAppointment)}
+                  </span>
+                )}
+                {patient.totalAppointments > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {patient.totalAppointments} visits
+                  </span>
+                )}
+                {patient.totalRecords > 0 && (
+                  <span className="flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    {patient.totalRecords} records
+                  </span>
+                )}
+              </div>
+            )}
 
             {patient.conditions && patient.conditions.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1">
