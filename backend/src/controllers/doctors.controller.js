@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { maskSensitiveFields } = require('../utils/maskSensitiveFields');
+const { getPresignedImageUrl } = require('../middleware/upload');
 
 const getAll = async (req, res, next) => {
   try {
@@ -295,8 +296,17 @@ const getStatistics = async (req, res, next) => {
 
 const getAssignedPatients = async (req, res, next) => {
   try {
-    const doctorId = req.user.doctorId;
+    // Fallback to DB lookup if doctorId not on token (e.g. pre-deploy sessions)
+    let doctorId = req.user.doctorId;
+    if (!doctorId) {
+      const lookup = await db.query('SELECT id FROM doctors WHERE user_id = $1', [req.user.id]);
+      doctorId = lookup.rows[0]?.id;
+    }
     if (!doctorId) throw new AppError('Doctor profile not found.', 403);
+
+    const { limit = 50, offset = 0 } = req.query;
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+    const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
 
     const result = await db.query(
       `SELECT
@@ -313,8 +323,8 @@ const getAssignedPatients = async (req, res, next) => {
          latest_apt.scheduled_at AS last_visit,
          latest_apt.status AS last_visit_status,
          upcoming.next_appointment,
-         COALESCE(stats.total_appointments, 0) AS total_appointments,
-         COALESCE(stats.total_records, 0) AS total_records
+         COALESCE(apt_stats.total_appointments, 0) AS total_appointments,
+         COALESCE(rec_stats.total_records, 0) AS total_records
        FROM patients p
        JOIN users u ON p.user_id = u.id
        JOIN (
@@ -335,19 +345,20 @@ const getAssignedPatients = async (req, res, next) => {
            AND a.status = 'scheduled' AND a.scheduled_at > NOW()
        ) upcoming ON true
        LEFT JOIN LATERAL (
-         SELECT
-           COUNT(DISTINCT a.id) AS total_appointments,
-           COUNT(DISTINCT mr.id) AS total_records
+         SELECT COUNT(*) AS total_appointments
          FROM appointments a
-         LEFT JOIN medical_records mr ON mr.patient_id = p.id AND mr.doctor_id = $1
          WHERE a.doctor_id = $1 AND a.patient_id = p.id
-       ) stats ON true
+       ) apt_stats ON true
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*) AS total_records
+         FROM medical_records mr
+         WHERE mr.doctor_id = $1 AND mr.patient_id = p.id
+       ) rec_stats ON true
        WHERE u.is_active = true
-       ORDER BY upcoming.next_appointment ASC NULLS LAST, latest_apt.scheduled_at DESC NULLS LAST`,
-      [doctorId]
+       ORDER BY upcoming.next_appointment ASC NULLS LAST, latest_apt.scheduled_at DESC NULLS LAST
+       LIMIT $2 OFFSET $3`,
+      [doctorId, safeLimit, safeOffset]
     );
-
-    const { getPresignedImageUrl } = require('../middleware/upload');
 
     const patients = await Promise.all(result.rows.map(async (row) => ({
       id: row.id,

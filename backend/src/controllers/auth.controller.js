@@ -39,7 +39,9 @@ async function resolveProfileId(user) {
       [user.id]
     );
     if (result.rows.length > 0) return { [mapping.field]: result.rows[0].id };
-  } catch { /* table may not exist */ }
+  } catch (err) {
+    console.error(`[resolveProfileId] Failed for role=${user.role}:`, err.message);
+  }
   return {};
 }
 
