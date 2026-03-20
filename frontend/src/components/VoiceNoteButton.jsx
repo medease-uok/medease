@@ -18,12 +18,12 @@ export default function VoiceNoteButton({ onTranscript, disabled = false, classN
   const [listening, setListening] = useState(false)
   const [supported] = useState(() => !!SpeechRecognition)
   const recognitionRef = useRef(null)
-  const manualStop = useRef(false)
+  const listeningRef = useRef(false)
 
   const stop = useCallback(() => {
-    manualStop.current = true
-    recognitionRef.current?.stop()
+    listeningRef.current = false
     setListening(false)
+    recognitionRef.current?.stop()
   }, [])
 
   const start = useCallback(() => {
@@ -35,7 +35,6 @@ export default function VoiceNoteButton({ onTranscript, disabled = false, classN
     recognition.continuous = true
     recognition.maxAlternatives = 1
     recognitionRef.current = recognition
-    manualStop.current = false
 
     recognition.onresult = (event) => {
       const last = event.results[event.results.length - 1]
@@ -48,12 +47,14 @@ export default function VoiceNoteButton({ onTranscript, disabled = false, classN
       if (event.error !== 'aborted' && event.error !== 'no-speech') {
         console.error('[VoiceNote] error:', event.error)
       }
+      listeningRef.current = false
       setListening(false)
     }
 
     recognition.onend = () => {
-      if (!manualStop.current && listening) {
-        try { recognition.start() } catch { setListening(false) }
+      // Auto-restart if user hasn't explicitly stopped
+      if (listeningRef.current) {
+        try { recognition.start() } catch { listeningRef.current = false; setListening(false) }
       } else {
         setListening(false)
       }
@@ -61,15 +62,16 @@ export default function VoiceNoteButton({ onTranscript, disabled = false, classN
 
     try {
       recognition.start()
+      listeningRef.current = true
       setListening(true)
     } catch (err) {
       console.error('[VoiceNote] start failed:', err)
     }
-  }, [disabled, lang, onTranscript, listening])
+  }, [disabled, lang, onTranscript])
 
   useEffect(() => {
     return () => {
-      manualStop.current = true
+      listeningRef.current = false
       recognitionRef.current?.stop()
     }
   }, [])
