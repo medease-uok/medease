@@ -32,7 +32,14 @@ function RecordCard({ record, showPatient }) {
             <FileText className="w-5 h-5 text-green-600" aria-hidden="true" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900">{record.diagnosis || 'Medical Record'}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-slate-900">{record.diagnosis || 'Medical Record'}</h3>
+              {record.icdCode && (
+                <span className="text-xs font-mono font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded" title={record.icdDescription || ''}>
+                  {record.icdCode}
+                </span>
+              )}
+            </div>
             {record.doctorName && (
               <p className="text-sm text-slate-500">{record.doctorName}</p>
             )}

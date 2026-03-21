@@ -10,6 +10,7 @@ import DetailCard from '../components/DetailCard';
 import DataTable from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import VoiceNoteButton from '../components/VoiceNoteButton';
+import IcdCodeLookup from '../components/IcdCodeLookup';
 
 const SEVERITY_COLORS = {
   severe: 'bg-red-100 text-red-700',
@@ -222,13 +223,14 @@ function DocumentPreviewModal({ doc, onClose }) {
 /* ─── Add Medical Record Modal (Doctor only) ─── */
 function AddMedicalRecordModal({ open, onClose, onSuccess, patientId }) {
   const [diagnosis, setDiagnosis] = useState('');
+  const [icdCode, setIcdCode] = useState(null);
   const [treatment, setTreatment] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (open) { setDiagnosis(''); setTreatment(''); setNotes(''); setError(null); }
+    if (open) { setDiagnosis(''); setIcdCode(null); setTreatment(''); setNotes(''); setError(null); }
   }, [open]);
 
   const handleSubmit = async (e) => {
@@ -240,6 +242,7 @@ function AddMedicalRecordModal({ open, onClose, onSuccess, patientId }) {
       await api.post('/medical-records', {
         patientId,
         diagnosis: diagnosis.trim(),
+        icdCode: icdCode || undefined,
         treatment: treatment.trim() || null,
         notes: notes.trim() || null,
       });
@@ -268,6 +271,18 @@ function AddMedicalRecordModal({ open, onClose, onSuccess, patientId }) {
             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
             required
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">ICD-10 Code</label>
+          <IcdCodeLookup
+            value={icdCode}
+            onChange={(code, desc) => {
+              setIcdCode(code);
+              if (code && desc && !diagnosis.trim()) setDiagnosis(desc);
+            }}
+            disabled={saving}
+          />
+          <p className="text-xs text-slate-400 mt-1">Optional. Search by code or description to assign a standard diagnosis code.</p>
         </div>
         <div>
           <div className="flex items-center justify-between mb-1">
@@ -833,7 +848,16 @@ export default function PatientDetail() {
         <DataTable
           columns={[
             { key: 'doctorName', label: 'Doctor' },
-            { key: 'diagnosis', label: 'Diagnosis' },
+            { key: 'diagnosis', label: 'Diagnosis', render: (val, row) => (
+              <div>
+                <span>{val}</span>
+                {row.icdCode && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-xs font-mono font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded" title={row.icdDescription || ''}>
+                    {row.icdCode}
+                  </span>
+                )}
+              </div>
+            )},
             { key: 'treatment', label: 'Plan' },
             { key: 'createdAt', label: 'Date', render: formatDate },
             { key: '_files', label: 'Files', render: (_, row) => renderFilesCell('medical_record', row) },
