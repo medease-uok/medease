@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   Upload, X, AlertCircle, Eye, Loader2, Download, ExternalLink,
   Plus, FileText, FlaskConical, Pill, ChevronLeft, CheckCircle2, Star,
+  ClipboardList, Calendar, Check, Circle, Trash2,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -597,6 +598,493 @@ function RequestLabTestModal({ open, onClose, onSuccess, patientId }) {
   );
 }
 
+/* ─── Add Treatment Plan Modal ─── */
+function AddTreatmentPlanModal({ open, onClose, onSuccess, patientId }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [items, setItems] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (open) {
+      setTitle(''); setDescription(''); setPriority('medium');
+      setStartDate(''); setEndDate(''); setNotes(''); setItems([]); setError(null);
+    }
+  }, [open]);
+
+  const addItem = () => setItems((prev) => [...prev, { title: '', description: '', dueDate: '' }]);
+  const updateItemField = (idx, field, value) =>
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)));
+  const removeItemRow = (idx) => setItems((prev) => prev.filter((_, i) => i !== idx));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!title.trim()) { setError('Title is required.'); return; }
+    const validItems = items.filter((it) => it.title.trim());
+    if (items.length > 0 && validItems.length === 0) { setError('Add at least one step with a title, or remove all steps.'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await api.post(`/patients/${patientId}/treatment-plans`, {
+        title: title.trim(),
+        description: description.trim() || null,
+        priority,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        notes: notes.trim() || null,
+        items: validItems.map((it) => ({
+          title: it.title.trim(),
+          description: it.description.trim() || null,
+          dueDate: it.dueDate || null,
+        })),
+      });
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to create treatment plan.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Add Treatment Plan" wide>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Title *</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={255}
+            placeholder="e.g. Post-surgery rehabilitation"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Priority</label>
+          <div className="flex gap-3">
+            {['low', 'medium', 'high'].map((p) => (
+              <label key={p} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="plan-priority"
+                  value={p}
+                  checked={priority === p}
+                  onChange={() => setPriority(p)}
+                  className="text-primary focus:ring-primary"
+                />
+                <span className={`text-sm font-medium capitalize ${p === 'high' ? 'text-red-600' : 'text-slate-700'}`}>
+                  {p}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              min={startDate || undefined}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-slate-700">Description</label>
+            <VoiceNoteButton onTranscript={(t) => setDescription((v) => v ? `${v} ${t}` : t)} disabled={saving} maxLength={1000} currentLength={description.length} />
+          </div>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={1000}
+            rows={3}
+            placeholder="Detailed treatment plan description..."
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+          />
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-slate-700">Notes</label>
+            <VoiceNoteButton onTranscript={(t) => setNotes((v) => v ? `${v} ${t}` : t)} disabled={saving} maxLength={1000} currentLength={notes.length} />
+          </div>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            maxLength={1000}
+            rows={2}
+            placeholder="Additional notes..."
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+          />
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-slate-700">Plan Steps</label>
+            <button
+              type="button"
+              onClick={addItem}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+            >
+              <Plus className="w-3 h-3" /> Add Step
+            </button>
+          </div>
+          {items.length === 0 && (
+            <p className="text-xs text-slate-400 italic">No steps added yet. You can add steps now or later.</p>
+          )}
+          <div className="space-y-3">
+            {items.map((item, idx) => (
+              <div key={idx} className="flex gap-2 items-start p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <span className="text-xs font-bold text-slate-400 mt-2 min-w-[20px]">{idx + 1}.</span>
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="text"
+                    value={item.title}
+                    onChange={(e) => updateItemField(idx, 'title', e.target.value)}
+                    maxLength={255}
+                    placeholder="Step title *"
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={item.description}
+                      onChange={(e) => updateItemField(idx, 'description', e.target.value)}
+                      placeholder="Description (optional)"
+                      className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                    <input
+                      type="date"
+                      value={item.dueDate}
+                      onChange={(e) => updateItemField(idx, 'dueDate', e.target.value)}
+                      className="w-36 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeItemRow(idx)}
+                  className="p-1 text-slate-400 hover:text-red-500 transition-colors mt-1"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+        {error && (
+          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : <><ClipboardList className="w-4 h-4" /> Create Plan</>}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ─── Treatment Plan Item Row ─── */
+function TreatmentPlanItemRow({ item, planId, patientId, canEdit, onRefresh }) {
+  const [toggling, setToggling] = useState(false);
+
+  const toggleComplete = async () => {
+    setToggling(true);
+    try {
+      await api.patch(`/patients/${patientId}/treatment-plans/${planId}/items/${item.id}`, {
+        isCompleted: !item.isCompleted,
+      });
+      onRefresh();
+    } catch {
+      // silent
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await api.delete(`/patients/${patientId}/treatment-plans/${planId}/items/${item.id}`);
+      onRefresh();
+    } catch {
+      // silent
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-slate-50 group">
+      {canEdit ? (
+        <button onClick={toggleComplete} disabled={toggling} className="flex-shrink-0">
+          {item.isCompleted ? (
+            <Check className="w-5 h-5 text-green-600" />
+          ) : (
+            <Circle className="w-5 h-5 text-slate-300 hover:text-slate-500" />
+          )}
+        </button>
+      ) : (
+        item.isCompleted ? <Check className="w-5 h-5 text-green-600 flex-shrink-0" /> : <Circle className="w-5 h-5 text-slate-300 flex-shrink-0" />
+      )}
+      <div className="flex-1 min-w-0">
+        <span className={`text-sm ${item.isCompleted ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+          {item.title}
+        </span>
+        {item.dueDate && (
+          <span className="ml-2 text-xs text-slate-400">
+            <Calendar className="w-3 h-3 inline mr-0.5" />
+            {formatDate(item.dueDate)}
+          </span>
+        )}
+      </div>
+      {canEdit && (
+        <button
+          onClick={handleDelete}
+          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all"
+          title="Remove item"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ─── Treatment Plan Card (expandable) ─── */
+function TreatmentPlanCard({ plan, patientId, isDoctor, expanded, onToggle, onRefresh }) {
+  const [items, setItems] = useState([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+  const [newItemTitle, setNewItemTitle] = useState('');
+  const [addingItem, setAddingItem] = useState(false);
+
+  useEffect(() => {
+    if (expanded && items.length === 0) {
+      setLoadingItems(true);
+      api.get(`/patients/${patientId}/treatment-plans/${plan.id}`)
+        .then((res) => setItems(res.data?.items || []))
+        .catch(() => {})
+        .finally(() => setLoadingItems(false));
+    }
+  }, [expanded, patientId, plan.id]);
+
+  const refreshItems = () => {
+    api.get(`/patients/${patientId}/treatment-plans/${plan.id}`)
+      .then((res) => setItems(res.data?.items || []))
+      .catch(() => {});
+    onRefresh();
+  };
+
+  const handleAddItem = async (e) => {
+    e.preventDefault();
+    if (!newItemTitle.trim()) return;
+    setAddingItem(true);
+    try {
+      await api.post(`/patients/${patientId}/treatment-plans/${plan.id}/items`, {
+        title: newItemTitle.trim(),
+      });
+      setNewItemTitle('');
+      refreshItems();
+    } catch {
+      // silent
+    } finally {
+      setAddingItem(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    try {
+      await api.patch(`/patients/${patientId}/treatment-plans/${plan.id}`, { status: newStatus });
+      onRefresh();
+    } catch {
+      // silent
+    }
+  };
+
+  const priorityColors = {
+    high: 'bg-red-100 text-red-700',
+    medium: 'bg-amber-100 text-amber-700',
+    low: 'bg-green-100 text-green-700',
+  };
+
+  const statusColors = {
+    active: 'bg-blue-100 text-blue-700',
+    on_hold: 'bg-amber-100 text-amber-700',
+    completed: 'bg-green-100 text-green-700',
+    cancelled: 'bg-slate-100 text-slate-500',
+  };
+
+  const progress = plan.itemCount > 0
+    ? Math.round((plan.completedItemCount / plan.itemCount) * 100)
+    : 0;
+
+  return (
+    <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full text-left px-5 py-4 hover:bg-slate-50 transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <ClipboardList className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+            <div className="min-w-0">
+              <h4 className="font-semibold text-slate-900 truncate">{plan.title}</h4>
+              <div className="flex items-center gap-2 mt-1">
+                {plan.doctorName && <span className="text-xs text-slate-500">{plan.doctorName}</span>}
+                {plan.startDate && (
+                  <span className="text-xs text-slate-400">
+                    Started {formatDate(plan.startDate)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${priorityColors[plan.priority] || ''}`}>
+              {plan.priority}
+            </span>
+            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[plan.status] || ''}`}>
+              {plan.status.replace('_', ' ')}
+            </span>
+            {plan.itemCount > 0 && (
+              <span className="text-xs text-slate-500 ml-1">
+                {plan.completedItemCount}/{plan.itemCount}
+              </span>
+            )}
+          </div>
+        </div>
+        {plan.itemCount > 0 && (
+          <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5">
+            <div
+              className="bg-indigo-500 h-1.5 rounded-full transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
+      </button>
+
+      {expanded && (
+        <div className="border-t border-slate-100 px-5 py-4">
+          {plan.description && (
+            <p className="text-sm text-slate-600 mb-3">{plan.description}</p>
+          )}
+          {plan.notes && (
+            <p className="text-sm text-slate-500 italic mb-3">{plan.notes}</p>
+          )}
+          {plan.endDate && (
+            <p className="text-xs text-slate-400 mb-3">Target end: {formatDate(plan.endDate)}</p>
+          )}
+
+          {isDoctor && plan.status === 'active' && (
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => handleStatusChange('completed')}
+                className="text-xs px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+              >
+                Mark Completed
+              </button>
+              <button
+                onClick={() => handleStatusChange('on_hold')}
+                className="text-xs px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+              >
+                Put On Hold
+              </button>
+              <button
+                onClick={() => handleStatusChange('cancelled')}
+                className="text-xs px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {isDoctor && plan.status === 'on_hold' && (
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => handleStatusChange('active')}
+                className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                Resume Plan
+              </button>
+            </div>
+          )}
+
+          <div className="mt-2">
+            <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Checklist Items</h5>
+            {loadingItems ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400 py-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading...
+              </div>
+            ) : (
+              <>
+                {items.map((item) => (
+                  <TreatmentPlanItemRow
+                    key={item.id}
+                    item={item}
+                    planId={plan.id}
+                    patientId={patientId}
+                    canEdit={isDoctor}
+                    onRefresh={refreshItems}
+                  />
+                ))}
+                {items.length === 0 && !isDoctor && (
+                  <p className="text-sm text-slate-400 py-2">No items yet.</p>
+                )}
+              </>
+            )}
+
+            {isDoctor && plan.status === 'active' && (
+              <form onSubmit={handleAddItem} className="flex items-center gap-2 mt-2">
+                <input
+                  type="text"
+                  value={newItemTitle}
+                  onChange={(e) => setNewItemTitle(e.target.value)}
+                  placeholder="Add a checklist item..."
+                  maxLength={255}
+                  className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <button
+                  type="submit"
+                  disabled={addingItem || !newItemTitle.trim()}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {addingItem ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main PatientDetail Component ─── */
 export default function PatientDetail() {
   const { id } = useParams();
@@ -621,6 +1109,9 @@ export default function PatientDetail() {
   const [completingAppt, setCompletingAppt] = useState(false);
   const [initialRecordCount, setInitialRecordCount] = useState(null);
   const [feedback, setFeedback] = useState([]);
+  const [treatmentPlans, setTreatmentPlans] = useState([]);
+  const [showAddPlan, setShowAddPlan] = useState(false);
+  const [expandedPlan, setExpandedPlan] = useState(null);
 
   const fetchPatient = useCallback(() => {
     api.get(`/patients/${id}`)
@@ -672,6 +1163,14 @@ export default function PatientDetail() {
   }, [id, isDoctor]);
 
   useEffect(() => { fetchFeedback(); }, [fetchFeedback]);
+
+  const fetchTreatmentPlans = useCallback(() => {
+    api.get(`/patients/${id}/treatment-plans`)
+      .then((res) => setTreatmentPlans(res.data || []))
+      .catch(() => {});
+  }, [id]);
+
+  useEffect(() => { fetchTreatmentPlans(); }, [fetchTreatmentPlans]);
 
   // Fetch active (in_progress) appointment for this patient
   const fetchActiveAppointment = useCallback(() => {
@@ -800,6 +1299,13 @@ export default function PatientDetail() {
           >
             <FlaskConical className="w-4 h-4" />
             Request Lab Test
+          </button>
+          <button
+            onClick={() => setShowAddPlan(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
+          >
+            <ClipboardList className="w-4 h-4" />
+            Add Treatment Plan
           </button>
         </div>
       )}
@@ -934,6 +1440,38 @@ export default function PatientDetail() {
           ]}
           data={labs}
         />
+      </div>
+
+      {/* Treatment Plans */}
+      <div style={{ marginBottom: 24 }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+          <h3>Treatment Plans ({treatmentPlans.length})</h3>
+          {isDoctor && (
+            <button
+              onClick={() => setShowAddPlan(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Plan
+            </button>
+          )}
+        </div>
+        {treatmentPlans.length > 0 ? (
+          <div className="space-y-3">
+            {treatmentPlans.map((plan) => (
+              <TreatmentPlanCard
+                key={plan.id}
+                plan={plan}
+                patientId={id}
+                isDoctor={isDoctor}
+                expanded={expandedPlan === plan.id}
+                onToggle={() => setExpandedPlan(expandedPlan === plan.id ? null : plan.id)}
+                onRefresh={fetchTreatmentPlans}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400">No treatment plans yet.</p>
+        )}
       </div>
 
       {/* Pending Lab Test Requests (Doctor view) */}
@@ -1078,6 +1616,13 @@ export default function PatientDetail() {
         open={showLabRequest}
         onClose={() => setShowLabRequest(false)}
         onSuccess={fetchLabRequests}
+        patientId={id}
+      />
+
+      <AddTreatmentPlanModal
+        open={showAddPlan}
+        onClose={() => setShowAddPlan(false)}
+        onSuccess={fetchTreatmentPlans}
         patientId={id}
       />
     </div>
