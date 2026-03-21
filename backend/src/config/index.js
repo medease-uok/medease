@@ -29,4 +29,12 @@ module.exports = {
     ttlSeconds: parseInt(process.env.OTP_TTL_SECONDS || '600', 10),
     maxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS || '3', 10),
   },
+  reminders: {
+    enabled: process.env.REMINDER_ENABLED !== 'false',
+    hoursBefore: (process.env.REMINDER_HOURS_BEFORE || '24,1')
+      .split(',')
+      .map((h) => parseInt(h.trim(), 10))
+      .filter((h) => !isNaN(h) && h > 0),
+    cronSchedule: process.env.REMINDER_CRON_SCHEDULE || '*/5 * * * *',
+  },
 };
