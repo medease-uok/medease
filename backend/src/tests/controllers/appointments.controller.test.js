@@ -19,6 +19,7 @@ jest.mock('../../utils/emailService', () => ({
   sendAppointmentConfirmationEmail: jest.fn().mockResolvedValue(undefined),
 }))
 
+const { sendAppointmentConfirmationEmail } = require('../../utils/emailService')
 const { getAll, getById, create, updateStatus } = require('../../controllers/appointments.controller')
 
 function makeReq(overrides = {}) {
@@ -45,6 +46,7 @@ beforeEach(() => {
   mockClientRelease.mockReset()
   mockGetClient.mockReset()
   mockGetClient.mockImplementation(() => ({ query: mockClientQuery, release: mockClientRelease }))
+  sendAppointmentConfirmationEmail.mockClear()
 })
 
 // ──────────────────────────────────────────────────────────────
@@ -221,6 +223,41 @@ describe('create', () => {
     expect(next).not.toHaveBeenCalled()
     expect(res.status).toHaveBeenCalledWith(201)
     expect(res.json.mock.calls[0][0].data.id).toBe('appt-new')
+
+    // Verify confirmation email sent with correct arguments
+    expect(sendAppointmentConfirmationEmail).toHaveBeenCalledWith(
+      'john@example.com',
+      expect.objectContaining({
+        patientName: 'John Doe',
+        doctorName: 'Dr. Kamal Perera',
+        specialization: 'Cardiology',
+        scheduledAt: VALID_SCHEDULED_AT,
+        appointmentId: 'appt-new',
+      })
+    )
+  })
+
+  test('skips confirmation email when patient has no email', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] })
+      .mockResolvedValueOnce({ rows: [{ ...PATIENT_ROW, email: null }] })
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)                              // BEGIN
+      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] })              // schedule
+      .mockResolvedValueOnce({ rows: [{ id: 'appt-no-email' }] })   // INSERT
+      .mockResolvedValueOnce(undefined)                              // COMMIT
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: 'doc-1' },
+      body: { doctorId: 'doc-1', patientId: 'pat-1', scheduledAt: VALID_SCHEDULED_AT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await create(req, res, next)
+
+    expect(res.status).toHaveBeenCalledWith(201)
+    expect(sendAppointmentConfirmationEmail).not.toHaveBeenCalled()
   })
 
   test('returns 400 when doctor is not available on this day', async () => {

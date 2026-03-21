@@ -1,6 +1,15 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
 
+/** Escape user-supplied values before interpolation into HTML email templates. */
+const escapeHtml = (str) =>
+  String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+
 /**
  * Lazily-created singleton SMTP transporter with connection pooling.
  * The app starts even if SMTP is not yet configured.
@@ -291,10 +300,18 @@ async function sendAppointmentConfirmationEmail(to, { patientName, doctorName, s
   const apptDate = new Date(scheduledAt);
   const dateStr = apptDate.toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    timeZone: 'Asia/Colombo',
   });
   const timeStr = apptDate.toLocaleTimeString('en-US', {
     hour: '2-digit', minute: '2-digit', hour12: true,
+    timeZone: 'Asia/Colombo',
   });
+
+  // Sanitize user-supplied values for HTML interpolation
+  const safePatientName = escapeHtml(patientName);
+  const safeDoctorName = escapeHtml(doctorName);
+  const safeSpecialization = specialization ? escapeHtml(specialization) : '';
+  const safeAppointmentId = escapeHtml(appointmentId);
 
   const html = `
     <!DOCTYPE html>
@@ -322,7 +339,7 @@ async function sendAppointmentConfirmationEmail(to, { patientName, doctorName, s
               <!-- Body -->
               <tr>
                 <td style="padding:40px;">
-                  <p style="margin:0 0 16px;font-size:16px;color:#333;">Hi ${patientName},</p>
+                  <p style="margin:0 0 16px;font-size:16px;color:#333;">Hi ${safePatientName},</p>
                   <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.6;">
                     Your appointment has been successfully booked. Here are the details:
                   </p>
@@ -335,11 +352,11 @@ async function sendAppointmentConfirmationEmail(to, { patientName, doctorName, s
                         <table width="100%" cellpadding="0" cellspacing="0">
                           <tr>
                             <td style="padding:8px 0;font-size:13px;color:#888;width:120px;">Doctor</td>
-                            <td style="padding:8px 0;font-size:15px;color:#333;font-weight:600;">${doctorName}</td>
+                            <td style="padding:8px 0;font-size:15px;color:#333;font-weight:600;">${safeDoctorName}</td>
                           </tr>
-                          ${specialization ? `<tr>
+                          ${safeSpecialization ? `<tr>
                             <td style="padding:8px 0;font-size:13px;color:#888;">Specialization</td>
-                            <td style="padding:8px 0;font-size:15px;color:#333;">${specialization}</td>
+                            <td style="padding:8px 0;font-size:15px;color:#333;">${safeSpecialization}</td>
                           </tr>` : ''}
                           <tr>
                             <td style="padding:8px 0;font-size:13px;color:#888;">Date</td>
@@ -351,7 +368,7 @@ async function sendAppointmentConfirmationEmail(to, { patientName, doctorName, s
                           </tr>
                           <tr>
                             <td style="padding:8px 0;font-size:13px;color:#888;">Reference</td>
-                            <td style="padding:8px 0;font-size:13px;color:#888;font-family:monospace;">${appointmentId}</td>
+                            <td style="padding:8px 0;font-size:13px;color:#888;font-family:monospace;">${safeAppointmentId}</td>
                           </tr>
                         </table>
                       </td>
