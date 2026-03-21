@@ -15,6 +15,9 @@ jest.mock('../../utils/abac', () => ({
 jest.mock('../../controllers/notifications.controller', () => ({
   createNotification: jest.fn().mockResolvedValue(undefined),
 }))
+jest.mock('../../utils/emailService', () => ({
+  sendAppointmentConfirmationEmail: jest.fn().mockResolvedValue(undefined),
+}))
 
 const { getAll, getById, create, updateStatus } = require('../../controllers/appointments.controller')
 
@@ -188,8 +191,8 @@ describe('create', () => {
   const VALID_SCHEDULED_AT = '2026-03-23T08:00:00Z' // Monday = dayOfWeek 1
 
   const SCHEDULE_ROW = { start_time: '08:00:00', end_time: '17:00:00', is_active: true }
-  const DOCTOR_ROW = { id: 'doc-1', user_id: 'usr-doc', first_name: 'Kamal', last_name: 'Perera' }
-  const PATIENT_ROW = { id: 'pat-1', user_id: 'usr-pat', first_name: 'John', last_name: 'Doe' }
+  const DOCTOR_ROW = { id: 'doc-1', user_id: 'usr-doc', first_name: 'Kamal', last_name: 'Perera', specialization: 'Cardiology' }
+  const PATIENT_ROW = { id: 'pat-1', user_id: 'usr-pat', first_name: 'John', last_name: 'Doe', email: 'john@example.com' }
 
   beforeEach(() => {
     mockClientQuery.mockReset()

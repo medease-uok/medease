@@ -4,6 +4,7 @@ const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
 const { SLOT_DURATION_MINUTES } = require('../utils/scheduleHelpers');
+const { sendAppointmentConfirmationEmail } = require('../utils/emailService');
 
 const mapAppointment = (row) => ({
   id: row.id,
@@ -151,12 +152,12 @@ const create = async (req, res, next) => {
 
     const [doctorCheck, patientCheck] = await Promise.all([
       db.query(
-        `SELECT d.id, u.id AS user_id, u.first_name, u.last_name
+        `SELECT d.id, d.specialization, u.id AS user_id, u.first_name, u.last_name
          FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
         [doctorId]
       ),
       db.query(
-        `SELECT p.id, u.id AS user_id, u.first_name, u.last_name
+        `SELECT p.id, u.id AS user_id, u.first_name, u.last_name, u.email
          FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
         [patientId]
       ),
@@ -236,6 +237,15 @@ const create = async (req, res, next) => {
         referenceId: result.rows[0].id,
         referenceType: 'appointment',
       });
+
+      // Send confirmation email to patient (fire-and-forget)
+      sendAppointmentConfirmationEmail(patient.email, {
+        patientName: `${patient.first_name} ${patient.last_name}`,
+        doctorName: `Dr. ${doctor.first_name} ${doctor.last_name}`,
+        specialization: doctor.specialization || '',
+        scheduledAt,
+        appointmentId: result.rows[0].id,
+      }).catch(() => {});
 
       res.status(201).json({ status: 'success', data: { id: result.rows[0].id } });
     } catch (txErr) {
