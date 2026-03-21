@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   Calendar, AlertCircle, Search, Clock, User, Stethoscope, CalendarDays, X, FileText, List,
+  CalendarPlus, Repeat,
 } from 'lucide-react';
 import { appointmentStatuses } from '../constants';
 import { useAuth } from '../data/AuthContext';
@@ -8,6 +9,7 @@ import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
+import BookAppointmentModal from '../components/BookAppointmentModal';
 import ScheduleCalendar from './ScheduleCalendar';
 
 const STATUS_STYLES = {
@@ -16,6 +18,13 @@ const STATUS_STYLES = {
   completed: { variant: 'success', label: 'Completed' },
   cancelled: { variant: 'destructive', label: 'Cancelled' },
   no_show: { variant: 'secondary', label: 'No Show' },
+};
+
+const RECURRENCE_LABELS = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  biweekly: 'Biweekly',
+  monthly: 'Monthly',
 };
 
 const SKELETON_COUNT = 6;
@@ -62,14 +71,31 @@ function AppointmentCard({ appointment, showPatient, isDoctor, onClick }) {
             )}
           </div>
         </div>
-        <Badge variant={style.variant}>{style.label}</Badge>
+        <div className="flex items-center gap-1.5">
+          {appointment.seriesId && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+              <Repeat className="w-3 h-3" />
+              {RECURRENCE_LABELS[appointment.recurrencePattern] || 'Recurring'}
+            </span>
+          )}
+          <Badge variant={style.variant}>{style.label}</Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         {appointment.scheduledAt && (
           <div className="flex items-center gap-2 text-slate-600">
             <Clock className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
-            <time dateTime={appointment.scheduledAt}>{formatDate(appointment.scheduledAt)}</time>
+            <span>
+              {appointment.seriesId && <span className="font-medium">Next: </span>}
+              <time dateTime={appointment.scheduledAt}>{formatDate(appointment.scheduledAt)}</time>
+            </span>
+          </div>
+        )}
+        {appointment._seriesCount > 1 && (
+          <div className="flex items-center gap-2 text-slate-500">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+            {appointment._seriesCount} appointments in series
           </div>
         )}
         {appointment.notes && (
@@ -115,6 +141,7 @@ export default function Appointments() {
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [viewMode, setViewMode] = useState('list');
+  const [showBooking, setShowBooking] = useState(false);
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
   const isDoctor = currentUser?.role === 'doctor';
@@ -140,17 +167,51 @@ export default function Appointments() {
   }, []);
 
   const filtered = useMemo(
-    () => appointments.filter((a) => {
-      if (filter !== 'all' && a.status !== filter) return false;
-      if (deferredSearch && !matchesSearch(a, deferredSearch)) return false;
-      if (dateFrom || dateTo) {
-        const aDate = a.scheduledAt ? new Date(a.scheduledAt).getTime() : NaN;
-        if (isNaN(aDate)) return false;
-        if (dateFrom && aDate < new Date(dateFrom).getTime()) return false;
-        if (dateTo && aDate > new Date(dateTo + 'T23:59:59').getTime()) return false;
+    () => {
+      const base = appointments.filter((a) => {
+        if (filter !== 'all' && a.status !== filter) return false;
+        if (deferredSearch && !matchesSearch(a, deferredSearch)) return false;
+        if (dateFrom || dateTo) {
+          const aDate = a.scheduledAt ? new Date(a.scheduledAt).getTime() : NaN;
+          if (isNaN(aDate)) return false;
+          if (dateFrom && aDate < new Date(dateFrom).getTime()) return false;
+          if (dateTo && aDate > new Date(dateTo + 'T23:59:59').getTime()) return false;
+        }
+        return true;
+      });
+
+      // Collapse recurring series: show only the next upcoming per series
+      const now = Date.now();
+      const seriesMap = new Map();
+      const result = [];
+
+      for (const a of base) {
+        if (!a.seriesId) {
+          result.push(a);
+          continue;
+        }
+        const existing = seriesMap.get(a.seriesId);
+        if (!existing) {
+          seriesMap.set(a.seriesId, { best: a, count: 1 });
+        } else {
+          existing.count++;
+          const existingTime = new Date(existing.best.scheduledAt).getTime();
+          const thisTime = new Date(a.scheduledAt).getTime();
+          // Prefer the nearest future appointment, or the latest if all past
+          if (thisTime >= now && (existingTime < now || thisTime < existingTime)) {
+            existing.best = a;
+          } else if (existingTime < now && thisTime > existingTime) {
+            existing.best = a;
+          }
+        }
       }
-      return true;
-    }),
+
+      for (const { best, count } of seriesMap.values()) {
+        result.push({ ...best, _seriesCount: count });
+      }
+
+      return result;
+    },
     [appointments, filter, deferredSearch, dateFrom, dateTo],
   );
 
@@ -166,20 +227,30 @@ export default function Appointments() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-          {isPatient ? 'My Appointments' : 'Appointments'}
-        </h1>
-        <p className="text-slate-500 mt-1">
-          {isPatient
-            ? 'View your scheduled and past appointments.'
-            : 'Manage and review patient appointments.'}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
+            {isPatient ? 'My Appointments' : 'Appointments'}
+          </h1>
+          <p className="text-slate-500 mt-1">
+            {isPatient
+              ? 'View your scheduled and past appointments.'
+              : 'Manage and review patient appointments.'}
+          </p>
+        </div>
+        {isPatient && (
+          <button
+            onClick={() => setShowBooking(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors shadow-sm flex-shrink-0"
+          >
+            <CalendarPlus className="w-4 h-4" />
+            Book Appointment
+          </button>
+        )}
       </div>
 
-      {/* List / Calendar toggle for doctors */}
-      {isDoctor && (
-        <div className="border-b border-slate-200">
+      {/* List / Calendar toggle */}
+      <div className="border-b border-slate-200">
           <nav className="flex gap-1 -mb-px" aria-label="View mode">
             <button
               onClick={() => setViewMode('list')}
@@ -209,10 +280,9 @@ export default function Appointments() {
             </button>
           </nav>
         </div>
-      )}
 
-      {/* Calendar view for doctors */}
-      {isDoctor && viewMode === 'calendar' && (
+      {/* Calendar view */}
+      {viewMode === 'calendar' && (
         <ScheduleCalendar
           embedded
           appointments={appointments}
@@ -223,8 +293,8 @@ export default function Appointments() {
         />
       )}
 
-      {/* List view (always for non-doctors, only in list mode for doctors) */}
-      {(!isDoctor || viewMode === 'list') && (
+      {/* List view */}
+      {viewMode === 'list' && (
         <>
           <Card>
             <CardContent className="py-4">
@@ -381,6 +451,14 @@ export default function Appointments() {
           appointmentId={selectedId}
           onClose={() => setSelectedId(null)}
           onStatusChange={fetchAppointments}
+        />
+      )}
+
+      {/* Book appointment modal */}
+      {showBooking && (
+        <BookAppointmentModal
+          onClose={() => setShowBooking(false)}
+          onBooked={fetchAppointments}
         />
       )}
     </div>

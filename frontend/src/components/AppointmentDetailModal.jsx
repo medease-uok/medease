@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   X, Calendar, Clock, Stethoscope, User, FileText,
-  Building2, BadgeCheck, AlertCircle,
+  Building2, BadgeCheck, AlertCircle, Repeat,
 } from 'lucide-react'
 import api from '../services/api'
 import { useAuth } from '../data/AuthContext'
@@ -12,6 +12,7 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [cancelling, setCancelling] = useState(false)
+  const [cancellingAll, setCancellingAll] = useState(false)
   const { currentUser } = useAuth()
   const isPatient = currentUser?.role === 'patient'
 
@@ -39,7 +40,29 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
     }
   }
 
+  const handleCancelSeries = async () => {
+    if (!confirm('Are you sure you want to cancel all upcoming appointments in this series?')) return
+    setCancellingAll(true)
+    try {
+      await api.patch(`/appointments/series/${appointment.seriesId}/cancel`)
+      if (onStatusChange) onStatusChange()
+      onClose()
+    } catch (err) {
+      setError(err.data?.message || err.message || 'Failed to cancel series.')
+    } finally {
+      setCancellingAll(false)
+    }
+  }
+
   const canCancel = appointment && appointment.status === 'scheduled'
+  const isRecurring = appointment && appointment.seriesId
+
+  const recurrenceLabel = {
+    daily: 'Daily',
+    weekly: 'Weekly',
+    biweekly: 'Every 2 weeks',
+    monthly: 'Monthly',
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
@@ -139,6 +162,24 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
                 </div>
               </div>
 
+              {/* Recurrence info */}
+              {isRecurring && (
+                <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <Repeat className="w-4 h-4 text-amber-600 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Recurring</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      {recurrenceLabel[appointment.recurrencePattern] || appointment.recurrencePattern}
+                    </p>
+                    {appointment.recurrenceEndDate && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Until {new Date(appointment.recurrenceEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Notes */}
               {appointment.notes && (
                 <div className="flex items-start gap-3">
@@ -150,16 +191,25 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
                 </div>
               )}
 
-              {/* Cancel button */}
+              {/* Cancel buttons */}
               {canCancel && (
-                <div className="pt-3 border-t border-slate-100">
+                <div className="pt-3 border-t border-slate-100 space-y-2">
                   <button
                     onClick={handleCancel}
-                    disabled={cancelling}
+                    disabled={cancelling || cancellingAll}
                     className="w-full px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
                   >
                     {cancelling ? 'Cancelling...' : 'Cancel Appointment'}
                   </button>
+                  {isRecurring && (
+                    <button
+                      onClick={handleCancelSeries}
+                      disabled={cancelling || cancellingAll}
+                      className="w-full px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                    >
+                      {cancellingAll ? 'Cancelling Series...' : 'Cancel All Upcoming in Series'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

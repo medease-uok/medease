@@ -1,3 +1,4 @@
+const { randomUUID } = require('crypto');
 const db = require('../config/database');
 const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
@@ -15,6 +16,9 @@ const mapAppointment = (row) => ({
   scheduledAt: row.scheduled_at,
   status: row.status,
   notes: row.notes,
+  seriesId: row.series_id || null,
+  recurrencePattern: row.recurrence_pattern || null,
+  recurrenceEndDate: row.recurrence_end_date || null,
 });
 
 const getAll = async (req, res, next) => {
@@ -34,10 +38,9 @@ const getAll = async (req, res, next) => {
 
     const { clause, params } = await buildAccessFilter('appointment', subject, columnMap);
 
-    const sortOrder = req.query.order === 'desc' ? 'DESC' : 'ASC';
-
     const query = `
       SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
+             a.series_id, a.recurrence_pattern, a.recurrence_end_date,
              pu.first_name || ' ' || pu.last_name AS patient_name,
              'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
       FROM appointments a
@@ -46,7 +49,15 @@ const getAll = async (req, res, next) => {
       JOIN doctors d ON a.doctor_id = d.id
       JOIN users du ON d.user_id = du.id
       WHERE ${clause}
-      ORDER BY a.scheduled_at ${sortOrder}`;
+      ORDER BY
+        CASE a.status
+          WHEN 'in_progress' THEN 0
+          WHEN 'scheduled' THEN 1
+          WHEN 'completed' THEN 2
+          WHEN 'cancelled' THEN 3
+          WHEN 'no_show' THEN 4
+        END,
+        a.scheduled_at DESC`;
 
     const result = await db.query(query, params);
 
@@ -70,7 +81,7 @@ const getById = async (req, res, next) => {
 
     const result = await db.query(
       `SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
-              a.created_at, a.updated_at,
+              a.created_at, a.updated_at, a.series_id, a.recurrence_pattern, a.recurrence_end_date,
               pu.first_name || ' ' || pu.last_name AS patient_name,
               'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name,
               d.specialization, d.department
@@ -126,6 +137,9 @@ const getById = async (req, res, next) => {
         scheduledAt: row.scheduled_at,
         status: row.status,
         notes: row.notes,
+        seriesId: row.series_id || null,
+        recurrencePattern: row.recurrence_pattern || null,
+        recurrenceEndDate: row.recurrence_end_date || null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       },
@@ -241,6 +255,8 @@ const create = async (req, res, next) => {
       message: `Your appointment with Dr. ${doctor.first_name} ${doctor.last_name} is scheduled for ${dateStr}.`,
       referenceId: appointmentId,
       referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send notification to patient', { appointmentId, error: err.message });
     });
     createNotification({
       recipientId: doctor.user_id,
@@ -249,6 +265,8 @@ const create = async (req, res, next) => {
       message: `Appointment with ${patient.first_name} ${patient.last_name} scheduled for ${dateStr}.`,
       referenceId: appointmentId,
       referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send notification to doctor', { appointmentId, error: err.message });
     });
 
     // Send confirmation email (fire-and-forget, after commit)
@@ -351,6 +369,8 @@ const updateStatus = async (req, res, next) => {
           message: 'Your appointment has been cancelled.',
           referenceId: id,
           referenceType: 'appointment',
+        }).catch((err) => {
+          console.error('Failed to send cancel notification to patient', { id, error: err.message });
         });
       }
       if (doctor) {
@@ -361,6 +381,8 @@ const updateStatus = async (req, res, next) => {
           message: `Appointment with ${patient?.first_name || 'a patient'} has been cancelled.`,
           referenceId: id,
           referenceType: 'appointment',
+        }).catch((err) => {
+          console.error('Failed to send cancel notification to doctor', { id, error: err.message });
         });
       }
     }
@@ -373,4 +395,342 @@ const updateStatus = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, create, updateStatus };
+/**
+ * Compute the next occurrence date for a recurrence pattern.
+ * originalDayOfMonth is needed for monthly to handle 31→Feb→28 correctly.
+ * Returns a new Date object or null for unknown patterns.
+ */
+function nextOccurrence(currentDate, pattern, originalDayOfMonth) {
+  const next = new Date(currentDate);
+  switch (pattern) {
+    case 'daily':
+      next.setUTCDate(next.getUTCDate() + 1);
+      break;
+    case 'weekly':
+      next.setUTCDate(next.getUTCDate() + 7);
+      break;
+    case 'biweekly':
+      next.setUTCDate(next.getUTCDate() + 14);
+      break;
+    case 'monthly': {
+      next.setUTCMonth(next.getUTCMonth() + 1);
+      const daysInMonth = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+      next.setUTCDate(Math.min(originalDayOfMonth, daysInMonth));
+      break;
+    }
+    default:
+      return null;
+  }
+  return next;
+}
+
+const MAX_RECURRING_APPOINTMENTS = 52; // safety cap
+
+const createRecurring = async (req, res, next) => {
+  try {
+    const { doctorId, scheduledAt, notes, recurrencePattern, recurrenceEndDate } = req.body;
+
+    // Validate all required fields upfront before any async work
+    if (!doctorId || !scheduledAt || !recurrencePattern || !recurrenceEndDate) {
+      throw new AppError('doctorId, scheduledAt, recurrencePattern, and recurrenceEndDate are required.', 400);
+    }
+
+    const validPatterns = ['daily', 'weekly', 'biweekly', 'monthly'];
+    if (!validPatterns.includes(recurrencePattern)) {
+      throw new AppError(`recurrencePattern must be one of: ${validPatterns.join(', ')}`, 400);
+    }
+
+    const endDate = new Date(recurrenceEndDate);
+    const startDate = new Date(scheduledAt);
+    if (isNaN(endDate.getTime()) || isNaN(startDate.getTime())) {
+      throw new AppError('Invalid date format.', 400);
+    }
+    if (endDate <= startDate) {
+      throw new AppError('recurrenceEndDate must be after scheduledAt.', 400);
+    }
+
+    let patientId = req.body.patientId;
+    if (req.user.role === 'patient') {
+      if (!req.user.patientId) throw new AppError('Patient profile not found.', 404);
+      patientId = req.user.patientId;
+    } else if (!['doctor', 'nurse', 'admin'].includes(req.user.role)) {
+      throw new AppError('You do not have permission to create appointments.', 403);
+    }
+    if (!patientId) {
+      throw new AppError('patientId is required.', 400);
+    }
+
+    const [doctorCheck, patientCheck] = await Promise.all([
+      db.query(
+        `SELECT d.id, d.specialization, u.id AS user_id, u.first_name, u.last_name
+         FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
+        [doctorId]
+      ),
+      db.query(
+        `SELECT p.id, u.id AS user_id, u.first_name, u.last_name, u.email
+         FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
+        [patientId]
+      ),
+    ]);
+    if (doctorCheck.rows.length === 0) throw new AppError('Doctor not found.', 404);
+    if (patientCheck.rows.length === 0) throw new AppError('Patient not found.', 404);
+    const doctor = doctorCheck.rows[0];
+    const patient = patientCheck.rows[0];
+
+    // Generate all occurrence dates, tracking original day for monthly rollover
+    const originalDayOfMonth = startDate.getUTCDate();
+    const dates = [startDate];
+    let current = startDate;
+    while (dates.length < MAX_RECURRING_APPOINTMENTS) {
+      const next = nextOccurrence(current, recurrencePattern, originalDayOfMonth);
+      if (!next || next > endDate) break;
+      dates.push(next);
+      current = next;
+    }
+
+    if (dates.length < 2) {
+      throw new AppError('Recurrence settings produce only one appointment. Adjust the end date or pattern.', 400);
+    }
+
+    const seriesId = randomUUID();
+
+    const client = await db.getClient();
+    const appointmentIds = [];
+    const skippedDates = [];
+
+    try {
+      await client.query('BEGIN');
+
+      // Batch: fetch doctor schedule once for all days
+      const scheduleResult = await client.query(
+        `SELECT day_of_week, start_time, end_time, is_active
+         FROM doctor_schedules WHERE doctor_id = $1`,
+        [doctorId]
+      );
+      const scheduleMap = Object.fromEntries(
+        scheduleResult.rows.map((r) => [r.day_of_week, r])
+      );
+
+      // Batch: fetch all conflicting slots in one query
+      const dateStrings = dates.map((d) => d.toISOString());
+      const conflictResult = await client.query(
+        `SELECT scheduled_at FROM appointments
+         WHERE doctor_id = $1
+           AND scheduled_at = ANY($2::timestamptz[])
+           AND status NOT IN ('cancelled', 'no_show')`,
+        [doctorId, dateStrings]
+      );
+      const conflictSet = new Set(
+        conflictResult.rows.map((r) => new Date(r.scheduled_at).toISOString())
+      );
+
+      for (const date of dates) {
+        const dayOfWeek = date.getUTCDay();
+        const apptHours = date.getUTCHours();
+        const apptMinutes = date.getUTCMinutes();
+        const apptTotalMinutes = apptHours * 60 + apptMinutes;
+        const dateISO = date.toISOString();
+
+        // Check doctor schedule for this day (from cached map)
+        const schedule = scheduleMap[dayOfWeek];
+        if (!schedule || !schedule.is_active) {
+          skippedDates.push(dateISO);
+          continue;
+        }
+
+        const [schStartH, schStartM] = schedule.start_time.slice(0, 5).split(':').map(Number);
+        const [schEndH, schEndM] = schedule.end_time.slice(0, 5).split(':').map(Number);
+        const schedStartMinutes = schStartH * 60 + schStartM;
+        const schedEndMinutes = schEndH * 60 + schEndM;
+
+        if (apptTotalMinutes < schedStartMinutes || apptTotalMinutes + SLOT_DURATION_MINUTES > schedEndMinutes) {
+          skippedDates.push(dateISO);
+          continue;
+        }
+
+        if ((apptTotalMinutes - schedStartMinutes) % SLOT_DURATION_MINUTES !== 0) {
+          skippedDates.push(dateISO);
+          continue;
+        }
+
+        // Check conflict from batch query
+        if (conflictSet.has(dateISO)) {
+          skippedDates.push(dateISO);
+          continue;
+        }
+
+        const result = await client.query(
+          `INSERT INTO appointments (patient_id, doctor_id, scheduled_at, notes, series_id, recurrence_pattern, recurrence_end_date)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+          [patientId, doctorId, dateISO, notes || null, seriesId, recurrencePattern, recurrenceEndDate]
+        );
+
+        appointmentIds.push(result.rows[0].id);
+      }
+
+      if (appointmentIds.length === 0) {
+        throw new AppError('No valid slots found for the recurring schedule. All dates were unavailable or conflicting.', 400);
+      }
+
+      await auditLog({
+        userId: req.user.id,
+        action: 'CREATE_RECURRING_APPOINTMENTS',
+        resourceType: 'appointment',
+        resourceId: seriesId,
+        ip: req.ip,
+        details: { patientId, doctorId, recurrencePattern, count: appointmentIds.length },
+      });
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
+    // Notifications after commit (with .catch() to prevent unhandled rejections)
+    const countStr = `${appointmentIds.length} recurring appointment${appointmentIds.length > 1 ? 's' : ''}`;
+    createNotification({
+      recipientId: patient.user_id,
+      type: 'appointment_scheduled',
+      title: 'Recurring Appointments Scheduled',
+      message: `${countStr} with Dr. ${doctor.first_name} ${doctor.last_name} have been scheduled.`,
+      referenceId: appointmentIds[0],
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send recurring notification to patient', { seriesId, error: err.message });
+    });
+    createNotification({
+      recipientId: doctor.user_id,
+      type: 'appointment_scheduled',
+      title: 'New Recurring Appointments',
+      message: `${countStr} with ${patient.first_name} ${patient.last_name} have been scheduled.`,
+      referenceId: appointmentIds[0],
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send recurring notification to doctor', { seriesId, error: err.message });
+    });
+
+    if (patient.email) {
+      sendAppointmentConfirmationEmail(patient.email, {
+        patientName: `${patient.first_name} ${patient.last_name}`,
+        doctorName: `Dr. ${doctor.first_name} ${doctor.last_name}`,
+        specialization: doctor.specialization || '',
+        scheduledAt,
+        appointmentId: appointmentIds[0],
+      }).catch((err) => {
+        console.error('Failed to send recurring appointment confirmation email', {
+          seriesId,
+          error: err.message,
+        });
+      });
+    }
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        seriesId,
+        appointmentIds,
+        totalCreated: appointmentIds.length,
+        skippedDates,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const cancelSeries = async (req, res, next) => {
+  try {
+    const { seriesId } = req.params;
+
+    if (!UUID_REGEX.test(seriesId)) {
+      throw new AppError('Invalid series ID format.', 400);
+    }
+
+    // Fetch one appointment from the series for ownership check + notification info
+    const seriesResult = await db.query(
+      `SELECT a.id, a.patient_id, a.doctor_id,
+              p.user_id AS patient_user_id,
+              pu.first_name AS patient_first_name,
+              d.user_id AS doctor_user_id,
+              du.first_name AS doctor_first_name, du.last_name AS doctor_last_name
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN users pu ON p.user_id = pu.id
+       JOIN doctors d ON a.doctor_id = d.id
+       JOIN users du ON d.user_id = du.id
+       WHERE a.series_id = $1
+       LIMIT 1`,
+      [seriesId]
+    );
+
+    if (seriesResult.rows.length === 0) {
+      throw new AppError('Appointment series not found.', 404);
+    }
+
+    const appt = seriesResult.rows[0];
+    const userId = req.user.id;
+    const isOwner = userId === appt.patient_user_id || userId === appt.doctor_user_id;
+    if (!isOwner && req.user.role !== 'admin') {
+      throw new AppError('You do not have permission to cancel this series.', 403);
+    }
+
+    // Cancel all future scheduled appointments in the series
+    const result = await db.query(
+      `UPDATE appointments SET status = 'cancelled', updated_at = NOW()
+       WHERE series_id = $1
+         AND status = 'scheduled'
+         AND scheduled_at > NOW()
+       RETURNING id`,
+      [seriesId]
+    );
+
+    const cancelledCount = result.rows.length;
+
+    if (cancelledCount > 0) {
+      createNotification({
+        recipientId: appt.patient_user_id,
+        type: 'appointment_cancelled',
+        title: 'Recurring Appointments Cancelled',
+        message: `${cancelledCount} upcoming appointment${cancelledCount > 1 ? 's' : ''} have been cancelled.`,
+        referenceId: seriesId,
+        referenceType: 'appointment',
+      }).catch((err) => {
+        console.error('Failed to send cancel notification to patient', { seriesId, error: err.message });
+      });
+      createNotification({
+        recipientId: appt.doctor_user_id,
+        type: 'appointment_cancelled',
+        title: 'Recurring Appointments Cancelled',
+        message: `${cancelledCount} upcoming appointment${cancelledCount > 1 ? 's' : ''} with ${appt.patient_first_name} have been cancelled.`,
+        referenceId: seriesId,
+        referenceType: 'appointment',
+      }).catch((err) => {
+        console.error('Failed to send cancel notification to doctor', { seriesId, error: err.message });
+      });
+    }
+
+    await auditLog({
+      userId: req.user.id,
+      action: 'CANCEL_APPOINTMENT_SERIES',
+      resourceType: 'appointment',
+      resourceId: seriesId,
+      ip: req.ip,
+      details: { cancelledCount },
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        seriesId,
+        cancelledCount,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus };

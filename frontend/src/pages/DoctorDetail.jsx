@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, Clock, Mail, Phone, Stethoscope,
   BadgeCheck, Building2, CalendarPlus, X, CheckCircle, AlertCircle,
-  FileText, User,
+  FileText, User, Repeat,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -21,6 +21,14 @@ function formatSlotTime(time) {
   return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 }
 
+const RECURRENCE_OPTIONS = [
+  { value: '', label: 'One-time' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Every 2 weeks' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
 function BookingModal({ doctor, onClose, onBooked }) {
   const [date, setDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -29,6 +37,8 @@ function BookingModal({ doctor, onClose, onBooked }) {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [recurrencePattern, setRecurrencePattern] = useState('');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -64,11 +74,21 @@ function BookingModal({ doctor, onClose, onBooked }) {
 
     try {
       const scheduledAt = `${date}T${selectedSlot}:00Z`;
-      await api.post('/appointments', {
-        doctorId: doctor.id,
-        scheduledAt,
-        notes: notes.trim() || undefined,
-      });
+      if (recurrencePattern) {
+        await api.post('/appointments/recurring', {
+          doctorId: doctor.id,
+          scheduledAt,
+          notes: notes.trim() || undefined,
+          recurrencePattern,
+          recurrenceEndDate,
+        });
+      } else {
+        await api.post('/appointments', {
+          doctorId: doctor.id,
+          scheduledAt,
+          notes: notes.trim() || undefined,
+        });
+      }
       onBooked();
     } catch (err) {
       setError(err?.response?.data?.message || err?.data?.message || err.message || 'Failed to book appointment.');
@@ -190,6 +210,43 @@ function BookingModal({ doctor, onClose, onBooked }) {
             />
           </div>
 
+          {/* Recurrence options */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+              <Repeat className="w-3.5 h-3.5 text-slate-400" />
+              Repeat
+            </label>
+            <select
+              value={recurrencePattern}
+              onChange={(e) => {
+                setRecurrencePattern(e.target.value);
+                if (!e.target.value) setRecurrenceEndDate('');
+              }}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              {RECURRENCE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {recurrencePattern && (
+            <div>
+              <label htmlFor="recurrence-end" className="block text-sm font-medium text-slate-700 mb-1">
+                Repeat until
+              </label>
+              <input
+                id="recurrence-end"
+                type="date"
+                required
+                min={date || today}
+                value={recurrenceEndDate}
+                onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
@@ -200,10 +257,10 @@ function BookingModal({ doctor, onClose, onBooked }) {
             </button>
             <button
               type="submit"
-              disabled={submitting || !date || !selectedSlot}
+              disabled={submitting || !date || !selectedSlot || (recurrencePattern && !recurrenceEndDate)}
               className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {submitting ? 'Booking...' : selectedSlot ? `Book ${formatSlotTime(selectedSlot)}` : 'Select a slot'}
+              {submitting ? 'Booking...' : selectedSlot ? (recurrencePattern ? `Book Recurring ${formatSlotTime(selectedSlot)}` : `Book ${formatSlotTime(selectedSlot)}`) : 'Select a slot'}
             </button>
           </div>
         </form>
