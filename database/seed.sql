@@ -1377,4 +1377,49 @@ INSERT INTO notifications (recipient_id, type, title, message, is_read, referenc
   ('c0000000-0000-0000-0000-000000000019', 'medical_record_created', 'New Medical Record', 'Dr. Malsha Kulathunga added a new record: Type 2 Diabetes Mellitus (poorly controlled).', false, 'medical_record', NOW() - INTERVAL '8 days'),
   ('c0000000-0000-0000-0000-000000000020', 'prescription_created', 'New Prescription', 'Dr. Nimasha Gunaratne prescribed Combined OCP (Yasmin).', false, 'prescription', NOW() - INTERVAL '12 days');
 
+-- Treatment plans seed data
+INSERT INTO treatment_plans (id, patient_id, doctor_id, title, description, status, priority, start_date, end_date, notes) VALUES
+  ('ab000000-0000-0000-0000-000000000001', 'ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001',
+   'Hypertension Management', 'Comprehensive plan to manage Stage 1 hypertension through medication and lifestyle changes.',
+   'active', 'high', '2026-03-01', '2026-09-01', 'Review blood pressure monthly. Target: <130/80 mmHg.'),
+  ('ab000000-0000-0000-0000-000000000002', 'ce000000-0000-0000-0000-000000000002', 'dc000000-0000-0000-0000-000000000002',
+   'Migraine Prevention', 'Preventive treatment plan for chronic migraines with medication and trigger avoidance.',
+   'active', 'medium', '2026-02-15', '2026-08-15', 'Patient reports 4-5 migraines per month. Goal: reduce to <2.'),
+  ('ab000000-0000-0000-0000-000000000003', 'ce000000-0000-0000-0000-000000000003', 'dc000000-0000-0000-0000-000000000003',
+   'Post-Surgery Knee Rehabilitation', 'Recovery plan following ACL reconstruction surgery.',
+   'active', 'high', '2026-03-10', '2026-06-10', 'Patient had surgery on 2026-03-08. Physiotherapy 3x/week.'),
+  ('ab000000-0000-0000-0000-000000000004', 'ce000000-0000-0000-0000-000000000001', 'dc000000-0000-0000-0000-000000000001',
+   'Cholesterol Reduction', 'Diet and medication plan to reduce LDL cholesterol levels.',
+   'completed', 'medium', '2025-10-01', '2026-02-28', 'LDL reduced from 180 to 120. Plan completed successfully.')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO treatment_plan_items (id, plan_id, title, description, is_completed, due_date, sort_order) VALUES
+  ('ac000000-0000-0000-0000-000000000001', 'ab000000-0000-0000-0000-000000000001',
+   'Start Amlodipine 5mg daily', 'Take one tablet in the morning with water.', true, '2026-03-01', 0),
+  ('ac000000-0000-0000-0000-000000000002', 'ab000000-0000-0000-0000-000000000001',
+   'Daily blood pressure monitoring', 'Record morning and evening readings in journal.', true, '2026-03-07', 1),
+  ('ac000000-0000-0000-0000-000000000003', 'ab000000-0000-0000-0000-000000000001',
+   'Reduce sodium intake', 'Limit to <2300mg/day. Avoid processed foods.', false, '2026-04-01', 2),
+  ('ac000000-0000-0000-0000-000000000004', 'ab000000-0000-0000-0000-000000000001',
+   'Follow-up blood work', 'Check kidney function and electrolytes.', false, '2026-05-01', 3),
+  ('ac000000-0000-0000-0000-000000000005', 'ab000000-0000-0000-0000-000000000002',
+   'Start Propranolol 40mg twice daily', 'Take with meals. Monitor heart rate.', true, '2026-02-15', 0),
+  ('ac000000-0000-0000-0000-000000000006', 'ab000000-0000-0000-0000-000000000002',
+   'Maintain headache diary', 'Record triggers, duration, and severity of each episode.', false, '2026-03-15', 1),
+  ('ac000000-0000-0000-0000-000000000007', 'ab000000-0000-0000-0000-000000000002',
+   'Follow-up appointment', 'Assess medication effectiveness after 4 weeks.', false, '2026-04-15', 2),
+  ('ac000000-0000-0000-0000-000000000008', 'ab000000-0000-0000-0000-000000000003',
+   'Ice and elevation protocol', 'Ice 20min every 2 hours for first 2 weeks.', true, '2026-03-24', 0),
+  ('ac000000-0000-0000-0000-000000000009', 'ab000000-0000-0000-0000-000000000003',
+   'Begin physiotherapy sessions', 'Attend 3 sessions per week at hospital rehab center.', false, '2026-03-24', 1),
+  ('ac000000-0000-0000-0000-000000000010', 'ab000000-0000-0000-0000-000000000003',
+   'Progress to weight-bearing exercises', 'Only with physiotherapist approval.', false, '2026-04-21', 2),
+  ('ac000000-0000-0000-0000-000000000011', 'ab000000-0000-0000-0000-000000000004',
+   'Start Atorvastatin 20mg nightly', 'Take before bed.', true, '2025-10-01', 0),
+  ('ac000000-0000-0000-0000-000000000012', 'ab000000-0000-0000-0000-000000000004',
+   'Dietary consultation', 'Meet with hospital dietitian for meal planning.', true, '2025-10-15', 1),
+  ('ac000000-0000-0000-0000-000000000013', 'ab000000-0000-0000-0000-000000000004',
+   'Follow-up lipid panel', 'Recheck cholesterol levels after 3 months.', true, '2026-01-01', 2)
+ON CONFLICT (id) DO NOTHING;
+
 COMMIT;

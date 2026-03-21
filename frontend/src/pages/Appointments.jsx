@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   Calendar, AlertCircle, Search, Clock, User, Stethoscope, CalendarDays, X, FileText, List,
+  CalendarPlus,
 } from 'lucide-react';
 import { appointmentStatuses } from '../constants';
 import { useAuth } from '../data/AuthContext';
@@ -8,6 +9,7 @@ import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
+import BookAppointmentModal from '../components/BookAppointmentModal';
 import ScheduleCalendar from './ScheduleCalendar';
 
 const STATUS_STYLES = {
@@ -115,6 +117,7 @@ export default function Appointments() {
   const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [viewMode, setViewMode] = useState('list');
+  const [showBooking, setShowBooking] = useState(false);
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
   const isDoctor = currentUser?.role === 'doctor';
@@ -166,15 +169,26 @@ export default function Appointments() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-          {isPatient ? 'My Appointments' : 'Appointments'}
-        </h1>
-        <p className="text-slate-500 mt-1">
-          {isPatient
-            ? 'View your scheduled and past appointments.'
-            : 'Manage and review patient appointments.'}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
+            {isPatient ? 'My Appointments' : 'Appointments'}
+          </h1>
+          <p className="text-slate-500 mt-1">
+            {isPatient
+              ? 'View your scheduled and past appointments.'
+              : 'Manage and review patient appointments.'}
+          </p>
+        </div>
+        {isPatient && (
+          <button
+            onClick={() => setShowBooking(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors shadow-sm flex-shrink-0"
+          >
+            <CalendarPlus className="w-4 h-4" />
+            Book Appointment
+          </button>
+        )}
       </div>
 
       {/* List / Calendar toggle for doctors */}
@@ -381,6 +395,14 @@ export default function Appointments() {
           appointmentId={selectedId}
           onClose={() => setSelectedId(null)}
           onStatusChange={fetchAppointments}
+        />
+      )}
+
+      {/* Book appointment modal */}
+      {showBooking && (
+        <BookAppointmentModal
+          onClose={() => setShowBooking(false)}
+          onBooked={fetchAppointments}
         />
       )}
     </div>
