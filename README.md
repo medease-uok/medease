@@ -14,6 +14,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 
 - Appointment scheduling with real-time doctor availability
 - Appointment confirmation emails sent to patients upon booking
+- Automated appointment reminder emails and in-app notifications sent before upcoming appointments
 - Electronic medical records, prescriptions, and lab reports
 - ICD-10 code lookup and assignment on medical records
 - Digital structured prescriptions with multi-medicine line items
@@ -48,6 +49,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 | Auth | JWT + email OTP |
 | Storage | AWS S3 |
 | PDF | PDFKit |
+| Scheduler | node-cron |
 | CAPTCHA | Cloudflare Turnstile |
 | Container | Docker & Docker Compose |
 | Cloud | AWS (Fargate, S3, CloudFront) |
