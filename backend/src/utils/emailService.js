@@ -1,6 +1,15 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
 
+/** Escape user-supplied values before interpolation into HTML email templates. */
+const escapeHtml = (str) =>
+  String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+
 /**
  * Lazily-created singleton SMTP transporter with connection pooling.
  * The app starts even if SMTP is not yet configured.
@@ -274,4 +283,135 @@ async function sendPasswordResetOtpEmail(to, firstName, otp) {
   return info;
 }
 
-module.exports = { sendLoginOtpEmail, sendRegistrationVerificationEmail, sendPasswordResetOtpEmail };
+/**
+ * Sends an appointment confirmation email to the patient.
+ *
+ * @param {string} to             - Patient email address
+ * @param {string} patientName    - Patient full name
+ * @param {string} doctorName     - Doctor full name (e.g. "Dr. Kamal Perera")
+ * @param {string} specialization - Doctor specialization
+ * @param {string} scheduledAt    - ISO date-time string
+ * @param {string} appointmentId  - UUID of the appointment
+ */
+async function sendAppointmentConfirmationEmail(to, { patientName, doctorName, specialization, scheduledAt, appointmentId }) {
+  const transporter = getTransporter();
+  const from = config.smtp.from || `"MedEase" <${config.smtp.user}>`;
+
+  const apptDate = new Date(scheduledAt);
+  const dateStr = apptDate.toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    timeZone: 'Asia/Colombo',
+  });
+  const timeStr = apptDate.toLocaleTimeString('en-US', {
+    hour: '2-digit', minute: '2-digit', hour12: true,
+    timeZone: 'Asia/Colombo',
+  });
+
+  // Sanitize user-supplied values for HTML interpolation
+  const safePatientName = escapeHtml(patientName);
+  const safeDoctorName = escapeHtml(doctorName);
+  const safeSpecialization = specialization ? escapeHtml(specialization) : '';
+  const safeAppointmentId = escapeHtml(appointmentId);
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>MedEase – Appointment Confirmed</title>
+    </head>
+    <body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:40px 0;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0"
+                   style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+
+              <!-- Header -->
+              <tr>
+                <td style="background:#1a73e8;padding:32px 40px;text-align:center;">
+                  <h1 style="margin:0;color:#ffffff;font-size:24px;letter-spacing:1px;">MedEase</h1>
+                  <p style="margin:6px 0 0;color:#d0e4ff;font-size:13px;">Hospital Management System</p>
+                </td>
+              </tr>
+
+              <!-- Body -->
+              <tr>
+                <td style="padding:40px;">
+                  <p style="margin:0 0 16px;font-size:16px;color:#333;">Hi ${safePatientName},</p>
+                  <p style="margin:0 0 24px;font-size:15px;color:#555;line-height:1.6;">
+                    Your appointment has been successfully booked. Here are the details:
+                  </p>
+
+                  <!-- Appointment details card -->
+                  <table width="100%" cellpadding="0" cellspacing="0"
+                         style="background:#f0f7ff;border:1px solid #d0e4ff;border-radius:8px;margin:24px 0;">
+                    <tr>
+                      <td style="padding:24px;">
+                        <table width="100%" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="padding:8px 0;font-size:13px;color:#888;width:120px;">Doctor</td>
+                            <td style="padding:8px 0;font-size:15px;color:#333;font-weight:600;">${safeDoctorName}</td>
+                          </tr>
+                          ${safeSpecialization ? `<tr>
+                            <td style="padding:8px 0;font-size:13px;color:#888;">Specialization</td>
+                            <td style="padding:8px 0;font-size:15px;color:#333;">${safeSpecialization}</td>
+                          </tr>` : ''}
+                          <tr>
+                            <td style="padding:8px 0;font-size:13px;color:#888;">Date</td>
+                            <td style="padding:8px 0;font-size:15px;color:#333;font-weight:600;">${dateStr}</td>
+                          </tr>
+                          <tr>
+                            <td style="padding:8px 0;font-size:13px;color:#888;">Time</td>
+                            <td style="padding:8px 0;font-size:15px;color:#1a73e8;font-weight:700;">${timeStr}</td>
+                          </tr>
+                          <tr>
+                            <td style="padding:8px 0;font-size:13px;color:#888;">Reference</td>
+                            <td style="padding:8px 0;font-size:13px;color:#888;font-family:monospace;">${safeAppointmentId}</td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="margin:0 0 8px;font-size:14px;color:#555;">
+                    Please arrive at least <strong>15 minutes</strong> before your scheduled time.
+                  </p>
+                  <p style="font-size:13px;color:#888;">
+                    If you need to cancel or reschedule, please do so through the MedEase portal
+                    at least 24 hours in advance.
+                  </p>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #eee;text-align:center;">
+                  <p style="margin:0;font-size:12px;color:#aaa;">
+                    &copy; ${new Date().getFullYear()} MedEase Hospital Management System.
+                    All rights reserved.
+                  </p>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  const info = await transporter.sendMail({
+    from,
+    to,
+    subject: `Appointment Confirmed – ${dateStr} at ${timeStr}`,
+    html,
+    text: `Hi ${patientName},\n\nYour appointment has been confirmed.\n\nDoctor: ${doctorName}${specialization ? `\nSpecialization: ${specialization}` : ''}\nDate: ${dateStr}\nTime: ${timeStr}\nReference: ${appointmentId}\n\nPlease arrive at least 15 minutes before your scheduled time.\n\nIf you need to cancel or reschedule, please do so through the MedEase portal at least 24 hours in advance.`,
+  });
+
+  return info;
+}
+
+module.exports = { sendLoginOtpEmail, sendRegistrationVerificationEmail, sendPasswordResetOtpEmail, sendAppointmentConfirmationEmail };
