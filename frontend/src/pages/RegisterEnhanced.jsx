@@ -24,6 +24,8 @@ import {
   Shield,
   CreditCard,
   FileText,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 
@@ -98,6 +100,10 @@ function getPasswordStrength(password) {
 }
 
 function InputField({ label, name, type = 'text', icon: Icon, error, value, onChange, disabled, ...props }) {
+  const [showPw, setShowPw] = useState(false);
+  const isPassword = type === 'password';
+  const inputType = isPassword ? (showPw ? 'text' : 'password') : type;
+
   return (
     <div>
       <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -106,12 +112,12 @@ function InputField({ label, name, type = 'text', icon: Icon, error, value, onCh
       <div className="relative">
         {Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />}
         <input
-          type={type}
+          type={inputType}
           name={name}
           value={value}
           onChange={onChange}
           className={`
-            w-full ${Icon ? 'pl-11' : 'pl-4'} pr-4 py-3
+            w-full ${Icon ? 'pl-11' : 'pl-4'} ${isPassword ? 'pr-11' : 'pr-4'} py-3
             border ${error ? 'border-red-500' : 'border-slate-300'} rounded-lg
             focus:ring-2 focus:ring-primary focus:border-transparent
             transition-all placeholder:text-slate-400
@@ -120,6 +126,17 @@ function InputField({ label, name, type = 'text', icon: Icon, error, value, onCh
           disabled={disabled}
           {...props}
         />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPw((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            tabIndex={-1}
+            aria-label={showPw ? 'Hide password' : 'Show password'}
+          >
+            {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        )}
       </div>
       {error && (
         <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
