@@ -23,6 +23,7 @@ function makeReq(overrides = {}) {
     user: { id: 'usr-doc', role: 'doctor', doctorId: 'doc-1', patientId: null },
     params: {},
     body: {},
+    query: {},
     ip: '127.0.0.1',
     ...overrides,
   }
@@ -408,6 +409,7 @@ describe('updateStatus', () => {
   test('doctor can mark appointment as completed', async () => {
     mockQuery
       .mockResolvedValueOnce({ rows: [APPT_DB] })                           // existing
+      .mockResolvedValueOnce({ rows: [{ id: 'rec-1' }] })                    // recordCheck (medical_records)
       .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, status: 'completed' }] }) // UPDATE
       .mockResolvedValueOnce({ rows: [{ user_id: 'usr-pat', first_name: 'John' }] }) // patient info
       .mockResolvedValueOnce({ rows: [{ user_id: 'usr-doc', first_name: 'Kamal', last_name: 'Perera' }] }) // doctor info
