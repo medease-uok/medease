@@ -132,6 +132,10 @@
   color: ededed
   description: Automated PR
 
+- name: docs-only
+  color: 0075ca
+  description: Documentation-only PR — skips CI validation checks
+
 - name: good-first-issue
   color: 7057ff
   description: Good for newcomers
