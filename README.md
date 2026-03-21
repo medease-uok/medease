@@ -14,6 +14,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 
 - Appointment scheduling with real-time doctor availability
 - Electronic medical records, prescriptions, and lab reports
+- ICD-10 code lookup and assignment on medical records
 - Digital structured prescriptions with multi-medicine line items
 - Handwritten prescription photo uploads (JPEG, PNG, WebP, PDF) stored in S3
 - Medicine catalogue search with category and form filtering
