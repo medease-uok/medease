@@ -27,7 +27,7 @@ async function processReminders() {
 
 async function processReminderWindow(hours) {
   // Find appointments scheduled within the reminder window that:
-  //  - Are still 'scheduled' or 'confirmed'
+  //  - Are still 'scheduled'
   //  - Haven't already had this reminder sent
   //  - Are within the time window: now + hours ± tolerance
   //
@@ -52,7 +52,7 @@ async function processReminderWindow(hours) {
      JOIN users pu ON p.user_id = pu.id
      JOIN doctors d ON a.doctor_id = d.id
      JOIN users du ON d.user_id = du.id
-     WHERE a.status IN ('scheduled', 'confirmed')
+     WHERE a.status = 'scheduled'
        AND a.scheduled_at BETWEEN NOW() + make_interval(hours => $1) - make_interval(mins => $2)
                                AND NOW() + make_interval(hours => $1) + make_interval(mins => $2)
        AND NOT EXISTS (
