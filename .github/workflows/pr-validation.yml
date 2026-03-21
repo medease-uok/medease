@@ -2,7 +2,7 @@ name: Validate Pull Request
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, edited, synchronize, reopened, labeled]
 
 permissions:
   pull-requests: write
@@ -12,9 +12,15 @@ jobs:
     name: Check PR requirements
     runs-on: ubuntu-latest
     steps:
+      - name: Skip validation for docs-only PRs
+        if: contains(github.event.pull_request.labels.*.name, 'docs-only')
+        run: echo "✅ Skipping validation for docs-only PR"
+
       - name: Auto-assign PR author if unassigned
         uses: actions/github-script@v7
-        if: github.event.pull_request.assignees == null || toJSON(github.event.pull_request.assignees) == '[]'
+        if: |
+          !contains(github.event.pull_request.labels.*.name, 'docs-only') &&
+          (github.event.pull_request.assignees == null || toJSON(github.event.pull_request.assignees) == '[]')
         with:
           script: |
             await github.rest.issues.addAssignees({
@@ -27,6 +33,7 @@ jobs:
 
       - name: Validate PR title format
         id: title_check
+        if: "!contains(github.event.pull_request.labels.*.name, 'docs-only')"
         continue-on-error: true
         uses: actions/github-script@v7
         with:
@@ -46,6 +53,7 @@ jobs:
 
       - name: Verify issue linkage
         id: issue_check
+        if: "!contains(github.event.pull_request.labels.*.name, 'docs-only')"
         continue-on-error: true
         uses: actions/github-script@v7
         with:
@@ -62,6 +70,7 @@ jobs:
 
       - name: Validate Jira reference
         id: jira_check
+        if: "!contains(github.event.pull_request.labels.*.name, 'docs-only')"
         continue-on-error: true
         uses: actions/github-script@v7
         with:
@@ -80,7 +89,9 @@ jobs:
             }
 
       - name: Check validation results
-        if: steps.title_check.outcome == 'failure' || steps.issue_check.outcome == 'failure' || steps.jira_check.outcome == 'failure'
+        if: |
+          !contains(github.event.pull_request.labels.*.name, 'docs-only') &&
+          (steps.title_check.outcome == 'failure' || steps.issue_check.outcome == 'failure' || steps.jira_check.outcome == 'failure')
         run: |
           echo "::error::One or more PR validation checks failed"
           exit 1

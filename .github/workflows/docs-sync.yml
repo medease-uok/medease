@@ -229,6 +229,14 @@ jobs:
               base: 'main'
             });
 
+            // Add docs-only label so PR validation is skipped
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: ['docs-only']
+            });
+
             console.log(`✅ Created PR #${pr.number}: ${pr.html_url}`);
 
       - name: Update Confluence pages
