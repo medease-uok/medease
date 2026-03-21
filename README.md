@@ -21,6 +21,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Doctor prescription templates for reusable medication sets
 - Doctor personal task list with priority ordering and due dates
 - Vaccination records and chronic condition tracking
+- Treatment plans with checklist items, priority levels, and status tracking
 - Medical document management (S3-backed with presigned URLs)
 - Prescription refill requests with doctor approval workflow
 - Lab test request workflow with priority levels and lab technician assignment
