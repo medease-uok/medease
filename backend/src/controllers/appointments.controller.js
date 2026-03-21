@@ -37,8 +37,6 @@ const getAll = async (req, res, next) => {
 
     const { clause, params } = await buildAccessFilter('appointment', subject, columnMap);
 
-    const sortOrder = req.query.order === 'desc' ? 'DESC' : 'ASC';
-
     const query = `
       SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
              a.series_id, a.recurrence_pattern, a.recurrence_end_date,
@@ -50,7 +48,15 @@ const getAll = async (req, res, next) => {
       JOIN doctors d ON a.doctor_id = d.id
       JOIN users du ON d.user_id = du.id
       WHERE ${clause}
-      ORDER BY a.scheduled_at ${sortOrder}`;
+      ORDER BY
+        CASE a.status
+          WHEN 'in_progress' THEN 0
+          WHEN 'scheduled' THEN 1
+          WHEN 'completed' THEN 2
+          WHEN 'cancelled' THEN 3
+          WHEN 'no_show' THEN 4
+        END,
+        a.scheduled_at DESC`;
 
     const result = await db.query(query, params);
 

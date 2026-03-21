@@ -122,12 +122,21 @@ const getById = async (req, res, next) => {
     const [apptsResult, rxResult] = await Promise.all([
       db.query(
         `SELECT a.id, a.patient_id, a.doctor_id, a.scheduled_at, a.status, a.notes,
+                a.series_id, a.recurrence_pattern, a.recurrence_end_date,
                 pu.first_name || ' ' || pu.last_name AS patient_name
          FROM appointments a
          JOIN patients p ON a.patient_id = p.id
          JOIN users pu ON p.user_id = pu.id
          WHERE a.doctor_id = $1 ${apptPatientFilter}
-         ORDER BY a.scheduled_at DESC`,
+         ORDER BY
+           CASE a.status
+             WHEN 'in_progress' THEN 0
+             WHEN 'scheduled' THEN 1
+             WHEN 'completed' THEN 2
+             WHEN 'cancelled' THEN 3
+             WHEN 'no_show' THEN 4
+           END,
+           a.scheduled_at DESC`,
         apptParams
       ),
       db.query(rxQuery, rxParams),
@@ -145,6 +154,9 @@ const getById = async (req, res, next) => {
           scheduledAt: row.scheduled_at,
           status: row.status,
           notes: row.notes,
+          seriesId: row.series_id || null,
+          recurrencePattern: row.recurrence_pattern || null,
+          recurrenceEndDate: row.recurrence_end_date || null,
         })),
         prescriptions: rxResult.rows.map((row) => ({
           id: row.id,
