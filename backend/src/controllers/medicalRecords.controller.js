@@ -13,8 +13,8 @@ const mapRecord = (row) => ({
   patientName: row.patient_name,
   doctorName: row.doctor_name,
   diagnosis: row.diagnosis,
-  icdCode: row.icd_code || null,
-  icdDescription: row.icd_description || null,
+  icdCode: row.icd_code ?? null,
+  icdDescription: row.icd_description ?? null,
   treatment: row.treatment,
   notes: row.notes,
   createdAt: row.created_at,
@@ -104,21 +104,21 @@ const create = async (req, res, next) => {
       validConditionId = chronicConditionId;
     }
 
-    // Validate ICD-10 code if provided
-    let validIcdCode = null;
-    if (icdCode && icdCode.trim()) {
-      const icdCheck = await db.query('SELECT code FROM icd10_codes WHERE code = $1', [icdCode.trim()]);
-      if (icdCheck.rowCount === 0) {
+    const validIcdCode = icdCode && icdCode.trim() ? icdCode.trim() : null;
+
+    let result;
+    try {
+      result = await db.query(
+        `INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes, chronic_condition_id, icd_code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [patientId, doctorId, diagnosis, treatment || null, notes || null, validConditionId, validIcdCode]
+      );
+    } catch (err) {
+      if (err.code === '23503' && err.constraint && err.constraint.includes('icd')) {
         throw new AppError('Invalid ICD-10 code.', 400);
       }
-      validIcdCode = icdCode.trim();
+      throw err;
     }
-
-    const result = await db.query(
-      `INSERT INTO medical_records (patient_id, doctor_id, diagnosis, treatment, notes, chronic_condition_id, icd_code)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [patientId, doctorId, diagnosis, treatment || null, notes || null, validConditionId, validIcdCode]
-    );
 
     createNotification({
       recipientId: patient.user_id,
