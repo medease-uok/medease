@@ -8,6 +8,7 @@ const redis = require('./config/redis');
 const db = require('./config/database');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
+const { startReminderScheduler } = require('./jobs/appointmentReminders');
 
 const app = express();
 
@@ -58,6 +59,7 @@ const PORT = config.port || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${config.nodeEnv}`);
+  startReminderScheduler();
 });
 
 module.exports = app;

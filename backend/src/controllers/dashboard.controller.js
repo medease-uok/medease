@@ -486,7 +486,7 @@ const getDoctorDashboard = async (req, res, next) => {
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         JOIN users pu ON p.user_id = pu.id
-        WHERE a.doctor_id = $1 AND a.status IN ('scheduled', 'confirmed') AND a.scheduled_at > NOW()
+        WHERE a.doctor_id = $1 AND a.status = 'scheduled' AND a.scheduled_at > NOW()
         ORDER BY a.scheduled_at ASC
         LIMIT $2
       `, [doctorId, MAX_UPCOMING_APPOINTMENTS]),
@@ -610,7 +610,7 @@ const getPatientQueue = async (req, res, next) => {
        JOIN doctors d ON a.doctor_id = d.id
        JOIN users du ON d.user_id = du.id
        WHERE DATE(a.scheduled_at) = CURRENT_DATE
-         AND a.status IN ('scheduled', 'confirmed', 'in_progress')
+         AND a.status IN ('scheduled', 'in_progress')
          ${roleQueueFilter}
        ORDER BY
          CASE a.status WHEN 'in_progress' THEN 0 ELSE 1 END,

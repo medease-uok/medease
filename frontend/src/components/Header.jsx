@@ -10,7 +10,6 @@ import {
 const NOTIFICATION_ICONS = {
   appointment_scheduled: Calendar,
   appointment_cancelled: Calendar,
-  appointment_confirmed: Calendar,
   prescription_created: Pill,
   prescription_dispensed: Pill,
   lab_report_ready: FlaskConical,
@@ -25,7 +24,6 @@ const NOTIFICATION_ICONS = {
 const NOTIFICATION_ROUTES = {
   appointment_scheduled: '/appointments',
   appointment_cancelled: '/appointments',
-  appointment_confirmed: '/appointments',
   prescription_created: '/prescriptions',
   prescription_dispensed: '/prescriptions',
   lab_report_ready: '/lab-reports',
@@ -40,7 +38,6 @@ const NOTIFICATION_ROUTES = {
 const NOTIFICATION_COLORS = {
   appointment_scheduled: 'bg-blue-100 text-blue-600',
   appointment_cancelled: 'bg-red-100 text-red-600',
-  appointment_confirmed: 'bg-green-100 text-green-600',
   prescription_created: 'bg-orange-100 text-orange-600',
   prescription_dispensed: 'bg-orange-100 text-orange-600',
   lab_report_ready: 'bg-pink-100 text-pink-600',

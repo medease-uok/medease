@@ -2,7 +2,6 @@
 CREATE TYPE notification_type AS ENUM (
   'appointment_scheduled',
   'appointment_cancelled',
-  'appointment_confirmed',
   'prescription_created',
   'prescription_dispensed',
   'lab_report_ready',
