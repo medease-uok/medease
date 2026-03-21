@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Activity,
   Mail,
@@ -10,8 +10,30 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
+  RefreshCw,
 } from 'lucide-react'
 import api from '../services/api'
+
+const RESEND_COOLDOWN = 60 // seconds
+
+function extractErrorMessage(err, fallback) {
+  const data = err.data || {}
+  if (Array.isArray(data.errors) && data.errors.length > 0) {
+    return data.errors[0].message || data.errors[0].msg || fallback
+  }
+  return data.message || err.message || fallback
+}
+
+function getPasswordStrength(pw) {
+  let score = 0
+  if (pw.length >= 8) score++
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++
+  if (/\d/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  const labels = ['Weak', 'Weak', 'Fair', 'Good', 'Strong']
+  const colors = ['bg-red-500', 'bg-red-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500']
+  return { score, label: labels[score], color: colors[score] }
+}
 
 export default function ForgotPassword() {
   const [step, setStep] = useState('email') // 'email' | 'otp' | 'reset' | 'done'
@@ -25,9 +47,35 @@ export default function ForgotPassword() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const navigate = useNavigate()
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendCooldown])
+
+  // Auto-redirect after success
+  useEffect(() => {
+    if (step !== 'done') return
+    const timer = setTimeout(() => navigate('/login'), 5000)
+    return () => clearTimeout(timer)
+  }, [step, navigate])
+
+  // Clear sensitive state on unmount
+  useEffect(() => {
+    return () => {
+      setOtp('')
+      setResetToken('')
+      setNewPassword('')
+      setConfirmPassword('')
+    }
+  }, [])
 
   // Step 1 — request OTP
-  const handleRequestOtp = async (e) => {
+  const handleRequestOtp = useCallback(async (e) => {
     e.preventDefault()
     if (!email) {
       setError('Please enter your email address.')
@@ -38,17 +86,34 @@ export default function ForgotPassword() {
     try {
       await api.post('/auth/forgot-password', { email })
       setStep('otp')
+      setResendCooldown(RESEND_COOLDOWN)
     } catch (err) {
-      setError(err.error || err.message || 'Failed to send reset code. Please try again.')
+      setError(extractErrorMessage(err, 'Failed to send reset code. Please try again.'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [email])
+
+  // Resend OTP
+  const handleResendOtp = useCallback(async () => {
+    if (resendCooldown > 0 || loading) return
+    setLoading(true)
+    setError('')
+    try {
+      await api.post('/auth/forgot-password', { email })
+      setResendCooldown(RESEND_COOLDOWN)
+      setOtp('')
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Failed to resend code. Please try again.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [email, resendCooldown, loading])
 
   // Step 2 — verify OTP
-  const handleVerifyOtp = async (e) => {
+  const handleVerifyOtp = useCallback(async (e) => {
     e.preventDefault()
-    if (!otp || otp.length !== 6) {
+    if (!/^\d{6}$/.test(otp)) {
       setError('Please enter the 6-digit code.')
       return
     }
@@ -60,17 +125,22 @@ export default function ForgotPassword() {
       setResetToken(data.resetToken)
       setStep('reset')
     } catch (err) {
-      setError(err.error || err.message || 'Invalid or expired code.')
+      setError(extractErrorMessage(err, 'Invalid or expired code.'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [email, otp])
 
   // Step 3 — set new password
-  const handleResetPassword = async (e) => {
+  const handleResetPassword = useCallback(async (e) => {
     e.preventDefault()
+    const strength = getPasswordStrength(newPassword)
     if (!newPassword || newPassword.length < 8) {
       setError('Password must be at least 8 characters.')
+      return
+    }
+    if (strength.score < 2) {
+      setError('Password is too weak. Include uppercase, lowercase, numbers, or special characters.')
       return
     }
     if (newPassword !== confirmPassword) {
@@ -88,22 +158,11 @@ export default function ForgotPassword() {
       })
       setStep('done')
     } catch (err) {
-      setError(err.error || err.message || 'Failed to reset password.')
+      setError(extractErrorMessage(err, 'Failed to reset password.'))
     } finally {
       setLoading(false)
     }
-  }
-
-  const getPasswordStrength = (pw) => {
-    let score = 0
-    if (pw.length >= 8) score++
-    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++
-    if (/\d/.test(pw)) score++
-    if (/[^A-Za-z0-9]/.test(pw)) score++
-    const labels = ['Weak', 'Fair', 'Good', 'Strong']
-    const colors = ['bg-red-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500']
-    return { score, label: labels[score - 1] || 'Weak', color: colors[score - 1] || 'bg-red-500' }
-  }
+  }, [newPassword, confirmPassword, userId, resetToken])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-white to-cta/10 flex items-center justify-center p-4">
@@ -132,7 +191,7 @@ export default function ForgotPassword() {
 
             {/* Step 1: Enter email */}
             {step === 'email' && (
-              <form onSubmit={handleRequestOtp} className="space-y-6">
+              <form onSubmit={handleRequestOtp} noValidate className="space-y-6">
                 <p className="text-sm text-slate-600 text-center leading-relaxed">
                   Enter your email address and we'll send you a verification code to reset your password.
                 </p>
@@ -175,7 +234,7 @@ export default function ForgotPassword() {
 
             {/* Step 2: Enter OTP */}
             {step === 'otp' && (
-              <form onSubmit={handleVerifyOtp} className="space-y-6">
+              <form onSubmit={handleVerifyOtp} noValidate className="space-y-6">
                 <div className="text-center mb-2">
                   <ShieldCheck className="w-12 h-12 text-primary mx-auto mb-3" />
                   <p className="text-sm text-slate-600 leading-relaxed">
@@ -217,21 +276,32 @@ export default function ForgotPassword() {
                   )}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => { setStep('email'); setOtp(''); setError('') }}
-                  disabled={loading}
-                  className="w-full py-2.5 px-4 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Use different email
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setStep('email'); setOtp(''); setError('') }}
+                    disabled={loading}
+                    className="flex-1 py-2.5 px-4 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Different email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={loading || resendCooldown > 0}
+                    className="flex-1 py-2.5 px-4 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend Code'}
+                  </button>
+                </div>
               </form>
             )}
 
             {/* Step 3: New password */}
             {step === 'reset' && (
-              <form onSubmit={handleResetPassword} className="space-y-6">
+              <form onSubmit={handleResetPassword} noValidate className="space-y-6">
                 <p className="text-sm text-slate-600 text-center leading-relaxed">
                   Create a new password for your account.
                 </p>
@@ -329,7 +399,7 @@ export default function ForgotPassword() {
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900 mb-2">Password Reset Successful</h2>
                   <p className="text-sm text-slate-600">
-                    Your password has been updated. You can now sign in with your new password.
+                    Your password has been updated. Redirecting to sign in...
                   </p>
                 </div>
                 <Link
