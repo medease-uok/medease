@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
-import { Activity, Mail, Lock, AlertCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { Activity, Mail, Lock, AlertCircle, ShieldCheck, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 
 export default function Login() {
@@ -13,6 +13,7 @@ export default function Login() {
   const [pendingLoginToken, setPendingLoginToken] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { login, verifyOtp } = useAuth();
   const navigate = useNavigate();
 
@@ -93,7 +94,7 @@ export default function Login() {
             )}
 
             {step === 'credentials' ? (
-              <form onSubmit={handleCredentials} className="space-y-6">
+              <form onSubmit={handleCredentials} className="space-y-5">
                 <div>
                   <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-2">
                     Email Address
@@ -127,13 +128,13 @@ export default function Login() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                       id="login-password"
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
                       value={password}
                       onChange={(e) => { setPassword(e.target.value); setError(''); }}
                       placeholder="Enter your password"
                       className="
-                        w-full pl-11 pr-4 py-3
+                        w-full pl-11 pr-11 py-3
                         border border-slate-300 rounded-lg
                         focus:ring-2 focus:ring-primary focus:border-transparent
                         transition-all
@@ -141,7 +142,25 @@ export default function Login() {
                       "
                       disabled={loading}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      tabIndex={-1}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
                   </div>
+                </div>
+
+                <div className="flex justify-end -mt-1">
+                  <Link
+                    to="/forgot-password"
+                    className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                  >
+                    Forgot Password?
+                  </Link>
                 </div>
 
                 <button
