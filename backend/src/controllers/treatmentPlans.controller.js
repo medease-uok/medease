@@ -94,26 +94,25 @@ const getById = async (req, res, next) => {
 
     await assertPatientAccess(req.user, patientId)
 
-    const [planResult, itemsResult] = await Promise.all([
-      db.query(
-        `${PLAN_SELECT}
-         WHERE tp.id = $1 AND tp.patient_id = $2
-         ${PLAN_GROUP}`,
-        [id, patientId]
-      ),
-      db.query(
-        `SELECT id, plan_id, title, description, is_completed, due_date,
-                completed_at, sort_order, created_at
-         FROM treatment_plan_items
-         WHERE plan_id = $1
-         ORDER BY sort_order, created_at`,
-        [id]
-      ),
-    ])
+    const planResult = await db.query(
+      `${PLAN_SELECT}
+       WHERE tp.id = $1 AND tp.patient_id = $2
+       ${PLAN_GROUP}`,
+      [id, patientId]
+    )
 
     if (planResult.rows.length === 0) {
       throw new AppError('Treatment plan not found.', 404)
     }
+
+    const itemsResult = await db.query(
+      `SELECT id, plan_id, title, description, is_completed, due_date,
+              completed_at, sort_order, created_at
+       FROM treatment_plan_items
+       WHERE plan_id = $1
+       ORDER BY sort_order, created_at`,
+      [id]
+    )
 
     await auditLog({
       userId: req.user.id,
@@ -154,35 +153,50 @@ const create = async (req, res, next) => {
     if (patientCheck.rows.length === 0) throw new AppError('Patient not found.', 404)
     const patient = patientCheck.rows[0]
 
-    const result = await db.query(
-      `INSERT INTO treatment_plans
-         (patient_id, doctor_id, title, description, status, priority, start_date, end_date, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id`,
-      [
-        patientId, doctorId, title,
-        description ?? null, status ?? 'active', priority ?? 'medium',
-        startDate ?? null, endDate ?? null, notes ?? null,
-      ]
-    )
-
-    const planId = result.rows[0].id
-
-    // Bulk-insert initial items if provided
     const items = req.body.items
-    if (Array.isArray(items) && items.length > 0) {
-      const values = []
-      const params = [planId]
-      items.forEach((item, i) => {
-        const base = i * 3 + 2
-        values.push(`($1, $${base}, $${base + 1}, $${base + 2}, ${i})`)
-        params.push(item.title, item.description ?? null, item.dueDate ?? null)
-      })
-      await db.query(
-        `INSERT INTO treatment_plan_items (plan_id, title, description, due_date, sort_order)
-         VALUES ${values.join(', ')}`,
-        params
+
+    // Use transaction to ensure plan + items are created atomically
+    const client = await db.getClient()
+    let planId
+    try {
+      await client.query('BEGIN')
+
+      const result = await client.query(
+        `INSERT INTO treatment_plans
+           (patient_id, doctor_id, title, description, status, priority, start_date, end_date, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id`,
+        [
+          patientId, doctorId, title,
+          description ?? null, status ?? 'active', priority ?? 'medium',
+          startDate ?? null, endDate ?? null, notes ?? null,
+        ]
       )
+
+      planId = result.rows[0].id
+
+      // Bulk-insert initial items if provided
+      if (Array.isArray(items) && items.length > 0) {
+        const values = []
+        const params = [planId]
+        items.forEach((item, i) => {
+          const base = params.length + 1
+          values.push(`($1, $${base}, $${base + 1}, $${base + 2}, $${base + 3})`)
+          params.push(item.title, item.description ?? null, item.dueDate ?? null, i)
+        })
+        await client.query(
+          `INSERT INTO treatment_plan_items (plan_id, title, description, due_date, sort_order)
+           VALUES ${values.join(', ')}`,
+          params
+        )
+      }
+
+      await client.query('COMMIT')
+    } catch (txErr) {
+      await client.query('ROLLBACK')
+      throw txErr
+    } finally {
+      client.release()
     }
 
     // Fetch doctor name for notification
@@ -201,7 +215,7 @@ const create = async (req, res, next) => {
       message: `${docName} created a treatment plan: ${title}.`,
       referenceId: planId,
       referenceType: 'treatment_plan',
-    })
+    }).catch(() => {})
 
     await auditLog({
       userId: req.user.id,
@@ -222,8 +236,6 @@ const update = async (req, res, next) => {
   try {
     const { patientId, id } = req.params
 
-    await assertPatientAccess(req.user, patientId)
-
     const fields = []
     const values = []
     const body = req.body
@@ -238,6 +250,20 @@ const update = async (req, res, next) => {
 
     if (fields.length === 0) {
       throw new AppError('No valid fields provided for update.', 400)
+    }
+
+    await assertPatientAccess(req.user, patientId)
+
+    // Verify the requesting doctor owns this plan (admins can edit any)
+    if (req.user.role === 'doctor') {
+      const ownerCheck = await db.query(
+        'SELECT doctor_id FROM treatment_plans WHERE id = $1 AND patient_id = $2',
+        [id, patientId]
+      )
+      if (ownerCheck.rows.length === 0) throw new AppError('Treatment plan not found.', 404)
+      if (ownerCheck.rows[0].doctor_id !== req.user.doctorId) {
+        throw new AppError('You can only modify your own treatment plans.', 403)
+      }
     }
 
     fields.push('updated_at = NOW()')
@@ -276,6 +302,18 @@ const remove = async (req, res, next) => {
     const { patientId, id } = req.params
 
     await assertPatientAccess(req.user, patientId)
+
+    // Verify the requesting doctor owns this plan (admins can delete any)
+    if (req.user.role === 'doctor') {
+      const ownerCheck = await db.query(
+        'SELECT doctor_id FROM treatment_plans WHERE id = $1 AND patient_id = $2',
+        [id, patientId]
+      )
+      if (ownerCheck.rows.length === 0) throw new AppError('Treatment plan not found.', 404)
+      if (ownerCheck.rows[0].doctor_id !== req.user.doctorId) {
+        throw new AppError('You can only delete your own treatment plans.', 403)
+      }
+    }
 
     const result = await db.query(
       'DELETE FROM treatment_plans WHERE id = $1 AND patient_id = $2 RETURNING id, title',
@@ -317,17 +355,23 @@ const addItem = async (req, res, next) => {
     )
     if (planCheck.rows.length === 0) throw new AppError('Treatment plan not found.', 404)
 
-    // Get next sort order
-    const orderResult = await db.query(
-      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM treatment_plan_items WHERE plan_id = $1',
-      [planId]
-    )
-
+    // Atomic sort order calculation + insert
     const result = await db.query(
       `INSERT INTO treatment_plan_items (plan_id, title, description, due_date, sort_order)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [planId, title, description ?? null, dueDate ?? null, orderResult.rows[0].next_order]
+       VALUES ($1, $2, $3, $4,
+         (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM treatment_plan_items WHERE plan_id = $1))
+       RETURNING *`,
+      [planId, title, description ?? null, dueDate ?? null]
     )
+
+    await auditLog({
+      userId: req.user.id,
+      action: 'ADD_TREATMENT_PLAN_ITEM',
+      resourceType: 'treatment_plan_item',
+      resourceId: result.rows[0].id,
+      ip: req.ip,
+      details: { planId },
+    })
 
     res.status(201).json({ status: 'success', data: mapItem(result.rows[0]) })
   } catch (err) {
@@ -404,6 +448,15 @@ const removeItem = async (req, res, next) => {
     if (result.rows.length === 0) {
       throw new AppError('Treatment plan item not found.', 404)
     }
+
+    await auditLog({
+      userId: req.user.id,
+      action: 'REMOVE_TREATMENT_PLAN_ITEM',
+      resourceType: 'treatment_plan_item',
+      resourceId: itemId,
+      ip: req.ip,
+      details: { planId },
+    })
 
     res.json({ status: 'success', message: 'Item removed.' })
   } catch (err) {

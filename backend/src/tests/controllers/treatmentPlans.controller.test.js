@@ -1,7 +1,13 @@
 const mockQuery = jest.fn()
+const mockClientQuery = jest.fn()
+const mockClient = {
+  query: (...args) => mockClientQuery(...args),
+  release: jest.fn(),
+}
 
 jest.mock('../../config/database', () => ({
   query: (...args) => mockQuery(...args),
+  getClient: jest.fn().mockResolvedValue(mockClient),
 }))
 
 jest.mock('../../utils/patientAccess', () => ({
@@ -11,7 +17,7 @@ jest.mock('../../utils/patientAccess', () => ({
 jest.mock('../../utils/auditLog', () => jest.fn().mockResolvedValue())
 
 jest.mock('../../../src/controllers/notifications.controller', () => ({
-  createNotification: jest.fn(),
+  createNotification: jest.fn().mockReturnValue(Promise.resolve()),
 }))
 
 const { getByPatientId, getById, create, update, remove, addItem, updateItem, removeItem } = require('../../controllers/treatmentPlans.controller')
@@ -20,6 +26,13 @@ const DOCTOR_USER = {
   id: 'user-doc-1',
   role: 'doctor',
   doctorId: 'doc-1',
+  patientId: null,
+}
+
+const ADMIN_USER = {
+  id: 'user-admin-1',
+  role: 'admin',
+  doctorId: null,
   patientId: null,
 }
 
@@ -69,6 +82,8 @@ function makeRes() {
 
 beforeEach(() => {
   mockQuery.mockReset()
+  mockClientQuery.mockReset()
+  mockClient.release.mockClear()
 })
 
 // ──────────────────────────────────────────────────────────────
@@ -138,9 +153,7 @@ describe('getById', () => {
   })
 
   test('returns 404 when plan not found', async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
     const next = jest.fn()
     await getById(makeReq({ params: { patientId: 'pat-1', id: 'nope' } }), makeRes(), next)
@@ -157,10 +170,15 @@ describe('create', () => {
   const DOCTOR_ROW = { first_name: 'Kamal', last_name: 'Perera' }
 
   test('creates plan and returns 201', async () => {
+    // patientCheck, docInfo (after transaction)
     mockQuery
       .mockResolvedValueOnce({ rows: [PATIENT_ROW] })
-      .mockResolvedValueOnce({ rows: [{ id: 'new-plan' }] })
       .mockResolvedValueOnce({ rows: [DOCTOR_ROW] })
+    // transaction: BEGIN, INSERT plan, COMMIT
+    mockClientQuery
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: 'new-plan' }] }) // INSERT
+      .mockResolvedValueOnce({}) // COMMIT
 
     const req = makeReq({
       params: { patientId: 'pat-1' },
@@ -171,6 +189,53 @@ describe('create', () => {
 
     expect(res.status).toHaveBeenCalledWith(201)
     expect(res.json.mock.calls[0][0].data.id).toBe('new-plan')
+    expect(mockClient.release).toHaveBeenCalled()
+  })
+
+  test('creates plan with items in transaction', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [PATIENT_ROW] })
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] })
+    mockClientQuery
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: 'new-plan' }] }) // INSERT plan
+      .mockResolvedValueOnce({}) // INSERT items
+      .mockResolvedValueOnce({}) // COMMIT
+
+    const req = makeReq({
+      params: { patientId: 'pat-1' },
+      body: {
+        title: 'New plan',
+        items: [
+          { title: 'Step 1', description: 'First step', dueDate: '2026-04-01' },
+          { title: 'Step 2' },
+        ],
+      },
+    })
+    const res = makeRes()
+    await create(req, res, jest.fn())
+
+    expect(res.status).toHaveBeenCalledWith(201)
+    // Verify items INSERT was called
+    const itemsCall = mockClientQuery.mock.calls[2]
+    expect(itemsCall[0]).toContain('INSERT INTO treatment_plan_items')
+  })
+
+  test('rolls back on transaction failure', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [PATIENT_ROW] })
+    mockClientQuery
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockRejectedValueOnce(new Error('DB error')) // INSERT fails
+      .mockResolvedValueOnce({}) // ROLLBACK
+
+    const next = jest.fn()
+    await create(makeReq({
+      params: { patientId: 'pat-1' },
+      body: { title: 'Test' },
+    }), makeRes(), next)
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error))
+    expect(mockClient.release).toHaveBeenCalled()
   })
 
   test('returns 403 when user is not a doctor', async () => {
@@ -203,8 +268,10 @@ describe('create', () => {
 // UPDATE
 // ──────────────────────────────────────────────────────────────
 describe('update', () => {
-  test('updates plan fields', async () => {
-    mockQuery.mockResolvedValue({ rows: [{ id: 'plan-1' }] })
+  test('updates plan fields for owning doctor', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ doctor_id: 'doc-1' }] }) // ownership check
+      .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] }) // UPDATE
 
     const req = makeReq({
       params: { patientId: 'pat-1', id: 'plan-1' },
@@ -214,6 +281,32 @@ describe('update', () => {
     await update(req, res, jest.fn())
 
     expect(res.json.mock.calls[0][0].data.id).toBe('plan-1')
+  })
+
+  test('admin can update any plan without ownership check', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] }) // UPDATE (no ownership query)
+
+    const req = makeReq({
+      user: ADMIN_USER,
+      params: { patientId: 'pat-1', id: 'plan-1' },
+      body: { title: 'Admin update' },
+    })
+    const res = makeRes()
+    await update(req, res, jest.fn())
+
+    expect(res.json.mock.calls[0][0].data.id).toBe('plan-1')
+  })
+
+  test('returns 403 when doctor does not own the plan', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ doctor_id: 'doc-other' }] })
+
+    const next = jest.fn()
+    await update(makeReq({
+      params: { patientId: 'pat-1', id: 'plan-1' },
+      body: { title: 'Updated' },
+    }), makeRes(), next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }))
   })
 
   test('returns 400 when no fields provided', async () => {
@@ -242,14 +335,25 @@ describe('update', () => {
 // REMOVE
 // ──────────────────────────────────────────────────────────────
 describe('remove', () => {
-  test('deletes plan and returns success', async () => {
-    mockQuery.mockResolvedValue({ rows: [{ id: 'plan-1', title: 'Test' }] })
+  test('deletes plan for owning doctor', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ doctor_id: 'doc-1' }] }) // ownership check
+      .mockResolvedValueOnce({ rows: [{ id: 'plan-1', title: 'Test' }] }) // DELETE
 
     const req = makeReq({ params: { patientId: 'pat-1', id: 'plan-1' } })
     const res = makeRes()
     await remove(req, res, jest.fn())
 
     expect(res.json.mock.calls[0][0].message).toBe('Treatment plan removed.')
+  })
+
+  test('returns 403 when doctor does not own the plan', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ doctor_id: 'doc-other' }] })
+
+    const next = jest.fn()
+    await remove(makeReq({ params: { patientId: 'pat-1', id: 'plan-1' } }), makeRes(), next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }))
   })
 
   test('returns 404 when plan not found', async () => {
@@ -266,11 +370,10 @@ describe('remove', () => {
 // ADD ITEM
 // ──────────────────────────────────────────────────────────────
 describe('addItem', () => {
-  test('adds item to plan', async () => {
+  test('adds item to plan with atomic sort order', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] })
-      .mockResolvedValueOnce({ rows: [{ next_order: 2 }] })
-      .mockResolvedValueOnce({ rows: [ITEM_ROW] })
+      .mockResolvedValueOnce({ rows: [{ id: 'plan-1' }] }) // plan check
+      .mockResolvedValueOnce({ rows: [ITEM_ROW] }) // atomic INSERT
 
     const req = makeReq({
       params: { patientId: 'pat-1', id: 'plan-1' },
@@ -281,6 +384,9 @@ describe('addItem', () => {
 
     expect(res.status).toHaveBeenCalledWith(201)
     expect(res.json.mock.calls[0][0].data.title).toBe('Blood glucose monitoring')
+    // Verify the INSERT uses subquery for sort_order
+    const insertCall = mockQuery.mock.calls[1][0]
+    expect(insertCall).toContain('COALESCE(MAX(sort_order)')
   })
 
   test('returns 404 when plan not found', async () => {
