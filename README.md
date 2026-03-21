@@ -13,6 +13,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 ### Key Features
 
 - Appointment scheduling with real-time doctor availability
+- Appointment confirmation emails sent to patients upon booking
 - Electronic medical records, prescriptions, and lab reports
 - ICD-10 code lookup and assignment on medical records
 - Digital structured prescriptions with multi-medicine line items
