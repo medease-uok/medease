@@ -26,6 +26,7 @@ import DoctorDashboard from './pages/DoctorDashboard';
 import MyRecords from './pages/MyRecords';
 import StaffRecords from './pages/StaffRecords';
 import PatientSatisfaction from './pages/PatientSatisfaction';
+import ForgotPassword from './pages/ForgotPassword';
 import './App.css';
 
 const R = ({ roles, children }) => <RoleGuard roles={roles}>{children}</RoleGuard>;
@@ -46,6 +47,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<RegisterEnhanced />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<DashboardRedirect />} />
             <Route path="dashboard" element={<R roles={ROLE_GROUPS.STAFF}><DashboardEnhanced /></R>} />
