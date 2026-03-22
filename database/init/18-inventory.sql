@@ -11,8 +11,19 @@ CREATE TABLE inventory (
   location VARCHAR(100),
   last_restocked_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW(),
+  deleted_at TIMESTAMP
 );
+
+-- Trigger for auto-updating updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_inventory_updated_at
+  BEFORE UPDATE ON inventory
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE INDEX idx_inventory_item_name ON inventory(item_name);
 CREATE INDEX idx_inventory_category ON inventory(category);
