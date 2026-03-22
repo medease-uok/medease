@@ -3,6 +3,28 @@ const { notifyAdmins } = require('../utils/notifications.helper');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function validateInventoryInput({ item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location }) {
+  const sanitizedName = item_name?.trim();
+  
+  if (!sanitizedName || sanitizedName.length === 0 || sanitizedName.length > 255 || !category || quantity === undefined || !unit || reorder_level === undefined || !expiry_date || !supplier || !location) {
+    return { error: 'All fields are strictly required and item_name must be valid.' };
+  }
+
+  const qty = parseInt(quantity, 10);
+  const reorder = parseInt(reorder_level, 10);
+  if (isNaN(qty) || qty < 0 || qty > 2147483647 || isNaN(reorder) || reorder < 0 || reorder > 2147483647) {
+    return { error: 'quantity and reorder_level must be non-negative integers up to maximum threshold.' };
+  }
+  
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  if (expiry_date && new Date(expiry_date) < today) {
+    return { error: 'expiry_date must be in the future.' };
+  }
+
+  return { data: { item_name: sanitizedName, category, quantity: qty, unit, reorder_level: reorder, expiry_date, supplier, location } };
+}
+
 exports.getAllInventory = async (req, res, next) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
@@ -10,25 +32,28 @@ exports.getAllInventory = async (req, res, next) => {
     const offset = (page - 1) * limit;
     const { search, category } = req.query;
 
-    let query = `
-      SELECT *, COUNT(*) OVER() AS total_count
-      FROM inventory
-      WHERE deleted_at IS NULL
-    `;
+    const conditions = ['deleted_at IS NULL'];
     const values = [];
 
     if (search) {
       values.push(search);
-      query += ` AND to_tsvector('english', item_name || ' ' || COALESCE(category, '') || ' ' || COALESCE(supplier, '')) @@ plainto_tsquery('english', $${values.length})`;
+      conditions.push(`to_tsvector('english', item_name || ' ' || COALESCE(category, '') || ' ' || COALESCE(supplier, '')) @@ plainto_tsquery('english', $${values.length})`);
     }
     
     if (category && category !== 'All') {
       values.push(category);
-      query += ` AND category = $${values.length}`;
+      conditions.push(`category = $${values.length}`);
     }
 
-    query += ` ORDER BY item_name ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
     values.push(limit, offset);
+    const query = `
+      SELECT *, COUNT(*) OVER() AS total_count
+      FROM inventory
+      ${whereClause}
+      ORDER BY item_name ASC LIMIT $${values.length - 1} OFFSET $${values.length}
+    `;
 
     const result = await pool.query(query, values);
     
@@ -57,22 +82,11 @@ exports.getAllInventory = async (req, res, next) => {
 
 exports.addInventory = async (req, res, next) => {
   try {
-    const { item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location } = req.body;
-    
-    // Validate required fields explicitly
-    if (!item_name || !category || quantity === undefined || !unit || reorder_level === undefined || !expiry_date || !supplier || !location) {
-      return res.status(400).json({ status: 'error', message: 'All fields are strictly required.' });
+    const validation = validateInventoryInput(req.body);
+    if (validation.error) {
+      return res.status(400).json({ status: 'error', message: validation.error });
     }
-
-    const qty = parseInt(quantity, 10);
-    const reorder = parseInt(reorder_level, 10);
-    if (isNaN(qty) || qty < 0 || isNaN(reorder) || reorder < 0) {
-      return res.status(400).json({ status: 'error', message: 'quantity and reorder_level must be non-negative integers.' });
-    }
-    
-    if (new Date(expiry_date) < new Date(new Date().setHours(0,0,0,0))) {
-      return res.status(400).json({ status: 'error', message: 'expiry_date must be in the future for new items.' });
-    }
+    const { item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location } = validation.data;
     
     const query = `
       INSERT INTO inventory (item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location, last_restocked_at)
@@ -80,7 +94,7 @@ exports.addInventory = async (req, res, next) => {
       RETURNING *
     `;
     
-    const values = [item_name, category, qty, unit, reorder, expiry_date, supplier, location];
+    const values = [item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location];
     const result = await pool.query(query, values);
     
     const newItem = result.rows[0];
@@ -99,29 +113,23 @@ exports.addInventory = async (req, res, next) => {
 };
 
 exports.updateInventory = async (req, res, next) => {
-  const client = await pool.connect();
+  const { id } = req.params;
+  if (!UUID_REGEX.test(id)) {
+    return res.status(400).json({ status: 'error', message: 'Invalid ID format.' });
+  }
+
+  const validation = validateInventoryInput(req.body);
+  if (validation.error) {
+    return res.status(400).json({ status: 'error', message: validation.error });
+  }
+
+  let client;
+  let connectionReleased = false;
+
   try {
-    const { id } = req.params;
-    const { item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location } = req.body;
+    client = await pool.connect();
+    const { item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location } = validation.data;
     
-    if (!UUID_REGEX.test(id)) {
-      client.release();
-      return res.status(400).json({ status: 'error', message: 'Invalid ID format.' });
-    }
-
-    // Validate required fields
-    if (!item_name || !category || quantity === undefined || !unit || reorder_level === undefined || !expiry_date || !supplier || !location) {
-      client.release();
-      return res.status(400).json({ status: 'error', message: 'All fields are strictly required.' });
-    }
-
-    const qty = parseInt(quantity, 10);
-    const reorder = parseInt(reorder_level, 10);
-    if (isNaN(qty) || qty < 0 || isNaN(reorder) || reorder < 0) {
-      client.release();
-      return res.status(400).json({ status: 'error', message: 'quantity and reorder_level must be non-negative integers.' });
-    }
-
     await client.query('BEGIN');
 
     // Get previous state safely utilizing row locking
@@ -129,6 +137,7 @@ exports.updateInventory = async (req, res, next) => {
     if (oldItemResult.rows.length === 0) {
       await client.query('ROLLBACK');
       client.release();
+      connectionReleased = true;
       return res.status(404).json({ status: 'error', message: 'Inventory item not found' });
     }
     const oldItem = oldItemResult.rows[0];
@@ -149,15 +158,16 @@ exports.updateInventory = async (req, res, next) => {
       RETURNING *
     `;
     
-    const values = [item_name, category, qty, unit, reorder, expiry_date, supplier, location, id];
+    const values = [item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location, id];
     const result = await client.query(query, values);
     
     const updatedItem = result.rows[0];
 
     await client.query('COMMIT');
     client.release();
+    connectionReleased = true;
 
-    // Trigger notification cleanly comparing against old items' threshold explicitly per reviewer
+    // Trigger notification cleanly outside the transaction
     if (oldItem.quantity > oldItem.reorder_level && updatedItem.quantity <= updatedItem.reorder_level) {
       const title = 'Low Stock Alert';
       const message = `${updatedItem.item_name} is running low (Current: ${updatedItem.quantity} ${updatedItem.unit}). Please restock.`;
@@ -166,8 +176,10 @@ exports.updateInventory = async (req, res, next) => {
     
     res.json({ status: 'success', data: updatedItem });
   } catch (error) {
-    if (client) {
-      await client.query('ROLLBACK');
+    if (client && !connectionReleased) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) {} // Ignore rollback failure on dead connections
       client.release();
     }
     next(error);
@@ -182,7 +194,7 @@ exports.deleteInventory = async (req, res, next) => {
       return res.status(400).json({ status: 'error', message: 'Invalid ID format.' });
     }
     
-    // Per PR logic review requirement, implement logical softly delete with audit tracing proxy equivalent
+    // Implement logical delete
     const query = `
       UPDATE inventory
       SET deleted_at = NOW()
