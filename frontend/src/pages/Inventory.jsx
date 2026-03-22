@@ -1,4 +1,4 @@
-chimport React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
 import { inventoryService } from '../services/inventory.service';
@@ -133,8 +133,8 @@ export default function Inventory() {
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${selectedCategory === cat
-                  ? 'bg-primary text-white shadow-md'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-primary text-white shadow-md'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
             >
               {cat}
