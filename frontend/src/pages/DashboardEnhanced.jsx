@@ -172,7 +172,7 @@ export default function DashboardEnhanced() {
         }).catch(console.error)
       : Promise.resolve();
 
-    const fetchInventory = ['admin', 'doctor', 'nurse', 'pharmacist'].includes(role)
+    const fetchInventory = ['admin', 'doctor', 'nurse', 'pharmacist', 'lab_technician'].includes(role)
       ? inventoryService.getAll().then((res) => {
           const allItems = res.data || [];
           setLowStockItems(allItems.filter(i => i.quantity <= i.reorder_level));
@@ -415,7 +415,7 @@ export default function DashboardEnhanced() {
       )}
 
       {/* Low Stock Alerts */}
-      {['admin', 'doctor', 'nurse', 'pharmacist'].includes(role) && lowStockItems.length > 0 && (
+      {['admin', 'doctor', 'nurse', 'pharmacist', 'lab_technician'].includes(role) && lowStockItems.length > 0 && (
         <Card className="border-red-200 hover:shadow-lg transition-shadow duration-300">
           <CardHeader className="bg-red-50 pb-3 border-b border-red-100 rounded-t-lg">
             <CardTitle className="text-lg flex items-center gap-2 text-red-700">
