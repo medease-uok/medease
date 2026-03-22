@@ -2,6 +2,10 @@ const pool = require('../config/database');
 
 exports.getAllInventory = async (req, res, next) => {
   try {
+    const limit = parseInt(req.query.limit) || 50;
+    const page = parseInt(req.query.page) || 1;
+    const offset = (page - 1) * limit;
+
     const query = `
       SELECT 
         id, item_name, category, quantity, unit, reorder_level,
@@ -9,9 +13,24 @@ exports.getAllInventory = async (req, res, next) => {
         created_at, updated_at
       FROM inventory
       ORDER BY item_name ASC
+      LIMIT $1 OFFSET $2
     `;
-    const result = await pool.query(query);
-    res.json({ status: 'success', data: result.rows });
+    const result = await pool.query(query, [limit, offset]);
+    
+    // Get total count for pagination metadata
+    const countResult = await pool.query('SELECT COUNT(*) FROM inventory');
+    const totalCount = parseInt(countResult.rows[0].count);
+
+    res.json({ 
+      status: 'success', 
+      data: result.rows,
+      meta: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    });
   } catch (error) {
     next(error);
   }
