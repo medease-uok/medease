@@ -28,6 +28,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Prescription refill requests with doctor approval workflow
 - Lab test request workflow with priority levels and lab technician assignment
 - Patient satisfaction and feedback system with per-doctor ratings and analytics
+- Inventory management for hospital supplies and equipment with low stock alerts and admin notifications
 - PDF generation for medical records and prescriptions
 - Voice input (speech-to-text) for clinical notes, diagnoses, prescriptions, and other text fields
 - Role-Based Access Control (RBAC) with 26 permissions across 6 roles
