@@ -1422,4 +1422,16 @@ INSERT INTO treatment_plan_items (id, plan_id, title, description, is_completed,
    'Follow-up lipid panel', 'Recheck cholesterol levels after 3 months.', true, '2026-01-01', 2)
 ON CONFLICT (id) DO NOTHING;
 
+-- ============================================
+-- INVENTORY SEED DATA
+-- ============================================
+INSERT INTO inventory (item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location, last_restocked_at) VALUES
+  ('Surgical Masks (N95)', 'Consumables', 500, 'boxes', 100, '2028-12-31', 'MediSupply Co.', 'Main Store Room A', NOW()),
+  ('Latex Examination Gloves', 'Consumables', 850, 'boxes', 200, '2027-10-15', 'SafeCare Medical', 'Main Store Room A', NOW()),
+  ('Syringes (5ml)', 'Medical Equipment', 1200, 'pieces', 300, '2029-01-20', 'HealthCorp', 'Ward 1 Cupboard', NOW()),
+  ('Digital Thermometers', 'Medical Equipment', 45, 'pieces', 10, '2030-05-10', 'TechMed', 'Nursing Station', NOW()),
+  ('Printer Paper (A4)', 'Stationery', 25, 'rims', 15, NULL, 'OfficeMax', 'Admin Office', NOW()),
+  ('Surgical Sutures', 'Surgical', 120, 'packs', 50, '2027-08-01', 'SteriLine', 'Operation Theater 2', NOW()),
+  ('IV Fluid (Normal Saline)', 'Medical Equipment', 150, 'bags', 50, '2026-11-20', 'LifeFluids', 'Emergency Ward', NOW());
+
 COMMIT;
