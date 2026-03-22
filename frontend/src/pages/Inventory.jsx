@@ -256,8 +256,8 @@ export default function Inventory() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Supplier</label>
-                  <input name="supplier" value={formData.supplier} onChange={handleInputChange} className="input-field w-full" placeholder="e.g. MediSupply Co." />
+                  <label className="text-sm font-medium text-slate-700">Supplier *</label>
+                  <input required name="supplier" value={formData.supplier} onChange={handleInputChange} className="input-field w-full" placeholder="e.g. MediSupply Co." />
                 </div>
 
                 <div className="space-y-2">
@@ -276,13 +276,13 @@ export default function Inventory() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Expiry Date</label>
-                  <input type="date" name="expiry_date" value={formData.expiry_date} onChange={handleInputChange} className="input-field w-full" />
+                  <label className="text-sm font-medium text-slate-700">Expiry Date *</label>
+                  <input required type="date" name="expiry_date" value={formData.expiry_date} onChange={handleInputChange} className="input-field w-full" />
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700">Location</label>
-                  <input name="location" value={formData.location} onChange={handleInputChange} className="input-field w-full" placeholder="e.g. Main Store Room A" />
+                  <label className="text-sm font-medium text-slate-700">Location *</label>
+                  <input required name="location" value={formData.location} onChange={handleInputChange} className="input-field w-full" placeholder="e.g. Main Store Room A" />
                 </div>
               </div>
 
