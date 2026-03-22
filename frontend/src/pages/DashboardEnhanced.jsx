@@ -16,6 +16,7 @@ import PatientQueue from '../components/PatientQueue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
+import { inventoryService } from '../services/inventory.service';
 
 const iconMap = {
   'Total Patients': Users,
@@ -130,6 +131,7 @@ export default function DashboardEnhanced() {
 
   const [dashData, setDashData] = useState(null);
   const [activityData, setActivityData] = useState([]);
+  const [lowStockItems, setLowStockItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -170,7 +172,14 @@ export default function DashboardEnhanced() {
         }).catch(console.error)
       : Promise.resolve();
 
-    Promise.allSettled([fetchStats, fetchActivity, fetchProfile]).finally(() => setLoading(false));
+    const fetchInventory = ['admin', 'doctor', 'nurse', 'pharmacist'].includes(role)
+      ? inventoryService.getAll().then((res) => {
+          const allItems = res.data || [];
+          setLowStockItems(allItems.filter(i => i.quantity <= i.reorder_level));
+        }).catch(console.error)
+      : Promise.resolve();
+
+    Promise.allSettled([fetchStats, fetchActivity, fetchProfile, fetchInventory]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -403,6 +412,36 @@ export default function DashboardEnhanced() {
       {/* Patient Queue — visible to clinical staff */}
       {['admin', 'nurse', 'doctor'].includes(role) && (
         <PatientQueue />
+      )}
+
+      {/* Low Stock Alerts */}
+      {['admin', 'doctor', 'nurse', 'pharmacist'].includes(role) && lowStockItems.length > 0 && (
+        <Card className="border-red-200 hover:shadow-lg transition-shadow duration-300">
+          <CardHeader className="bg-red-50 pb-3 border-b border-red-100 rounded-t-lg">
+            <CardTitle className="text-lg flex items-center gap-2 text-red-700">
+              <AlertTriangle className="w-5 h-5" />
+              Low Stock Alerts
+            </CardTitle>
+            <CardDescription className="text-red-600/80">
+              {lowStockItems.length} items need immediate restocking
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {lowStockItems.map(item => (
+                <div key={item.id} className="p-3 border border-red-100 rounded-lg bg-red-50/30 flex justify-between items-center transition-colors hover:bg-red-50/80">
+                  <div>
+                    <p className="font-semibold text-slate-900 text-sm whitespace-nowrap overflow-hidden text-ellipsis">{item.item_name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Threshold: <span className="font-medium text-slate-700">{item.reorder_level}</span> {item.unit}</p>
+                  </div>
+                  <div className="text-right min-w-fit ml-4">
+                    <p className="font-bold text-red-600 text-lg leading-tight">{item.quantity} <span className="text-xs font-semibold text-red-500/80 uppercase tracking-wider">{item.unit}</span></p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Activity Feed */}
