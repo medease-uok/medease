@@ -37,7 +37,7 @@ const navConfig = [
   { path: '/patient-satisfaction', label: 'Patient Feedback', icon: Star, roles: [ROLES.ADMIN] },
   { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: [ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN] },
   { path: '/records', label: 'Records', icon: FileText, roles: [...ROLE_GROUPS.CLINICAL, ROLES.LAB_TECHNICIAN] },
-  { path: '/inventory', label: 'Inventory', icon: Archive, roles: ROLE_GROUPS.CLINICAL },
+  { path: '/inventory', label: 'Inventory', icon: Archive, roles: [...ROLE_GROUPS.CLINICAL, ROLES.PHARMACIST] },
 ];
 
 const roleColors = {

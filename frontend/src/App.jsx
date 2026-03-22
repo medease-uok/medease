@@ -70,7 +70,7 @@ function App() {
             <Route path="documents" element={<R roles={ROLE_GROUPS.PATIENT_CARE.concat(ROLES.LAB_TECHNICIAN)}><MedicalDocuments /></R>} />
             <Route path="vaccinations" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><Vaccinations /></R>} />
             <Route path="chronic-conditions" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><ChronicConditions /></R>} />
-            <Route path="inventory" element={<R roles={ROLE_GROUPS.CLINICAL}><Inventory /></R>} />
+            <Route path="inventory" element={<R roles={[...ROLE_GROUPS.CLINICAL, ROLES.PHARMACIST]}><Inventory /></R>} />
             <Route path="patient-satisfaction" element={<R roles={[ROLES.DOCTOR, ROLES.ADMIN]}><PatientSatisfaction /></R>} />
             <Route path="permissions" element={<R roles={[ROLES.ADMIN]}><PermissionManagement /></R>} />
             <Route path="admin" element={<DashboardRedirect />} />
