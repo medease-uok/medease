@@ -27,8 +27,8 @@ export default function Inventory() {
 
   const fetchInventory = async () => {
     try {
-      const data = await inventoryService.getAll();
-      setItems(data);
+      const response = await inventoryService.getAll();
+      setItems(response.data || []);
     } catch (error) {
       console.error('Error fetching inventory:', error);
     } finally {
