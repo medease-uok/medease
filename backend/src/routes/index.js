@@ -23,6 +23,7 @@ const patientFeedbackRoutes = require('./patientFeedback.routes');
 const labTestRequestRoutes = require('./labTestRequests.routes');
 const doctorTaskRoutes = require('./doctorTasks.routes');
 const icd10Routes = require('./icd10.routes');
+const inventoryRoutes = require('./inventory.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -55,5 +56,6 @@ router.use('/patient-feedback', patientFeedbackRoutes);
 router.use('/lab-test-requests', labTestRequestRoutes);
 router.use('/doctor-tasks', doctorTaskRoutes);
 router.use('/icd10', icd10Routes);
+router.use('/inventory', inventoryRoutes);
 
 module.exports = router;
