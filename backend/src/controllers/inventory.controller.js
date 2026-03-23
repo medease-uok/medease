@@ -80,6 +80,30 @@ exports.getAllInventory = async (req, res, next) => {
   }
 };
 
+exports.getInventoryById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_REGEX.test(id)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid ID format.' });
+    }
+
+    const query = `
+      SELECT *
+      FROM inventory
+      WHERE id = $1 AND deleted_at IS NULL
+    `;
+    const result = await pool.query(query, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Inventory item not found' });
+    }
+
+    res.json({ status: 'success', data: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.addInventory = async (req, res, next) => {
   try {
     const validation = validateInventoryInput(req.body);
