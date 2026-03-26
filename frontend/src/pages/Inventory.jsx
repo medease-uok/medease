@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
 import { inventoryService } from '../services/inventory.service';
-import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download } from 'lucide-react';
 
 export default function Inventory() {
   const { currentUser } = useAuth();
@@ -10,6 +10,7 @@ export default function Inventory() {
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingReport, setDownloadingReport] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -98,6 +99,51 @@ export default function Inventory() {
     return matchesSearch && matchesCat;
   });
 
+  const handleDownloadReport = async () => {
+    try {
+      setDownloadingReport(true);
+      const res = await inventoryService.getReport();
+      const reportData = res.data;
+      
+      let csvContent = "data:text/csv;charset=utf-8,";
+      
+      // Overview Section
+      csvContent += "Overview\n";
+      csvContent += `Total Items,${reportData.overview.total_items}\n`;
+      csvContent += `Low Stock Items,${reportData.overview.low_stock_items}\n`;
+      csvContent += `Out of Stock Items,${reportData.overview.out_of_stock_items}\n\n`;
+      
+      // Categories Section
+      csvContent += "Category Distribution\n";
+      csvContent += "Category,Item Count,Total Quantity\n";
+      reportData.categories.forEach(cat => {
+        csvContent += `${cat.category},${cat.count},${cat.total_quantity}\n`;
+      });
+      csvContent += "\n";
+      
+      // Trends Section
+      csvContent += "Recent Trends (Last 30 Days)\n";
+      csvContent += "Date,Transaction Type,Total Quantity Changed\n";
+      reportData.trends.forEach(trend => {
+        csvContent += `${new Date(trend.date).toLocaleDateString()},${trend.transaction_type},${trend.total_quantity}\n`;
+      });
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `inventory_report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('Failed to download report:', error);
+      alert('Failed to generate report');
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -106,13 +152,23 @@ export default function Inventory() {
           <p className="text-slate-600">Track and manage hospital equipment and supplies</p>
         </div>
         {isAdmin && (
-          <button
-            onClick={() => handleOpenModal()}
-            className="btn-primary flex items-center gap-2 shadow-lg shadow-primary/20"
-          >
-            <Plus className="w-5 h-5" />
-            Add Item
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleDownloadReport}
+              disabled={downloadingReport}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              {downloadingReport ? 'Generating...' : 'Download Report'}
+            </button>
+            <button
+              onClick={() => handleOpenModal()}
+              className="btn-primary flex items-center gap-2 shadow-lg shadow-primary/20"
+            >
+              <Plus className="w-5 h-5" />
+              Add Item
+            </button>
+          </div>
         )}
       </div>
 
