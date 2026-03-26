@@ -39,3 +39,41 @@ ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
 
 -- Allow application users appropriate access (RLS policy)
 CREATE POLICY "Allow all for authenticated app users" ON inventory FOR ALL TO medease_app USING (true);
+
+-- Inventory Transactions table: tracking stock usage and trends
+CREATE TABLE inventory_transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  inventory_id UUID REFERENCES inventory(id) ON DELETE CASCADE,
+  transaction_type VARCHAR(50) NOT NULL, -- 'IN', 'OUT', 'ADJUSTMENT'
+  quantity_changed INTEGER NOT NULL,
+  reference VARCHAR(255),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Trigger to auto-log changes in inventory quantity
+CREATE OR REPLACE FUNCTION log_inventory_transaction()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO inventory_transactions (inventory_id, transaction_type, quantity_changed, reference)
+    VALUES (NEW.id, 'IN', NEW.quantity, 'Initial Stock');
+  ELSIF TG_OP = 'UPDATE' AND NEW.quantity <> OLD.quantity THEN
+    INSERT INTO inventory_transactions (inventory_id, transaction_type, quantity_changed, reference)
+    VALUES (
+      NEW.id,
+      CASE WHEN NEW.quantity > OLD.quantity THEN 'IN' ELSE 'OUT' END,
+      ABS(NEW.quantity - OLD.quantity),
+      'Stock Update'
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_inventory_transaction
+  AFTER INSERT OR UPDATE ON inventory
+  FOR EACH ROW EXECUTE FUNCTION log_inventory_transaction();
+
+GRANT SELECT, INSERT ON inventory_transactions TO medease_app;
+ALTER TABLE inventory_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for authenticated app users" ON inventory_transactions FOR ALL TO medease_app USING (true);
