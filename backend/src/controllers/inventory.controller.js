@@ -237,3 +237,64 @@ exports.deleteInventory = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getInventoryReport = async (req, res, next) => {
+  try {
+    // 1. Overview counts
+    const overviewQuery = `
+      SELECT 
+        COUNT(*) as total_items,
+        COUNT(CASE WHEN quantity <= reorder_level AND quantity > 0 THEN 1 END) as low_stock_items,
+        COUNT(CASE WHEN quantity = 0 THEN 1 END) as out_of_stock_items
+      FROM inventory
+      WHERE deleted_at IS NULL
+    `;
+    const overviewResult = await pool.query(overviewQuery);
+    
+    // 2. Category distribution
+    const categoryQuery = `
+      SELECT category, COUNT(*) as count, SUM(quantity) as total_quantity
+      FROM inventory
+      WHERE deleted_at IS NULL
+      GROUP BY category
+    `;
+    const categoryResult = await pool.query(categoryQuery);
+
+    // 3. Recent Transactions Trends (e.g., last 30 days)
+    const trendsQuery = `
+      SELECT 
+        DATE(created_at) as date,
+        transaction_type,
+        SUM(quantity_changed) as total_quantity
+      FROM inventory_transactions
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY DATE(created_at), transaction_type
+      ORDER BY date ASC
+    `;
+    const trendsResult = await pool.query(trendsQuery);
+
+    res.json({
+      status: 'success',
+      data: {
+        overview: {
+          total_items: parseInt(overviewResult.rows[0].total_items) || 0,
+          low_stock_items: parseInt(overviewResult.rows[0].low_stock_items) || 0,
+          out_of_stock_items: parseInt(overviewResult.rows[0].out_of_stock_items) || 0
+        },
+        categories: categoryResult.rows.map(row => ({
+          category: row.category,
+          count: parseInt(row.count),
+          total_quantity: parseInt(row.total_quantity)
+        })),
+        trends: trendsResult.rows.map(row => ({
+          date: row.date,
+          transaction_type: row.transaction_type,
+          total_quantity: parseInt(row.total_quantity)
+        }))
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
