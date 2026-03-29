@@ -5,7 +5,8 @@ const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
 const { SLOT_DURATION_MINUTES } = require('../utils/scheduleHelpers');
-const { sendAppointmentConfirmationEmail } = require('../utils/emailService');
+const { sendAppointmentConfirmationEmail } = require('../utils/emailService')
+const { notifyWaitlistOnCancellation } = require('./waitlist.controller');
 
 const mapAppointment = (row) => ({
   id: row.id,
@@ -302,7 +303,7 @@ const updateStatus = async (req, res, next) => {
     }
 
     const existing = await db.query(
-      `SELECT a.id, a.patient_id, a.doctor_id, a.status,
+      `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
               p.user_id AS patient_user_id, d.user_id AS doctor_user_id
        FROM appointments a
        JOIN patients p ON a.patient_id = p.id
@@ -385,6 +386,11 @@ const updateStatus = async (req, res, next) => {
           console.error('Failed to send cancel notification to doctor', { id, error: err.message });
         });
       }
+
+      // Notify the first pending waitlist entry for this doctor+date
+      notifyWaitlistOnCancellation(appt.doctor_id, appt.scheduled_at).catch((err) => {
+        console.error('Failed to notify waitlist on cancellation', { id, error: err.message });
+      });
     }
 
     await auditLog({ userId: req.user.id, action: 'UPDATE_APPOINTMENT_STATUS', resourceType: 'appointment', resourceId: id, ip: req.ip, details: { status, previousStatus: appt.status } });
@@ -683,7 +689,7 @@ const cancelSeries = async (req, res, next) => {
        WHERE series_id = $1
          AND status = 'scheduled'
          AND scheduled_at > NOW()
-       RETURNING id`,
+       RETURNING id, scheduled_at`,
       [seriesId]
     );
 
@@ -709,6 +715,13 @@ const cancelSeries = async (req, res, next) => {
         referenceType: 'appointment',
       }).catch((err) => {
         console.error('Failed to send cancel notification to doctor', { seriesId, error: err.message });
+      });
+    }
+
+    // Notify waitlist for each cancelled slot (fire-and-forget)
+    for (const row of result.rows) {
+      notifyWaitlistOnCancellation(appt.doctor_id, row.scheduled_at).catch((err) => {
+        console.error('Failed to notify waitlist on series cancellation', { seriesId, error: err.message });
       });
     }
 

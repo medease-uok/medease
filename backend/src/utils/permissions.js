@@ -7,6 +7,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
   admin: [
     'view_patients', 'view_own_profile', 'edit_own_profile', 'edit_patient',
     'view_appointments', 'view_own_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status',
+    'create_waitlist_entry', 'view_own_waitlist', 'view_waitlist', 'manage_waitlist',
     'view_medical_records', 'view_own_medical_records', 'create_medical_record', 'edit_medical_record',
     'view_prescriptions', 'view_own_prescriptions', 'create_prescription', 'dispense_prescription', 'cancel_prescription',
     'request_refill', 'view_refill_requests', 'view_own_refill_requests', 'respond_refill_request',
@@ -26,6 +27,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'upload_document', 'view_documents',
     'view_vaccinations', 'create_vaccination', 'edit_vaccination',
     'view_chronic_conditions', 'create_chronic_condition', 'edit_chronic_condition',
+    'view_waitlist', 'manage_waitlist',
   ],
   nurse: [
     'view_patients',
@@ -37,6 +39,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'upload_document', 'view_documents',
     'view_vaccinations', 'create_vaccination', 'edit_vaccination',
     'view_chronic_conditions',
+    'view_waitlist',
   ],
   patient: [
     'view_own_profile', 'edit_own_profile',
@@ -48,6 +51,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
     'upload_document', 'view_own_documents',
     'view_own_vaccinations',
     'view_own_chronic_conditions',
+    'create_waitlist_entry', 'view_own_waitlist',
   ],
   lab_technician: [
     'view_patients',

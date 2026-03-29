@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   Calendar, AlertCircle, Search, Clock, User, Stethoscope, CalendarDays, X, FileText, List,
-  CalendarPlus, Repeat,
+  CalendarPlus, Repeat, ClipboardList, Trash2,
 } from 'lucide-react';
 import { appointmentStatuses } from '../constants';
 import { useAuth } from '../data/AuthContext';
@@ -28,6 +28,14 @@ const RECURRENCE_LABELS = {
 };
 
 const SKELETON_COUNT = 6;
+
+const WAITLIST_STATUS_STYLES = {
+  pending:   { label: 'Pending',   classes: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  notified:  { label: 'Notified',  classes: 'bg-blue-50 text-blue-700 border border-blue-200' },
+  booked:    { label: 'Booked',    classes: 'bg-green-50 text-green-700 border border-green-200' },
+  cancelled: { label: 'Cancelled', classes: 'bg-slate-100 text-slate-500 border border-slate-200' },
+  expired:   { label: 'Expired',   classes: 'bg-red-50 text-red-500 border border-red-200' },
+};
 
 const formatDate = (iso) => {
   if (!iso) return '-';
@@ -127,6 +135,149 @@ function ListSkeleton() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function WaitlistTab() {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [cancelling, setCancelling] = useState(null);
+
+  const fetchEntries = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    api.get('/waitlist')
+      .then((res) => {
+        const active = (res.data || []).filter((e) => !['cancelled', 'expired'].includes(e.status))
+        setEntries(active)
+      })
+      .catch(() => setError('Failed to load waitlist entries.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { fetchEntries(); }, [fetchEntries]);
+
+  const handleCancel = async (id) => {
+    setCancelling(id);
+    try {
+      await api.delete(`/waitlist/${id}`);
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+    } catch {
+      setError('Failed to cancel waitlist entry.');
+    } finally {
+      setCancelling(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-slate-200 p-5 animate-pulse">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-slate-200" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-slate-200 rounded w-3/4" />
+                <div className="h-3 bg-slate-100 rounded w-1/2" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
+        <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+        <p className="text-sm text-red-700">{error}</p>
+        <button onClick={fetchEntries} className="ml-auto px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <div className="text-center">
+            <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-lg font-medium text-slate-700">No waitlist entries</p>
+            <p className="text-sm text-slate-500 mt-1">
+              When all slots are booked, you can join the waitlist from the booking form.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {entries.map((entry) => {
+        const style = WAITLIST_STATUS_STYLES[entry.status] || WAITLIST_STATUS_STYLES.pending;
+        return (
+          <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <ClipboardList className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">{entry.doctorName || 'Doctor'}</h3>
+                  {entry.doctorSpecialization && (
+                    <p className="text-xs text-slate-500">{entry.doctorSpecialization}</p>
+                  )}
+                </div>
+              </div>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.classes}`}>
+                {style.label}
+              </span>
+            </div>
+
+            <div className="space-y-1.5 text-sm text-slate-600">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span>{entry.preferredDate}</span>
+              </div>
+              {entry.preferredTime && (
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Preferred: {entry.preferredTime}</span>
+                </div>
+              )}
+              {entry.notes && (
+                <div className="flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                  <span className="truncate">{entry.notes}</span>
+                </div>
+              )}
+            </div>
+
+            {entry.status === 'notified' && (
+              <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                A slot is available! Book your appointment now.
+              </div>
+            )}
+
+            {['pending', 'notified'].includes(entry.status) && (
+              <button
+                onClick={() => handleCancel(entry.id)}
+                disabled={cancelling === entry.id}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {cancelling === entry.id ? 'Removing...' : 'Leave Waitlist'}
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -249,7 +400,7 @@ export default function Appointments() {
         )}
       </div>
 
-      {/* List / Calendar toggle */}
+      {/* List / Calendar / Waitlist toggle */}
       <div className="border-b border-slate-200">
           <nav className="flex gap-1 -mb-px" aria-label="View mode">
             <button
@@ -278,8 +429,26 @@ export default function Appointments() {
               <CalendarDays className="w-4 h-4" />
               Calendar
             </button>
+            {isPatient && (
+              <button
+                onClick={() => setViewMode('waitlist')}
+                role="tab"
+                aria-selected={viewMode === 'waitlist'}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  viewMode === 'waitlist'
+                    ? 'border-amber-500 text-amber-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                <ClipboardList className="w-4 h-4" />
+                Waitlist
+              </button>
+            )}
           </nav>
         </div>
+
+      {/* Waitlist view (patients only) */}
+      {viewMode === 'waitlist' && isPatient && <WaitlistTab />}
 
       {/* Calendar view */}
       {viewMode === 'calendar' && (
