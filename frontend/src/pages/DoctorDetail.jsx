@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, Clock, Mail, Phone, Stethoscope,
   BadgeCheck, Building2, CalendarPlus, X, CheckCircle, AlertCircle,
-  FileText, User, Repeat,
+  FileText, User, Repeat, ClipboardList,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -29,7 +29,7 @@ const RECURRENCE_OPTIONS = [
   { value: 'monthly', label: 'Monthly' },
 ];
 
-function BookingModal({ doctor, onClose, onBooked }) {
+function BookingModal({ doctor, onClose, onBooked, onWaitlistJoined }) {
   const [date, setDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [notes, setNotes] = useState('');
@@ -39,6 +39,10 @@ function BookingModal({ doctor, onClose, onBooked }) {
   const [error, setError] = useState(null);
   const [recurrencePattern, setRecurrencePattern] = useState('');
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+  const [showWaitlist, setShowWaitlist] = useState(false);
+  const [waitlistNotes, setWaitlistNotes] = useState('');
+  const [joinSubmitting, setJoinSubmitting] = useState(false);
+  const [joinError, setJoinError] = useState(null);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -51,6 +55,7 @@ function BookingModal({ doctor, onClose, onBooked }) {
     const fetchSlots = async () => {
       setLoadingSlots(true);
       setSelectedSlot(null);
+      setShowWaitlist(false);
       setError(null);
       try {
         const res = await api.get(`/schedules/${doctor.id}/slots?date=${date}`);
@@ -98,6 +103,26 @@ function BookingModal({ doctor, onClose, onBooked }) {
   };
 
   const availableSlots = slots.filter((s) => s.available);
+  const allBooked = slots.length > 0 && availableSlots.length === 0;
+
+  const handleJoinWaitlist = async (e) => {
+    e.preventDefault();
+    setJoinSubmitting(true);
+    setJoinError(null);
+    try {
+      await api.post('/waitlist', {
+        doctorId: doctor.id,
+        preferredDate: date,
+        notes: waitlistNotes.trim() || undefined,
+      });
+      onWaitlistJoined();
+    } catch (err) {
+      const msg = err?.data?.message || err?.message || 'Failed to join waitlist.';
+      setJoinError(msg.includes('already on the waitlist') ? 'You are already on the waitlist for this doctor on this date.' : msg);
+    } finally {
+      setJoinSubmitting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
@@ -159,10 +184,50 @@ function BookingModal({ doctor, onClose, onBooked }) {
                 <p className="text-sm text-slate-400 text-center py-4">
                   Doctor is not available on this day.
                 </p>
-              ) : availableSlots.length === 0 ? (
-                <p className="text-sm text-amber-600 text-center py-4">
-                  No slots available for this day. All slots are booked.
-                </p>
+              ) : allBooked ? (
+                showWaitlist ? (
+                  <form onSubmit={handleJoinWaitlist} className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                      <ClipboardList className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                      <p className="text-sm text-amber-700">Join the waitlist — we'll notify you when a slot opens up.</p>
+                    </div>
+                    {joinError && (
+                      <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <p className="text-xs text-red-700">{joinError}</p>
+                      </div>
+                    )}
+                    <textarea
+                      rows={2}
+                      maxLength={500}
+                      placeholder="Notes (optional)"
+                      value={waitlistNotes}
+                      onChange={(e) => setWaitlistNotes(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setShowWaitlist(false)} className="flex-1 px-3 py-1.5 text-sm text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
+                        Back
+                      </button>
+                      <button type="submit" disabled={joinSubmitting} className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors">
+                        {joinSubmitting ? 'Joining...' : 'Join Waitlist'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center space-y-3">
+                    <p className="text-sm text-amber-700 font-medium">All slots are booked for this day.</p>
+                    <p className="text-xs text-slate-500">Join the waitlist to be notified when a slot opens up.</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowWaitlist(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors"
+                    >
+                      <ClipboardList className="w-4 h-4" />
+                      Join Waitlist
+                    </button>
+                  </div>
+                )
               ) : (
                 <div className="grid grid-cols-4 gap-2">
                   {slots.map((slot) => (
@@ -282,6 +347,7 @@ export default function DoctorDetail() {
   const [loading, setLoading] = useState(true);
   const [showBooking, setShowBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [waitlistSuccess, setWaitlistSuccess] = useState(false);
   const [selectedApptId, setSelectedApptId] = useState(null);
 
   const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -315,6 +381,12 @@ export default function DoctorDetail() {
     setBookingSuccess(true);
     fetchDoctor();
     setTimeout(() => setBookingSuccess(false), 4000);
+  };
+
+  const handleWaitlistJoined = () => {
+    setShowBooking(false);
+    setWaitlistSuccess(true);
+    setTimeout(() => setWaitlistSuccess(false), 4000);
   };
 
   if (loading) {
@@ -367,6 +439,13 @@ export default function DoctorDetail() {
         <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg animate-in fade-in">
           <CheckCircle className="w-5 h-5 text-green-500" />
           <p className="text-sm text-green-700 font-medium">Appointment booked successfully!</p>
+        </div>
+      )}
+
+      {waitlistSuccess && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <ClipboardList className="w-5 h-5 text-amber-500" />
+          <p className="text-sm text-amber-700 font-medium">Added to waitlist! You'll be notified when a slot opens up.</p>
         </div>
       )}
 
@@ -544,6 +623,7 @@ export default function DoctorDetail() {
           doctor={doctor}
           onClose={() => setShowBooking(false)}
           onBooked={handleBooked}
+          onWaitlistJoined={handleWaitlistJoined}
         />
       )}
 
