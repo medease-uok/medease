@@ -13,6 +13,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 ### Key Features
 
 - Appointment scheduling with real-time doctor availability
+- Recurring appointment series (daily, weekly, biweekly, monthly) with conflict detection and bulk cancellation
 - Appointment confirmation emails sent to patients upon booking
 - Automated appointment reminder emails and in-app notifications sent before upcoming appointments
 - Electronic medical records, prescriptions, and lab reports
