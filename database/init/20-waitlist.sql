@@ -2,8 +2,10 @@
 -- Allows patients to join a waitlist when all slots for a doctor/date are booked.
 -- When an appointment is cancelled, the first pending waitlist entry for that slot is notified.
 
--- Add new notification type
+-- Add new notification types
 ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'waitlist_slot_available';
+ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'waitlist_joined';
+ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'waitlist_cancelled';
 
 -- Waitlist entry status
 CREATE TYPE waitlist_status AS ENUM ('pending', 'notified', 'booked', 'cancelled', 'expired');

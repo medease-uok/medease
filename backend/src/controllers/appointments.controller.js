@@ -5,7 +5,7 @@ const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
 const { SLOT_DURATION_MINUTES } = require('../utils/scheduleHelpers');
-const { sendAppointmentConfirmationEmail } = require('../utils/emailService')
+const { sendAppointmentConfirmationEmail } = require('../utils/emailService');
 const { notifyWaitlistOnCancellation } = require('./waitlist.controller');
 
 const mapAppointment = (row) => ({
