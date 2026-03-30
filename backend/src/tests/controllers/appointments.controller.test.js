@@ -18,9 +18,12 @@ jest.mock('../../controllers/notifications.controller', () => ({
 jest.mock('../../utils/emailService', () => ({
   sendAppointmentConfirmationEmail: jest.fn().mockResolvedValue(undefined),
 }))
+jest.mock('../../controllers/waitlist.controller', () => ({
+  notifyWaitlistOnCancellation: jest.fn().mockResolvedValue(undefined),
+}))
 
 const { sendAppointmentConfirmationEmail } = require('../../utils/emailService')
-const { getAll, getById, create, updateStatus } = require('../../controllers/appointments.controller')
+const { getAll, getById, create, updateStatus, reschedule } = require('../../controllers/appointments.controller')
 
 function makeReq(overrides = {}) {
   return {
@@ -189,8 +192,8 @@ describe('getById', () => {
 // CREATE
 // ──────────────────────────────────────────────────────────────
 describe('create', () => {
-  // Monday 08:00 UTC on a known Monday date
-  const VALID_SCHEDULED_AT = '2026-03-23T08:00:00Z' // Monday = dayOfWeek 1
+  // 2026-03-23T02:30:00Z = Monday 08:00 Asia/Colombo (UTC+5:30), on a valid 20-min slot boundary
+  const VALID_SCHEDULED_AT = '2026-03-23T02:30:00Z'
 
   const SCHEDULE_ROW = { start_time: '08:00:00', end_time: '17:00:00', is_active: true }
   const DOCTOR_ROW = { id: 'doc-1', user_id: 'usr-doc', first_name: 'Kamal', last_name: 'Perera', specialization: 'Cardiology' }
@@ -547,5 +550,275 @@ describe('updateStatus', () => {
     await updateStatus(req, res, next)
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }))
+  })
+})
+
+// ──────────────────────────────────────────────────────────────
+// RESCHEDULE
+// ──────────────────────────────────────────────────────────────
+describe('reschedule', () => {
+  const VALID_UUID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  // 2030-03-25T02:30:00Z = Monday 08:00 Asia/Colombo — existing slot (future date)
+  const CURRENT_SLOT = '2030-03-25T02:30:00Z'
+  // 2030-03-25T02:50:00Z = Monday 08:20 Asia/Colombo — next valid slot
+  const NEW_SLOT = '2030-03-25T02:50:00Z'
+  const SCHEDULE_ROW = { start_time: '08:00:00', end_time: '17:00:00', is_active: true }
+
+  const APPT_ROW = {
+    id: VALID_UUID,
+    patient_id: 'pat-1',
+    doctor_id: 'doc-1',
+    status: 'scheduled',
+    scheduled_at: CURRENT_SLOT,
+    patient_user_id: 'usr-pat',
+    patient_first_name: 'John',
+    patient_last_name: 'Doe',
+    doctor_user_id: 'usr-doc',
+    doctor_first_name: 'Kamal',
+    doctor_last_name: 'Perera',
+  }
+
+  beforeEach(() => {
+    mockClientQuery.mockReset()
+    mockClientRelease.mockReset()
+  })
+
+  function mockSuccessfulTransaction(newSlot = NEW_SLOT) {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)                                        // BEGIN
+      .mockResolvedValueOnce({ rows: [APPT_ROW] })                             // FOR UPDATE
+      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] })                         // schedule
+      .mockResolvedValueOnce({ rows: [] })                                      // no conflict
+      .mockResolvedValueOnce({ rows: [{ scheduled_at: new Date(newSlot) }] })  // UPDATE RETURNING
+      .mockResolvedValueOnce(undefined)                                         // COMMIT
+  }
+
+  test('should reschedule appointment and return DB-committed scheduledAt', async () => {
+    mockSuccessfulTransaction()
+
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'success',
+        data: expect.objectContaining({
+          id: VALID_UUID,
+          scheduledAt: new Date(NEW_SLOT).toISOString(),
+        }),
+      })
+    )
+  })
+
+  test('should return 400 when new scheduledAt is the same as current', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)            // BEGIN
+      .mockResolvedValueOnce({ rows: [APPT_ROW] }) // FOR UPDATE
+      .mockResolvedValueOnce(undefined)             // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: CURRENT_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }))
+  })
+
+  test('should return 409 when new slot is already booked by another appointment', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [APPT_ROW] })
+      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] })
+      .mockResolvedValueOnce({ rows: [{ id: 'other-appt' }] }) // conflict
+      .mockResolvedValueOnce(undefined)                         // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409 }))
+  })
+
+  test('should return 404 when appointment does not exist', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)   // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // FOR UPDATE returns nothing
+      .mockResolvedValueOnce(undefined)    // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }))
+  })
+
+  test('should return 403 when patient tries to reschedule another patient\'s appointment', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ ...APPT_ROW, patient_id: 'pat-other' }] })
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-mine' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }))
+  })
+
+  test('should return 403 when doctor tries to reschedule another doctor\'s appointment', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ ...APPT_ROW, doctor_id: 'doc-other' }] })
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: 'doc-mine' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }))
+  })
+
+  test('should allow nurse to reschedule any appointment without ownership check', async () => {
+    mockSuccessfulTransaction()
+
+    const req = makeReq({
+      user: { id: 'usr-nurse', role: 'nurse' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(res.json.mock.calls[0][0].status).toBe('success')
+  })
+
+  test('should return 400 when appointment status is not scheduled', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ ...APPT_ROW, status: 'completed' }] })
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }))
+  })
+
+  test('should return 400 when new slot is outside doctor schedule hours', async () => {
+    // 2030-03-25T12:00:00Z = Monday 17:30 Asia/Colombo — after 17:00 schedule end
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [APPT_ROW] })
+      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] })
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: '2030-03-25T12:00:00Z' },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }))
+  })
+
+  test('should return 400 for invalid UUID appointment id', async () => {
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      params: { id: 'not-a-uuid' },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }))
+  })
+
+  test('should return 400 when scheduledAt is missing', async () => {
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      params: { id: VALID_UUID },
+      body: {},
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }))
+  })
+
+  test('should issue ROLLBACK and release client on unexpected DB error', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)                    // BEGIN
+      .mockRejectedValueOnce(new Error('connection lost')) // FOR UPDATE fails
+      .mockResolvedValueOnce(undefined)                    // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error))
+    expect(mockClientRelease).toHaveBeenCalled()
+    const calls = mockClientQuery.mock.calls.map((c) => c[0])
+    expect(calls).toContain('ROLLBACK')
   })
 })

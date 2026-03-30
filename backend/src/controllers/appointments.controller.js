@@ -8,6 +8,25 @@ const { SLOT_DURATION_MINUTES } = require('../utils/scheduleHelpers');
 const { sendAppointmentConfirmationEmail } = require('../utils/emailService');
 const { notifyWaitlistOnCancellation } = require('./waitlist.controller');
 
+// Clinic operates in a fixed timezone; all schedule comparisons use this.
+const CLINIC_TIMEZONE = 'Asia/Colombo';
+
+// Returns { dayOfWeek (0=Sun..6=Sat), totalMinutes } in the clinic's local timezone.
+function clinicLocalTime(date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: CLINIC_TIMEZONE,
+    weekday: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(date).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+  const DAY_INDEX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return {
+    dayOfWeek: DAY_INDEX[parts.weekday],
+    totalMinutes: (parseInt(parts.hour, 10) % 24) * 60 + parseInt(parts.minute, 10),
+  };
+}
+
 const mapAppointment = (row) => ({
   id: row.id,
   patientId: row.patient_id,
@@ -184,11 +203,8 @@ const create = async (req, res, next) => {
 
     // Slot validation: verify doctor has an active schedule and time is on a valid slot boundary
     const apptDate = new Date(scheduledAt);
-    // Use UTC consistently for both day-of-week and time extraction
-    const dayOfWeek = apptDate.getUTCDay();
-    const apptHours = apptDate.getUTCHours();
-    const apptMinutes = apptDate.getUTCMinutes();
-    const apptTotalMinutes = apptHours * 60 + apptMinutes;
+    // Extract day and time in clinic timezone — schedule rows are stored in local clinic time
+    const { dayOfWeek, totalMinutes: apptTotalMinutes } = clinicLocalTime(apptDate);
 
     let appointmentId;
     const client = await db.getClient();
@@ -246,7 +262,7 @@ const create = async (req, res, next) => {
 
     const dateStr = new Date(scheduledAt).toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
-      timeZone: 'Asia/Colombo',
+      timeZone: CLINIC_TIMEZONE,
     });
 
     createNotification({
@@ -777,18 +793,23 @@ const reschedule = async (req, res, next) => {
     const client = await db.getClient();
     let appt;
     let previousScheduledAt;
+    let committedScheduledAt;
 
     try {
       await client.query('BEGIN');
 
-      // Fetch and lock the appointment row
+      // Fetch and lock the appointment row — include user names for notifications
       const existing = await client.query(
         `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
                 p.user_id AS patient_user_id,
-                d.user_id AS doctor_user_id
+                pu.first_name AS patient_first_name, pu.last_name AS patient_last_name,
+                d.user_id AS doctor_user_id,
+                du.first_name AS doctor_first_name, du.last_name AS doctor_last_name
          FROM appointments a
          JOIN patients p ON a.patient_id = p.id
+         JOIN users pu ON p.user_id = pu.id
          JOIN doctors d ON a.doctor_id = d.id
+         JOIN users du ON d.user_id = du.id
          WHERE a.id = $1
          FOR UPDATE`,
         [id]
@@ -813,9 +834,8 @@ const reschedule = async (req, res, next) => {
         throw new AppError('New time is the same as the current scheduled time.', 400);
       }
 
-      // Validate new slot against doctor schedule
-      const dayOfWeek = newDate.getUTCDay();
-      const apptTotalMinutes = newDate.getUTCHours() * 60 + newDate.getUTCMinutes();
+      // Validate new slot against doctor schedule (compare in clinic local timezone)
+      const { dayOfWeek, totalMinutes: apptTotalMinutes } = clinicLocalTime(newDate);
 
       const scheduleResult = await client.query(
         `SELECT start_time, end_time, is_active
@@ -856,10 +876,11 @@ const reschedule = async (req, res, next) => {
 
       previousScheduledAt = appt.scheduled_at;
 
-      await client.query(
-        `UPDATE appointments SET scheduled_at = $1, updated_at = NOW() WHERE id = $2`,
-        [newDate.toISOString(), id]
+      const updateResult = await client.query(
+        `UPDATE appointments SET scheduled_at = $1, updated_at = NOW() WHERE id = $2 RETURNING scheduled_at`,
+        [newDate, id]
       );
+      committedScheduledAt = updateResult.rows[0].scheduled_at;
 
       await auditLog({
         userId: req.user.id,
@@ -878,33 +899,17 @@ const reschedule = async (req, res, next) => {
       client.release();
     }
 
-    // Fetch patient and doctor info for notifications (after commit)
-    const [patientInfo, doctorInfo] = await Promise.all([
-      db.query(
-        `SELECT u.id AS user_id, u.first_name, u.last_name
-         FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
-        [appt.patient_id]
-      ),
-      db.query(
-        `SELECT u.id AS user_id, u.first_name, u.last_name
-         FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
-        [appt.doctor_id]
-      ),
-    ]);
-
-    const patient = patientInfo.rows[0];
-    const doctor = doctorInfo.rows[0];
-
-    const newDateStr = new Date(scheduledAt).toLocaleDateString('en-US', {
+    const newDateTimeStr = new Date(committedScheduledAt).toLocaleString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
-      timeZone: 'Asia/Colombo',
+      hour: 'numeric', minute: '2-digit',
+      timeZone: CLINIC_TIMEZONE,
     });
 
     createNotification({
-      recipientId: patient.user_id,
+      recipientId: appt.patient_user_id,
       type: 'appointment_rescheduled',
       title: 'Appointment Rescheduled',
-      message: `Your appointment with Dr. ${doctor.first_name} ${doctor.last_name} has been rescheduled to ${newDateStr}.`,
+      message: `Your appointment with Dr. ${appt.doctor_first_name} ${appt.doctor_last_name} has been rescheduled to ${newDateTimeStr}.`,
       referenceId: id,
       referenceType: 'appointment',
     }).catch((err) => {
@@ -912,10 +917,10 @@ const reschedule = async (req, res, next) => {
     });
 
     createNotification({
-      recipientId: doctor.user_id,
+      recipientId: appt.doctor_user_id,
       type: 'appointment_rescheduled',
       title: 'Appointment Rescheduled',
-      message: `Appointment with ${patient.first_name} ${patient.last_name} has been rescheduled to ${newDateStr}.`,
+      message: `Appointment with ${appt.patient_first_name} ${appt.patient_last_name} has been rescheduled to ${newDateTimeStr}.`,
       referenceId: id,
       referenceType: 'appointment',
     }).catch((err) => {
@@ -929,7 +934,7 @@ const reschedule = async (req, res, next) => {
 
     res.json({
       status: 'success',
-      data: { id, scheduledAt: new Date(scheduledAt).toISOString() },
+      data: { id, scheduledAt: new Date(committedScheduledAt).toISOString() },
     });
   } catch (err) {
     return next(err);
