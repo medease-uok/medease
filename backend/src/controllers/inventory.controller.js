@@ -84,11 +84,11 @@ exports.getInventoryById = async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!UUID_REGEX.test(id)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid ID format.' });
+      return res.status(400).json({ status: 'error', message: 'Invalid ID format' });
     }
 
     const query = `
-      SELECT *
+      SELECT id, item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location, last_restocked_at, created_at, updated_at
       FROM inventory
       WHERE id = $1 AND deleted_at IS NULL
     `;
@@ -139,7 +139,7 @@ exports.addInventory = async (req, res, next) => {
 exports.updateInventory = async (req, res, next) => {
   const { id } = req.params;
   if (!UUID_REGEX.test(id)) {
-    return res.status(400).json({ status: 'error', message: 'Invalid ID format.' });
+    return res.status(400).json({ status: 'error', message: 'Invalid ID format' });
   }
 
   const validation = validateInventoryInput(req.body);
@@ -215,7 +215,7 @@ exports.deleteInventory = async (req, res, next) => {
     const { id } = req.params;
 
     if (!UUID_REGEX.test(id)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid ID format.' });
+      return res.status(400).json({ status: 'error', message: 'Invalid ID format' });
     }
     
     // Implement logical delete
@@ -239,7 +239,10 @@ exports.deleteInventory = async (req, res, next) => {
 };
 
 exports.getInventoryReport = async (req, res, next) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     // 1. Overview counts
     const overviewQuery = `
       SELECT 
@@ -249,7 +252,7 @@ exports.getInventoryReport = async (req, res, next) => {
       FROM inventory
       WHERE deleted_at IS NULL
     `;
-    const overviewResult = await pool.query(overviewQuery);
+    const overviewResult = await client.query(overviewQuery);
     
     // 2. Category distribution
     const categoryQuery = `
@@ -258,7 +261,7 @@ exports.getInventoryReport = async (req, res, next) => {
       WHERE deleted_at IS NULL
       GROUP BY category
     `;
-    const categoryResult = await pool.query(categoryQuery);
+    const categoryResult = await client.query(categoryQuery);
 
     // 3. Recent Transactions Trends (e.g., last 30 days)
     const trendsQuery = `
@@ -271,7 +274,9 @@ exports.getInventoryReport = async (req, res, next) => {
       GROUP BY DATE(created_at), transaction_type
       ORDER BY date ASC
     `;
-    const trendsResult = await pool.query(trendsQuery);
+    const trendsResult = await client.query(trendsQuery);
+
+    await client.query('COMMIT');
 
     res.json({
       status: 'success',
@@ -283,18 +288,25 @@ exports.getInventoryReport = async (req, res, next) => {
         },
         categories: categoryResult.rows.map(row => ({
           category: row.category,
-          count: parseInt(row.count),
-          total_quantity: parseInt(row.total_quantity)
+          count: parseInt(row.count) || 0,
+          total_quantity: parseInt(row.total_quantity) || 0
         })),
         trends: trendsResult.rows.map(row => ({
           date: row.date,
           transaction_type: row.transaction_type,
-          total_quantity: parseInt(row.total_quantity)
+          total_quantity: parseInt(row.total_quantity) || 0
         }))
       }
     });
 
   } catch (error) {
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) {}
+    }
     next(error);
+  } finally {
+    if (client) client.release();
   }
 };

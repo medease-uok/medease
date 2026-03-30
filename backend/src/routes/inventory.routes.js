@@ -7,7 +7,11 @@ const authorize = require('../middleware/authorize');
 router.use(authenticate);
 
 router.get('/', authorize('admin', 'doctor', 'nurse', 'lab_technician', 'pharmacist'), getAllInventory);
-router.get('/report', authorize('admin', 'doctor', 'nurse', 'lab_technician', 'pharmacist'), getInventoryReport);
+
+// WARNING: Route ordering dependency
+// /report MUST come before /:id, otherwise 'report' will be captured as an :id parameter
+router.get('/report', authorize('admin'), getInventoryReport);
+
 router.get('/:id', authorize('admin', 'doctor', 'nurse', 'lab_technician', 'pharmacist'), getInventoryById);
 router.post('/', authorize('admin'), addInventory);
 router.put('/:id', authorize('admin'), updateInventory);
