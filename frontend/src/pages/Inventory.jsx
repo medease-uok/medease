@@ -119,7 +119,9 @@ export default function Inventory() {
       csvContent += "Overview\n";
       csvContent += `Total Items,${reportData.overview.total_items}\n`;
       csvContent += `Low Stock Items,${reportData.overview.low_stock_items}\n`;
-      csvContent += `Out of Stock Items,${reportData.overview.out_of_stock_items}\n\n`;
+      csvContent += `Out of Stock Items,${reportData.overview.out_of_stock_items}\n`;
+      csvContent += `Expired Items,${reportData.overview.expired_items || 0}\n`;
+      csvContent += `Expiring Soon Items,${reportData.overview.expiring_soon_items || 0}\n\n`;
       
       // Categories Section
       csvContent += "Category Distribution\n";
@@ -242,6 +244,23 @@ export default function Inventory() {
               <tbody className="divide-y divide-slate-100">
                 {filteredItems.map(item => {
                   const isLowStock = item.quantity <= item.reorder_level;
+                  const today = new Date();
+                  today.setHours(0,0,0,0);
+                  
+                  let expiryStatus = 'normal';
+                  let expiryDays = null;
+                  
+                  if (item.expiry_date) {
+                    const expDate = new Date(item.expiry_date);
+                    const diffTime = expDate - today;
+                    expiryDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (expiryDays <= 0) {
+                      expiryStatus = 'danger';
+                    } else if (expiryDays <= 30) {
+                      expiryStatus = 'warning';
+                    }
+                  }
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -267,8 +286,18 @@ export default function Inventory() {
                       </td>
                       <td className="p-4 hidden md:table-cell">
                         <div className="text-sm">
-                          {item.expiry_date && <div className="text-slate-900">Exp: {new Date(item.expiry_date).toLocaleDateString()}</div>}
-                          {item.location && <div className="text-slate-500">Loc: {item.location}</div>}
+                          {item.expiry_date && (
+                            <div className={`flex items-center gap-1 ${
+                              expiryStatus === 'danger' ? 'text-red-600 font-semibold' : 
+                              expiryStatus === 'warning' ? 'text-amber-600 font-semibold' : 
+                              'text-slate-900'
+                            }`}>
+                              Exp: {new Date(item.expiry_date).toLocaleDateString()}
+                              {expiryStatus === 'danger' && <AlertCircle className="w-3.5 h-3.5" title="Expired" />}
+                              {expiryStatus === 'warning' && <AlertCircle className="w-3.5 h-3.5 text-amber-500" title={`Expiring in ${expiryDays} days`} />}
+                            </div>
+                          )}
+                          {item.location && <div className="text-slate-500 mt-0.5">Loc: {item.location}</div>}
                         </div>
                       </td>
                       {isAdmin && (
