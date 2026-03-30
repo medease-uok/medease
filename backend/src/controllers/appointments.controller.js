@@ -746,4 +746,194 @@ const cancelSeries = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus };
+/**
+ * PUT /appointments/:id/reschedule
+ * Move a scheduled appointment to a new time slot (same doctor).
+ * - Patient: own appointments only
+ * - Doctor: appointments assigned to them only
+ * - Nurse / Admin: any appointment
+ * The old slot is freed → waitlist is notified.
+ */
+const reschedule = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { scheduledAt } = req.body;
+
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError('Invalid appointment ID format.', 400);
+    }
+    if (!scheduledAt) {
+      throw new AppError('scheduledAt is required.', 400);
+    }
+
+    const newDate = new Date(scheduledAt);
+    if (isNaN(newDate.getTime())) {
+      throw new AppError('Invalid scheduledAt date.', 400);
+    }
+    if (newDate <= new Date()) {
+      throw new AppError('scheduledAt must be in the future.', 400);
+    }
+
+    const client = await db.getClient();
+    let appt;
+    let previousScheduledAt;
+
+    try {
+      await client.query('BEGIN');
+
+      // Fetch and lock the appointment row
+      const existing = await client.query(
+        `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
+                p.user_id AS patient_user_id,
+                d.user_id AS doctor_user_id
+         FROM appointments a
+         JOIN patients p ON a.patient_id = p.id
+         JOIN doctors d ON a.doctor_id = d.id
+         WHERE a.id = $1
+         FOR UPDATE`,
+        [id]
+      );
+
+      if (existing.rows.length === 0) throw new AppError('Appointment not found.', 404);
+      appt = existing.rows[0];
+
+      // Ownership check
+      if (req.user.role === 'patient' && req.user.patientId !== appt.patient_id) {
+        throw new AppError('You do not have permission to reschedule this appointment.', 403);
+      }
+      if (req.user.role === 'doctor' && req.user.doctorId !== appt.doctor_id) {
+        throw new AppError('You do not have permission to reschedule this appointment.', 403);
+      }
+
+      if (appt.status !== 'scheduled') {
+        throw new AppError(`Cannot reschedule an appointment with status '${appt.status}'.`, 400);
+      }
+
+      if (new Date(appt.scheduled_at).toISOString() === newDate.toISOString()) {
+        throw new AppError('New time is the same as the current scheduled time.', 400);
+      }
+
+      // Validate new slot against doctor schedule
+      const dayOfWeek = newDate.getUTCDay();
+      const apptTotalMinutes = newDate.getUTCHours() * 60 + newDate.getUTCMinutes();
+
+      const scheduleResult = await client.query(
+        `SELECT start_time, end_time, is_active
+         FROM doctor_schedules
+         WHERE doctor_id = $1 AND day_of_week = $2`,
+        [appt.doctor_id, dayOfWeek]
+      );
+
+      if (scheduleResult.rows.length === 0 || !scheduleResult.rows[0].is_active) {
+        throw new AppError('Doctor is not available on this day.', 400);
+      }
+
+      const schedule = scheduleResult.rows[0];
+      const [schStartH, schStartM] = schedule.start_time.slice(0, 5).split(':').map(Number);
+      const [schEndH, schEndM] = schedule.end_time.slice(0, 5).split(':').map(Number);
+      const schedStartMinutes = schStartH * 60 + schStartM;
+      const schedEndMinutes = schEndH * 60 + schEndM;
+
+      if (apptTotalMinutes < schedStartMinutes || apptTotalMinutes + SLOT_DURATION_MINUTES > schedEndMinutes) {
+        throw new AppError("Appointment time is outside the doctor's schedule hours.", 400);
+      }
+      if ((apptTotalMinutes - schedStartMinutes) % SLOT_DURATION_MINUTES !== 0) {
+        throw new AppError(`Appointment time must be on a ${SLOT_DURATION_MINUTES}-minute slot boundary.`, 400);
+      }
+
+      // Check for conflict at the new slot (exclude the current appointment)
+      const conflictResult = await client.query(
+        `SELECT id FROM appointments
+         WHERE doctor_id = $1
+           AND scheduled_at = $2
+           AND status NOT IN ('cancelled', 'no_show')
+           AND id != $3`,
+        [appt.doctor_id, newDate.toISOString(), id]
+      );
+      if (conflictResult.rows.length > 0) {
+        throw new AppError('The selected time slot is already booked.', 409);
+      }
+
+      previousScheduledAt = appt.scheduled_at;
+
+      await client.query(
+        `UPDATE appointments SET scheduled_at = $1, updated_at = NOW() WHERE id = $2`,
+        [newDate.toISOString(), id]
+      );
+
+      await auditLog({
+        userId: req.user.id,
+        action: 'RESCHEDULE_APPOINTMENT',
+        resourceType: 'appointment',
+        resourceId: id,
+        ip: req.ip,
+        details: { previousScheduledAt, newScheduledAt: newDate.toISOString() },
+      });
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
+    // Fetch patient and doctor info for notifications (after commit)
+    const [patientInfo, doctorInfo] = await Promise.all([
+      db.query(
+        `SELECT u.id AS user_id, u.first_name, u.last_name
+         FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
+        [appt.patient_id]
+      ),
+      db.query(
+        `SELECT u.id AS user_id, u.first_name, u.last_name
+         FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
+        [appt.doctor_id]
+      ),
+    ]);
+
+    const patient = patientInfo.rows[0];
+    const doctor = doctorInfo.rows[0];
+
+    const newDateStr = new Date(scheduledAt).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      timeZone: 'Asia/Colombo',
+    });
+
+    createNotification({
+      recipientId: patient.user_id,
+      type: 'appointment_rescheduled',
+      title: 'Appointment Rescheduled',
+      message: `Your appointment with Dr. ${doctor.first_name} ${doctor.last_name} has been rescheduled to ${newDateStr}.`,
+      referenceId: id,
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send reschedule notification to patient', { id, error: err.message });
+    });
+
+    createNotification({
+      recipientId: doctor.user_id,
+      type: 'appointment_rescheduled',
+      title: 'Appointment Rescheduled',
+      message: `Appointment with ${patient.first_name} ${patient.last_name} has been rescheduled to ${newDateStr}.`,
+      referenceId: id,
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send reschedule notification to doctor', { id, error: err.message });
+    });
+
+    // Free the old slot — notify waitlist (fire-and-forget)
+    notifyWaitlistOnCancellation(appt.doctor_id, previousScheduledAt).catch((err) => {
+      console.error('Failed to notify waitlist on reschedule', { id, error: err.message });
+    });
+
+    res.json({
+      status: 'success',
+      data: { id, scheduledAt: new Date(scheduledAt).toISOString() },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus, reschedule };
