@@ -102,7 +102,6 @@ const getById = async (req, res, next) => {
 
     const row = result.rows[0];
 
-    // Access check: patient can only view own appointments
     if (req.user.role === 'patient') {
       const patientResult = await db.query(
         'SELECT id FROM patients WHERE user_id = $1', [req.user.id]
@@ -113,7 +112,6 @@ const getById = async (req, res, next) => {
       }
     }
 
-    // Access check: doctor can only view appointments where they are assigned
     if (req.user.role === 'doctor') {
       const doctorResult = await db.query(
         'SELECT id FROM doctors WHERE user_id = $1', [req.user.id]
@@ -183,9 +181,7 @@ const create = async (req, res, next) => {
     const doctor = doctorCheck.rows[0];
     const patient = patientCheck.rows[0];
 
-    // Slot validation: verify doctor has an active schedule and time is on a valid slot boundary
     const apptDate = new Date(scheduledAt);
-    // Extract day and time in clinic timezone — schedule rows are stored in local clinic time
     const { dayOfWeek, totalMinutes: apptTotalMinutes } = clinicLocalTime(apptDate);
 
     let appointmentId;
@@ -193,7 +189,6 @@ const create = async (req, res, next) => {
     try {
       await client.query('BEGIN');
 
-      // Slot validation inside transaction to prevent race conditions
       const scheduleResult = await client.query(
         `SELECT start_time, end_time, is_active
          FROM doctor_schedules
@@ -212,7 +207,6 @@ const create = async (req, res, next) => {
       const schedStartMinutes = schStartH * 60 + schStartM;
       const schedEndMinutes = schEndH * 60 + schEndM;
 
-      // Must be within schedule hours and on a slot boundary
       if (apptTotalMinutes < schedStartMinutes || apptTotalMinutes + SLOT_DURATION_MINUTES > schedEndMinutes) {
         throw new AppError('Appointment time is outside the doctor\'s schedule hours.', 400);
       }
@@ -240,8 +234,6 @@ const create = async (req, res, next) => {
       client.release();
     }
 
-    // Everything below runs after transaction is committed and client released
-
     const dateStr = new Date(scheduledAt).toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
       timeZone: CLINIC_TIMEZONE,
@@ -268,7 +260,6 @@ const create = async (req, res, next) => {
       console.error('Failed to send notification to doctor', { appointmentId, error: err.message });
     });
 
-    // Send confirmation email (fire-and-forget, after commit)
     if (patient.email) {
       sendAppointmentConfirmationEmail(patient.email, {
         patientName: `${patient.first_name} ${patient.last_name}`,
@@ -514,7 +505,6 @@ const createRecurring = async (req, res, next) => {
         scheduleResult.rows.map((r) => [r.day_of_week, r])
       );
 
-      // Batch: fetch all conflicting slots in one query
       const dateStrings = dates.map((d) => d.toISOString());
       const conflictResult = await client.query(
         `SELECT scheduled_at FROM appointments
@@ -556,7 +546,6 @@ const createRecurring = async (req, res, next) => {
           continue;
         }
 
-        // Check conflict from batch query
         if (conflictSet.has(dateISO)) {
           skippedDates.push(dateISO);
           continue;
@@ -652,7 +641,6 @@ const cancelSeries = async (req, res, next) => {
       throw new AppError('Invalid series ID format.', 400);
     }
 
-    // Fetch one appointment from the series for ownership check + notification info
     const seriesResult = await db.query(
       `SELECT a.id, a.patient_id, a.doctor_id,
               p.user_id AS patient_user_id,
@@ -680,7 +668,6 @@ const cancelSeries = async (req, res, next) => {
       throw new AppError('You do not have permission to cancel this series.', 403);
     }
 
-    // Cancel all future scheduled appointments in the series
     const result = await db.query(
       `UPDATE appointments SET status = 'cancelled', updated_at = NOW()
        WHERE series_id = $1
@@ -715,7 +702,6 @@ const cancelSeries = async (req, res, next) => {
       });
     }
 
-    // Notify waitlist for each cancelled slot (fire-and-forget)
     for (const row of result.rows) {
       notifyWaitlistOnCancellation(appt.doctor_id, row.scheduled_at).catch((err) => {
         console.error('Failed to notify waitlist on series cancellation', { seriesId, error: err.message });
@@ -779,7 +765,6 @@ const reschedule = async (req, res, next) => {
       throw new AppError('scheduledAt must be in the future.', 400);
     }
 
-    // Reasonable upper bound: 1 year from now
     const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
     if (newDate > oneYearFromNow) {
       throw new AppError('scheduledAt cannot be more than 1 year in the future.', 400);
@@ -793,7 +778,6 @@ const reschedule = async (req, res, next) => {
     try {
       await client.query('BEGIN');
 
-      // Fetch and lock the appointment row — include user names for notifications
       const existing = await client.query(
         `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
                 p.user_id AS patient_user_id,
@@ -813,7 +797,6 @@ const reschedule = async (req, res, next) => {
       if (existing.rows.length === 0) throw new AppError('Appointment not found.', 404);
       appt = existing.rows[0];
 
-      // Ownership and department checks
       if (req.user.role === 'patient' && req.user.patientId !== appt.patient_id) {
         throw new AppError('You do not have permission to reschedule this appointment.', 403);
       }
@@ -843,7 +826,6 @@ const reschedule = async (req, res, next) => {
         throw new AppError('New time is the same as the current scheduled time.', 400);
       }
 
-      // Validate new slot against doctor schedule (compare in clinic local timezone)
       const { dayOfWeek, totalMinutes: apptTotalMinutes } = clinicLocalTime(newDate);
 
       const scheduleResult = await client.query(
@@ -940,7 +922,6 @@ const reschedule = async (req, res, next) => {
       console.error('Failed to send reschedule notification to doctor', { id, error: err.message });
     });
 
-    // Free the old slot — notify waitlist (fire-and-forget)
     notifyWaitlistOnCancellation(appt.doctor_id, previousScheduledAt).catch((err) => {
       console.error('Failed to notify waitlist on reschedule', { id, error: err.message });
     });
