@@ -389,6 +389,118 @@ const updateStatus = async (req, res, next) => {
   }
 };
 
+const cancelAppointment = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError('Invalid appointment ID format.', 400);
+    }
+
+    const existing = await db.query(
+      `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
+              p.user_id AS patient_user_id, d.user_id AS doctor_user_id
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN doctors d ON a.doctor_id = d.id
+       WHERE a.id = $1`,
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      throw new AppError('Appointment not found.', 404);
+    }
+
+    const appt = existing.rows[0];
+
+    if (req.user.role === 'patient' && req.user.patientId !== appt.patient_id) {
+      throw new AppError('You do not have permission to cancel this appointment.', 403);
+    }
+
+    if (req.user.role === 'doctor' && req.user.doctorId !== appt.doctor_id) {
+      throw new AppError('You do not have permission to cancel this appointment.', 403);
+    }
+
+    if (appt.status === APPOINTMENT_STATUS.CANCELLED) {
+      throw new AppError('Appointment is already cancelled.', 400);
+    }
+
+    if (appt.status === APPOINTMENT_STATUS.COMPLETED) {
+      throw new AppError('Cannot cancel a completed appointment.', 400);
+    }
+
+    const result = await db.query(
+      `UPDATE appointments SET status = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, status`,
+      [APPOINTMENT_STATUS.CANCELLED, id]
+    );
+
+    const [patientInfo, doctorInfo] = await Promise.all([
+      db.query(
+        `SELECT u.id AS user_id, u.first_name FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = $1`,
+        [appt.patient_id]
+      ),
+      db.query(
+        `SELECT u.id AS user_id, u.first_name, u.last_name FROM doctors d JOIN users u ON d.user_id = u.id WHERE d.id = $1`,
+        [appt.doctor_id]
+      ),
+    ]);
+
+    const patient = patientInfo.rows[0];
+    const doctor = doctorInfo.rows[0];
+
+    if (patient) {
+      createNotification({
+        recipientId: patient.user_id,
+        type: 'appointment_cancelled',
+        title: 'Appointment Cancelled',
+        message: 'Your appointment has been cancelled.',
+        referenceId: id,
+        referenceType: 'appointment',
+      }).catch((err) => {
+        console.error('Failed to send cancel notification to patient', { id, error: err.message });
+      });
+    }
+
+    if (doctor) {
+      createNotification({
+        recipientId: doctor.user_id,
+        type: 'appointment_cancelled',
+        title: 'Appointment Cancelled',
+        message: `Appointment with ${patient?.first_name || 'a patient'} has been cancelled.`,
+        referenceId: id,
+        referenceType: 'appointment',
+      }).catch((err) => {
+        console.error('Failed to send cancel notification to doctor', { id, error: err.message });
+      });
+    }
+
+    notifyWaitlistOnCancellation(appt.doctor_id, appt.scheduled_at).catch((err) => {
+      console.error('Failed to notify waitlist on cancellation', { id, error: err.message });
+    });
+
+    await auditLog({
+      userId: req.user.id,
+      action: 'CANCEL_APPOINTMENT',
+      resourceType: 'appointment',
+      resourceId: id,
+      ip: req.ip,
+      details: { previousStatus: appt.status },
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        id: result.rows[0].id,
+        status: result.rows[0].status,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 /**
  * Compute the next occurrence date for a recurrence pattern.
  * originalDayOfMonth is needed for monthly to handle 31→Feb→28 correctly.
@@ -935,4 +1047,4 @@ const reschedule = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus, reschedule };
+module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus, cancelAppointment, reschedule };
