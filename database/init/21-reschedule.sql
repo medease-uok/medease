@@ -5,7 +5,7 @@
 ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'appointment_rescheduled';
 
 -- New permission
-INSERT INTO permissions (name, description, resource)
+INSERT INTO permissions (name, description, category)
 VALUES ('reschedule_appointment', 'Reschedule an existing appointment to a new time slot', 'appointments')
 ON CONFLICT (name) DO NOTHING;
 
