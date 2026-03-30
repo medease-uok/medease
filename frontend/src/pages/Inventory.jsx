@@ -11,6 +11,7 @@ export default function Inventory() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [reportError, setReportError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -79,7 +80,7 @@ export default function Inventory() {
       handleCloseModal();
     } catch (error) {
       console.error('Error saving inventory item:', error);
-      alert('Failed to save inventory item');
+      setReportError(error.message || 'Failed to save inventory item');
     }
   };
 
@@ -101,12 +102,19 @@ export default function Inventory() {
 
   const handleDownloadReport = async () => {
     try {
+      setReportError(null);
       setDownloadingReport(true);
       const res = await inventoryService.getReport();
       const reportData = res.data;
       
       let csvContent = "data:text/csv;charset=utf-8,";
       
+      const escapeCSV = (value) => {
+        const str = String(value ?? '');
+        const sanitized = str.replace(/^[=+\-@\t\r]/, "'$&");
+        return /[,"\n\r]/.test(sanitized) ? `"${sanitized.replace(/"/g, '""')}"` : sanitized;
+      };
+
       // Overview Section
       csvContent += "Overview\n";
       csvContent += `Total Items,${reportData.overview.total_items}\n`;
@@ -117,7 +125,7 @@ export default function Inventory() {
       csvContent += "Category Distribution\n";
       csvContent += "Category,Item Count,Total Quantity\n";
       reportData.categories.forEach(cat => {
-        csvContent += `${cat.category},${cat.count},${cat.total_quantity}\n`;
+        csvContent += `${escapeCSV(cat.category)},${escapeCSV(cat.count)},${escapeCSV(cat.total_quantity)}\n`;
       });
       csvContent += "\n";
       
@@ -125,7 +133,7 @@ export default function Inventory() {
       csvContent += "Recent Trends (Last 30 Days)\n";
       csvContent += "Date,Transaction Type,Total Quantity Changed\n";
       reportData.trends.forEach(trend => {
-        csvContent += `${new Date(trend.date).toLocaleDateString()},${trend.transaction_type},${trend.total_quantity}\n`;
+        csvContent += `${escapeCSV(new Date(trend.date).toLocaleDateString())},${escapeCSV(trend.transaction_type)},${escapeCSV(trend.total_quantity)}\n`;
       });
       
       const encodedUri = encodeURI(csvContent);
@@ -138,7 +146,7 @@ export default function Inventory() {
       
     } catch (error) {
       console.error('Failed to download report:', error);
-      alert('Failed to generate report');
+      setReportError('Failed to generate report');
     } finally {
       setDownloadingReport(false);
     }
@@ -171,6 +179,13 @@ export default function Inventory() {
           </div>
         )}
       </div>
+
+      {reportError && (
+        <div className="mb-6 flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg animate-fade-in" role="alert">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <p className="text-sm font-medium text-red-800">{reportError}</p>
+        </div>
+      )}
 
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
