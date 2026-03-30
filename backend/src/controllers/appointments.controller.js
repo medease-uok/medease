@@ -4,28 +4,10 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
-const { SLOT_DURATION_MINUTES } = require('../utils/scheduleHelpers');
+const { SLOT_DURATION_MINUTES, CLINIC_TIMEZONE, clinicLocalTime } = require('../utils/scheduleHelpers');
 const { sendAppointmentConfirmationEmail } = require('../utils/emailService');
 const { notifyWaitlistOnCancellation } = require('./waitlist.controller');
-
-// Clinic operates in a fixed timezone; all schedule comparisons use this.
-const CLINIC_TIMEZONE = 'Asia/Colombo';
-
-// Returns { dayOfWeek (0=Sun..6=Sat), totalMinutes } in the clinic's local timezone.
-function clinicLocalTime(date) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: CLINIC_TIMEZONE,
-    weekday: 'short',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  }).formatToParts(date).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
-  const DAY_INDEX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  return {
-    dayOfWeek: DAY_INDEX[parts.weekday],
-    totalMinutes: (parseInt(parts.hour, 10) % 24) * 60 + parseInt(parts.minute, 10),
-  };
-}
+const { APPOINTMENT_STATUS, UPDATEABLE_STATUSES, INACTIVE_STATUSES } = require('../constants/appointmentStatus');
 
 const mapAppointment = (row) => ({
   id: row.id,
@@ -313,9 +295,8 @@ const updateStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['in_progress', 'completed', 'cancelled'];
-    if (!validStatuses.includes(status)) {
-      throw new AppError(`status must be one of: ${validStatuses.join(', ')}`, 400);
+    if (!UPDATEABLE_STATUSES.includes(status)) {
+      throw new AppError(`status must be one of: ${UPDATEABLE_STATUSES.join(', ')}`, 400);
     }
 
     const existing = await db.query(
@@ -336,12 +317,12 @@ const updateStatus = async (req, res, next) => {
       throw new AppError('You do not have permission to update this appointment.', 403);
     }
 
-    if (req.user.role === 'patient' && status !== 'cancelled') {
+    if (req.user.role === 'patient' && status !== APPOINTMENT_STATUS.CANCELLED) {
       throw new AppError('Patients can only cancel appointments.', 403);
     }
 
     // Doctors must attach a medical record before completing an appointment
-    if (status === 'completed') {
+    if (status === APPOINTMENT_STATUS.COMPLETED) {
       const recordCheck = await db.query(
         `SELECT id FROM medical_records
          WHERE patient_id = $1 AND doctor_id = $2
@@ -377,7 +358,7 @@ const updateStatus = async (req, res, next) => {
     const patient = patientInfo.rows[0];
     const doctor = doctorInfo.rows[0];
 
-    if (status === 'cancelled') {
+    if (status === APPOINTMENT_STATUS.CANCELLED) {
       if (patient) {
         createNotification({
           recipientId: patient.user_id,
@@ -782,12 +763,26 @@ const reschedule = async (req, res, next) => {
       throw new AppError('scheduledAt is required.', 400);
     }
 
+    // Validate ISO 8601 format to prevent ambiguous date strings
+    const ISO_8601_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
+    if (!ISO_8601_REGEX.test(scheduledAt)) {
+      throw new AppError('scheduledAt must be an ISO 8601 UTC datetime string (e.g., 2026-03-25T08:00:00Z).', 400);
+    }
+
     const newDate = new Date(scheduledAt);
     if (isNaN(newDate.getTime())) {
       throw new AppError('Invalid scheduledAt date.', 400);
     }
-    if (newDate <= new Date()) {
+
+    const now = new Date();
+    if (newDate <= now) {
       throw new AppError('scheduledAt must be in the future.', 400);
+    }
+
+    // Reasonable upper bound: 1 year from now
+    const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    if (newDate > oneYearFromNow) {
+      throw new AppError('scheduledAt cannot be more than 1 year in the future.', 400);
     }
 
     const client = await db.getClient();
@@ -840,8 +835,8 @@ const reschedule = async (req, res, next) => {
         }
       }
 
-      if (appt.status !== 'scheduled') {
-        throw new AppError(`Cannot reschedule an appointment with status '${appt.status}'.`, 400);
+      if (appt.status !== APPOINTMENT_STATUS.SCHEDULED) {
+        throw new AppError('Cannot reschedule an appointment that is not in scheduled status.', 400);
       }
 
       if (new Date(appt.scheduled_at).toISOString() === newDate.toISOString()) {
@@ -904,9 +899,8 @@ const reschedule = async (req, res, next) => {
       client.release();
     }
 
-    // Audit after release — auditLog uses a separate pool connection; running it inside
-    // the FOR UPDATE transaction would deadlock when the rescheduler is the patient or doctor
-    // (their user rows are locked by the JOIN … FOR UPDATE).
+    // Audit after release to keep the transaction short and avoid holding locks.
+    // Note: FOR UPDATE only locks rows in the target table (appointments), not JOINed tables.
     auditLog({
       userId: req.user.id,
       action: 'RESCHEDULE_APPOINTMENT',
@@ -914,6 +908,8 @@ const reschedule = async (req, res, next) => {
       resourceId: id,
       ip: req.ip,
       details: { previousScheduledAt, newScheduledAt: newDate.toISOString() },
+    }).catch((err) => {
+      console.error('AUDIT LOG FAILURE — reschedule', { appointmentId: id, userId: req.user.id, error: err.message });
     });
 
     const newDateTimeStr = new Date(committedScheduledAt).toLocaleString('en-US', {

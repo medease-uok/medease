@@ -558,10 +558,10 @@ describe('updateStatus', () => {
 // ──────────────────────────────────────────────────────────────
 describe('reschedule', () => {
   const VALID_UUID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
-  // 2030-03-25T02:30:00Z = Monday 08:00 Asia/Colombo — existing slot (future date)
-  const CURRENT_SLOT = '2030-03-25T02:30:00Z'
-  // 2030-03-25T02:50:00Z = Monday 08:20 Asia/Colombo — next valid slot
-  const NEW_SLOT = '2030-03-25T02:50:00Z'
+  // 2026-06-15T02:30:00Z = Monday 08:00 Asia/Colombo — existing slot (within 1 year)
+  const CURRENT_SLOT = '2026-06-15T02:30:00Z'
+  // 2026-06-15T02:50:00Z = Monday 08:20 Asia/Colombo — next valid slot
+  const NEW_SLOT = '2026-06-15T02:50:00Z'
   const SCHEDULE_ROW = { start_time: '08:00:00', end_time: '17:00:00', is_active: true }
 
   const APPT_ROW = {

@@ -343,10 +343,8 @@ const login = async (req, res, next) => {
       console.log(`[DEV] OTP for ${user.email}: ${otp}`);
     }
 
-    // Send OTP email — fire-and-forget so SMTP latency doesn't block the response
-    sendLoginOtpEmail(user.email, user.first_name, otp).catch((err) => {
-      console.error('[Auth] Failed to send OTP email', { email: user.email, error: err.message });
-    });
+    // Send OTP email
+    await sendLoginOtpEmail(user.email, user.first_name, otp);
 
     await auditLog({
       userId: user.id,
