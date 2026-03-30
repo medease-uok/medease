@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAll, getById, create, createRecurring, cancelSeries, updateStatus } = require('../controllers/appointments.controller');
+const { getAll, getById, create, createRecurring, cancelSeries, updateStatus, cancelAppointment } = require('../controllers/appointments.controller');
 const authenticate = require('../middleware/authenticate');
 const { requirePermission } = require('../middleware/authorize');
 const resolveSubject = require('../middleware/resolveSubject');
@@ -14,5 +14,6 @@ router.post('/', requirePermission('create_appointment'), create);
 router.post('/recurring', requirePermission('create_appointment'), createRecurring);
 router.patch('/series/:seriesId/cancel', requirePermission('update_appointment_status', 'cancel_appointment'), cancelSeries);
 router.patch('/:id/status', requirePermission('update_appointment_status', 'cancel_appointment'), updateStatus);
+router.delete('/:id', requirePermission('update_appointment_status', 'cancel_appointment'), cancelAppointment);
 
 module.exports = router;

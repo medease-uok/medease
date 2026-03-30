@@ -18,9 +18,12 @@ jest.mock('../../controllers/notifications.controller', () => ({
 jest.mock('../../utils/emailService', () => ({
   sendAppointmentConfirmationEmail: jest.fn().mockResolvedValue(undefined),
 }))
+jest.mock('../../controllers/waitlist.controller', () => ({
+  notifyWaitlistOnCancellation: jest.fn().mockResolvedValue(undefined),
+}))
 
 const { sendAppointmentConfirmationEmail } = require('../../utils/emailService')
-const { getAll, getById, create, updateStatus } = require('../../controllers/appointments.controller')
+const { getAll, getById, create, updateStatus, cancelAppointment } = require('../../controllers/appointments.controller')
 
 function makeReq(overrides = {}) {
   return {
@@ -547,5 +550,141 @@ describe('updateStatus', () => {
     await updateStatus(req, res, next)
 
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }))
+  })
+})
+
+describe('cancelAppointment', () => {
+  const VALID_UUID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+
+  it('should cancel appointment successfully', async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: VALID_UUID, patient_id: 'pat-1', doctor_id: 'doc-1', status: 'scheduled', scheduled_at: new Date(), patient_user_id: 'usr-pat', doctor_user_id: 'usr-doc' }],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, status: 'cancelled' }] })
+      .mockResolvedValueOnce({ rows: [{ user_id: 'usr-pat', first_name: 'John' }] })
+      .mockResolvedValueOnce({ rows: [{ user_id: 'usr-doc', first_name: 'Dr.', last_name: 'Smith' }] })
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(res.json).toHaveBeenCalledWith({ status: 'success', data: { id: VALID_UUID, status: 'cancelled' } })
+  })
+
+  it('should return 404 when appointment not found', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
+
+    const req = makeReq({ params: { id: VALID_UUID } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }))
+  })
+
+  it('should return 403 when patient tries to cancel another patient\'s appointment', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: VALID_UUID, patient_id: 'pat-2', doctor_id: 'doc-1', status: 'scheduled', scheduled_at: new Date() }],
+    })
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }))
+  })
+
+  it('should return 403 when doctor tries to cancel another doctor\'s appointment', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: VALID_UUID, patient_id: 'pat-1', doctor_id: 'doc-2', status: 'scheduled', scheduled_at: new Date() }],
+    })
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor', doctorId: 'doc-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }))
+  })
+
+  it('should return 400 when appointment is already cancelled', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: VALID_UUID, patient_id: 'pat-1', doctor_id: 'doc-1', status: 'cancelled', scheduled_at: new Date() }],
+    })
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400, message: 'Appointment is already cancelled.' }))
+  })
+
+  it('should return 400 when trying to cancel completed appointment', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: VALID_UUID, patient_id: 'pat-1', doctor_id: 'doc-1', status: 'completed', scheduled_at: new Date() }],
+    })
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400, message: 'Cannot cancel a completed appointment.' }))
+  })
+
+  it('should allow nurse to cancel any appointment', async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: VALID_UUID, patient_id: 'pat-1', doctor_id: 'doc-1', status: 'scheduled', scheduled_at: new Date(), patient_user_id: 'usr-pat', doctor_user_id: 'usr-doc' }],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, status: 'cancelled' }] })
+      .mockResolvedValueOnce({ rows: [{ user_id: 'usr-pat', first_name: 'John' }] })
+      .mockResolvedValueOnce({ rows: [{ user_id: 'usr-doc', first_name: 'Dr.', last_name: 'Smith' }] })
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-nurse', role: 'nurse' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(res.json).toHaveBeenCalledWith({ status: 'success', data: { id: VALID_UUID, status: 'cancelled' } })
+  })
+
+  it('should allow admin to cancel any appointment', async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: VALID_UUID, patient_id: 'pat-1', doctor_id: 'doc-1', status: 'scheduled', scheduled_at: new Date(), patient_user_id: 'usr-pat', doctor_user_id: 'usr-doc' }],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, status: 'cancelled' }] })
+      .mockResolvedValueOnce({ rows: [{ user_id: 'usr-pat', first_name: 'John' }] })
+      .mockResolvedValueOnce({ rows: [{ user_id: 'usr-doc', first_name: 'Dr.', last_name: 'Smith' }] })
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-admin', role: 'admin' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(res.json).toHaveBeenCalledWith({ status: 'success', data: { id: VALID_UUID, status: 'cancelled' } })
+  })
+
+  it('should return 400 for invalid UUID format', async () => {
+    const req = makeReq({ params: { id: 'invalid-uuid' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400, message: 'Invalid appointment ID format.' }))
   })
 })
