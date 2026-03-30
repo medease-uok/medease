@@ -248,7 +248,9 @@ exports.getInventoryReport = async (req, res, next) => {
       SELECT 
         COUNT(*) as total_items,
         COUNT(CASE WHEN quantity <= reorder_level AND quantity > 0 THEN 1 END) as low_stock_items,
-        COUNT(CASE WHEN quantity = 0 THEN 1 END) as out_of_stock_items
+        COUNT(CASE WHEN quantity = 0 THEN 1 END) as out_of_stock_items,
+        COUNT(CASE WHEN expiry_date IS NOT NULL AND expiry_date <= CURRENT_DATE THEN 1 END) as expired_items,
+        COUNT(CASE WHEN expiry_date IS NOT NULL AND expiry_date > CURRENT_DATE AND expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 1 END) as expiring_soon_items
       FROM inventory
       WHERE deleted_at IS NULL
     `;
@@ -284,7 +286,9 @@ exports.getInventoryReport = async (req, res, next) => {
         overview: {
           total_items: parseInt(overviewResult.rows[0].total_items) || 0,
           low_stock_items: parseInt(overviewResult.rows[0].low_stock_items) || 0,
-          out_of_stock_items: parseInt(overviewResult.rows[0].out_of_stock_items) || 0
+          out_of_stock_items: parseInt(overviewResult.rows[0].out_of_stock_items) || 0,
+          expired_items: parseInt(overviewResult.rows[0].expired_items) || 0,
+          expiring_soon_items: parseInt(overviewResult.rows[0].expiring_soon_items) || 0
         },
         categories: categoryResult.rows.map(row => ({
           category: row.category,
