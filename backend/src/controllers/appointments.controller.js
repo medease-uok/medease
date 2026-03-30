@@ -803,7 +803,7 @@ const reschedule = async (req, res, next) => {
         `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
                 p.user_id AS patient_user_id,
                 pu.first_name AS patient_first_name, pu.last_name AS patient_last_name,
-                d.user_id AS doctor_user_id,
+                d.user_id AS doctor_user_id, d.department AS doctor_department,
                 du.first_name AS doctor_first_name, du.last_name AS doctor_last_name
          FROM appointments a
          JOIN patients p ON a.patient_id = p.id
@@ -818,12 +818,26 @@ const reschedule = async (req, res, next) => {
       if (existing.rows.length === 0) throw new AppError('Appointment not found.', 404);
       appt = existing.rows[0];
 
-      // Ownership check
+      // Ownership and department checks
       if (req.user.role === 'patient' && req.user.patientId !== appt.patient_id) {
         throw new AppError('You do not have permission to reschedule this appointment.', 403);
       }
       if (req.user.role === 'doctor' && req.user.doctorId !== appt.doctor_id) {
         throw new AppError('You do not have permission to reschedule this appointment.', 403);
+      }
+      if (req.user.role === 'nurse') {
+        // Nurses can only reschedule appointments for doctors in their department
+        const nurseDeptResult = await client.query(
+          'SELECT department FROM nurses WHERE user_id = $1',
+          [req.user.id]
+        );
+        if (nurseDeptResult.rows.length === 0) {
+          throw new AppError('Nurse profile not found.', 404);
+        }
+        const nurseDepartment = nurseDeptResult.rows[0].department;
+        if (nurseDepartment !== appt.doctor_department) {
+          throw new AppError('You can only reschedule appointments for doctors in your department.', 403);
+        }
       }
 
       if (appt.status !== 'scheduled') {
@@ -882,15 +896,6 @@ const reschedule = async (req, res, next) => {
       );
       committedScheduledAt = updateResult.rows[0].scheduled_at;
 
-      await auditLog({
-        userId: req.user.id,
-        action: 'RESCHEDULE_APPOINTMENT',
-        resourceType: 'appointment',
-        resourceId: id,
-        ip: req.ip,
-        details: { previousScheduledAt, newScheduledAt: newDate.toISOString() },
-      });
-
       await client.query('COMMIT');
     } catch (txErr) {
       await client.query('ROLLBACK');
@@ -898,6 +903,18 @@ const reschedule = async (req, res, next) => {
     } finally {
       client.release();
     }
+
+    // Audit after release — auditLog uses a separate pool connection; running it inside
+    // the FOR UPDATE transaction would deadlock when the rescheduler is the patient or doctor
+    // (their user rows are locked by the JOIN … FOR UPDATE).
+    auditLog({
+      userId: req.user.id,
+      action: 'RESCHEDULE_APPOINTMENT',
+      resourceType: 'appointment',
+      resourceId: id,
+      ip: req.ip,
+      details: { previousScheduledAt, newScheduledAt: newDate.toISOString() },
+    });
 
     const newDateTimeStr = new Date(committedScheduledAt).toLocaleString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',

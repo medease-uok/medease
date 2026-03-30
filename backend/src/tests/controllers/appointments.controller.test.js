@@ -574,6 +574,7 @@ describe('reschedule', () => {
     patient_first_name: 'John',
     patient_last_name: 'Doe',
     doctor_user_id: 'usr-doc',
+    doctor_department: 'Cardiology',
     doctor_first_name: 'Kamal',
     doctor_last_name: 'Perera',
   }
@@ -715,8 +716,15 @@ describe('reschedule', () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }))
   })
 
-  test('should allow nurse to reschedule any appointment without ownership check', async () => {
-    mockSuccessfulTransaction()
+  test('should allow nurse in same department to reschedule appointment', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)                                        // BEGIN
+      .mockResolvedValueOnce({ rows: [APPT_ROW] })                             // FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ department: 'Cardiology' }] })         // nurse department
+      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] })                         // schedule
+      .mockResolvedValueOnce({ rows: [] })                                      // no conflict
+      .mockResolvedValueOnce({ rows: [{ scheduled_at: new Date(NEW_SLOT) }] })  // UPDATE RETURNING
+      .mockResolvedValueOnce(undefined)                                         // COMMIT
 
     const req = makeReq({
       user: { id: 'usr-nurse', role: 'nurse' },
@@ -730,6 +738,52 @@ describe('reschedule', () => {
 
     expect(next).not.toHaveBeenCalled()
     expect(res.json.mock.calls[0][0].status).toBe('success')
+  })
+
+  test('should return 403 when nurse tries to reschedule appointment for doctor in different department', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)                                // BEGIN
+      .mockResolvedValueOnce({ rows: [APPT_ROW] })                     // FOR UPDATE (doctor in Cardiology)
+      .mockResolvedValueOnce({ rows: [{ department: 'Pediatrics' }] }) // nurse in different dept
+      .mockResolvedValueOnce(undefined)                                 // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-nurse', role: 'nurse' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 403,
+      message: 'You can only reschedule appointments for doctors in your department.'
+    }))
+  })
+
+  test('should return 404 when nurse profile not found', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)            // BEGIN
+      .mockResolvedValueOnce({ rows: [APPT_ROW] }) // FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] })         // nurse not found
+      .mockResolvedValueOnce(undefined)             // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-nurse', role: 'nurse' },
+      params: { id: VALID_UUID },
+      body: { scheduledAt: NEW_SLOT },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await reschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 404,
+      message: 'Nurse profile not found.'
+    }))
   })
 
   test('should return 400 when appointment status is not scheduled', async () => {
