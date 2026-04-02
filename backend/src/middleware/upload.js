@@ -48,7 +48,13 @@ const upload = multer({
 });
 
 async function uploadToS3(file, patientId) {
-  const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+  // Sanitize file extension
+  let ext = path.extname(file.originalname).toLowerCase();
+  ext = ext.replace(/[^a-z0-9.]/g, '') || '.jpg';
+  if (!ext.startsWith('.') || ext.length > 10) {
+    ext = '.jpg';
+  }
+
   const hash = crypto.randomBytes(16).toString('hex');
   const key = `profile-images/${patientId}/${hash}${ext}`;
 
@@ -79,7 +85,8 @@ async function deleteFromS3(key) {
       Key: key,
     }));
   } catch (err) {
-    console.warn(`Failed to delete S3 object "${key}":`, err.message);
+    // Don't include key in error message to prevent log injection
+    console.warn('Failed to delete S3 object:', err.message);
   }
 }
 
@@ -96,7 +103,13 @@ const documentUpload = multer({
 });
 
 async function uploadDocumentToS3(file, patientId) {
-  const ext = path.extname(file.originalname).toLowerCase() || '.pdf';
+  // Sanitize file extension
+  let ext = path.extname(file.originalname).toLowerCase();
+  ext = ext.replace(/[^a-z0-9.]/g, '') || '.pdf';
+  if (!ext.startsWith('.') || ext.length > 10) {
+    ext = '.pdf';
+  }
+
   const hash = crypto.randomBytes(16).toString('hex');
   const key = `medical-documents/${patientId}/${hash}${ext}`;
 
@@ -126,7 +139,13 @@ const prescriptionImageUpload = multer({
 });
 
 async function uploadPrescriptionImageToS3(file, patientId) {
-  const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+  // Sanitize file extension
+  let ext = path.extname(file.originalname).toLowerCase();
+  ext = ext.replace(/[^a-z0-9.]/g, '') || '.jpg';
+  if (!ext.startsWith('.') || ext.length > 10) {
+    ext = '.jpg';
+  }
+
   const hash = crypto.randomBytes(16).toString('hex');
   const key = `prescription-images/${patientId}/${hash}${ext}`;
 
@@ -168,7 +187,15 @@ async function uploadLabReportToS3(file, patientId) {
     throw new Error('Invalid patientId format for S3 upload');
   }
 
-  const ext = path.extname(file.originalname).toLowerCase() || '.pdf';
+  // Sanitize file extension to prevent log injection
+  let ext = path.extname(file.originalname).toLowerCase();
+  // Only allow alphanumeric and dot, default to .pdf
+  ext = ext.replace(/[^a-z0-9.]/g, '') || '.pdf';
+  // Ensure it starts with a dot and is reasonable length
+  if (!ext.startsWith('.') || ext.length > 10) {
+    ext = '.pdf';
+  }
+
   const hash = crypto.randomBytes(16).toString('hex');
   const key = `lab-reports/${patientId}/${hash}${ext}`;
 
