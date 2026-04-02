@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, FlaskConical, Clock, AlertTriangle, FileText, CheckCircle, XCircle, Play, User } from 'lucide-react';
 import api from '../services/api';
 import CreateLabReportModal from '../components/CreateLabReportModal';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../data/AuthContext';
 
 const PRIORITY_COLORS = {
   urgent: 'bg-red-100 text-red-800',
@@ -25,7 +25,7 @@ const STATUS_ICONS = {
 };
 
 export default function LabTestRequests() {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -82,7 +82,7 @@ export default function LabTestRequests() {
       setUpdatingStatus((prev) => ({ ...prev, [requestId]: true }));
       await api.patch(`/lab-test-requests/${requestId}`, {
         status: 'in_progress',
-        assignedTo: user.id, // Self-assign
+        assignedTo: currentUser.id, // Self-assign
       });
       await fetchRequests();
     } catch (err) {
