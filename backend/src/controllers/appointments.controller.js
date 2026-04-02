@@ -389,6 +389,130 @@ const updateStatus = async (req, res, next) => {
   }
 };
 
+const cancelAppointment = async (req, res, next) => {
+  const client = await db.getClient();
+  let appt;
+
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError('Invalid appointment ID format.', 400);
+    }
+
+    await client.query('BEGIN');
+
+    const existing = await client.query(
+      `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
+              p.user_id AS patient_user_id, pu.first_name AS patient_first_name,
+              d.user_id AS doctor_user_id, du.first_name AS doctor_first_name, du.last_name AS doctor_last_name
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN users pu ON p.user_id = pu.id
+       JOIN doctors d ON a.doctor_id = d.id
+       JOIN users du ON d.user_id = du.id
+       WHERE a.id = $1
+       FOR UPDATE`,
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      throw new AppError('Appointment not found.', 404);
+    }
+
+    appt = existing.rows[0];
+
+    if (req.user.role === 'patient') {
+      if (!req.user.patientId) {
+        throw new AppError('Patient profile not found for this user.', 403);
+      }
+      if (req.user.patientId !== appt.patient_id) {
+        throw new AppError('You do not have permission to cancel this appointment.', 403);
+      }
+    }
+
+    if (req.user.role === 'doctor') {
+      if (!req.user.doctorId) {
+        throw new AppError('Doctor profile not found for this user.', 403);
+      }
+      if (req.user.doctorId !== appt.doctor_id) {
+        throw new AppError('You do not have permission to cancel this appointment.', 403);
+      }
+    }
+
+    if (appt.status === APPOINTMENT_STATUS.CANCELLED) {
+      throw new AppError('Appointment is already cancelled.', 400);
+    }
+
+    if (appt.status === APPOINTMENT_STATUS.COMPLETED) {
+      throw new AppError('Cannot cancel a completed appointment.', 400);
+    }
+
+    if (appt.status === APPOINTMENT_STATUS.IN_PROGRESS) {
+      throw new AppError('Cannot cancel an appointment that is currently in progress.', 400);
+    }
+
+    const result = await client.query(
+      `UPDATE appointments SET status = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, status`,
+      [APPOINTMENT_STATUS.CANCELLED, id]
+    );
+
+    await client.query('COMMIT');
+
+    createNotification({
+      recipientId: appt.patient_user_id,
+      type: 'appointment_cancelled',
+      title: 'Appointment Cancelled',
+      message: `Your appointment with Dr. ${appt.doctor_first_name} ${appt.doctor_last_name} has been cancelled.`,
+      referenceId: id,
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send cancel notification to patient', { id, error: err.message });
+    });
+
+    createNotification({
+      recipientId: appt.doctor_user_id,
+      type: 'appointment_cancelled',
+      title: 'Appointment Cancelled',
+      message: `Appointment with ${appt.patient_first_name} has been cancelled.`,
+      referenceId: id,
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send cancel notification to doctor', { id, error: err.message });
+    });
+
+    notifyWaitlistOnCancellation(appt.doctor_id, appt.scheduled_at).catch((err) => {
+      console.error('Failed to notify waitlist on cancellation', { id, error: err.message });
+    });
+
+    auditLog({
+      userId: req.user.id,
+      action: 'CANCEL_APPOINTMENT',
+      resourceType: 'appointment',
+      resourceId: id,
+      ip: req.ip,
+      details: { previousStatus: appt.status },
+    }).catch((err) => {
+      console.error('AUDIT LOG FAILURE — cancel appointment', { appointmentId: id, userId: req.user.id, error: err.message });
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        id: result.rows[0].id,
+        status: result.rows[0].status,
+      },
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    return next(err);
+  } finally {
+    client.release();
+  }
+};
+
 /**
  * Compute the next occurrence date for a recurrence pattern.
  * originalDayOfMonth is needed for monthly to handle 31→Feb→28 correctly.
@@ -935,4 +1059,4 @@ const reschedule = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus, reschedule };
+module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus, cancelAppointment, reschedule };
