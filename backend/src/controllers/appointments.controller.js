@@ -8,7 +8,7 @@ const auditLog = require('../utils/auditLog');
 const { SLOT_DURATION_MINUTES, CLINIC_TIMEZONE, clinicLocalTime } = require('../utils/scheduleHelpers');
 const { sendAppointmentConfirmationEmail } = require('../utils/emailService');
 const { notifyWaitlistOnCancellation } = require('./waitlist.controller');
-const { APPOINTMENT_STATUS, UPDATEABLE_STATUSES, INACTIVE_STATUSES } = require('../constants/appointmentStatus');
+const { APPOINTMENT_STATUS, UPDATEABLE_STATUSES } = require('../constants/appointmentStatus');
 
 // No-show flagging threshold
 const NO_SHOW_FLAG_THRESHOLD = 3;
@@ -1101,7 +1101,6 @@ const reschedule = async (req, res, next) => {
  * - Sends notifications to patient and relevant staff
  */
 const markNoShow = async (req, res, next) => {
-  const NO_SHOW_FLAG_THRESHOLD = 3;
   let client;
 
   try {
