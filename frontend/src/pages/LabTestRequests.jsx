@@ -252,6 +252,12 @@ export default function LabTestRequests() {
           labTestRequestId={selectedRequest.id}
           prefillPatient={selectedRequest.patientId}
           prefillTestName={selectedRequest.testName}
+          requestDetails={{
+            doctorName: selectedRequest.doctorName,
+            patientName: selectedRequest.patientName,
+            priority: selectedRequest.priority,
+            clinicalNotes: selectedRequest.clinicalNotes,
+          }}
         />
       )}
     </div>

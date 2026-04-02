@@ -10,6 +10,7 @@ export default function CreateLabReportModal({
   labTestRequestId = null,
   prefillPatient = null,
   prefillTestName = null,
+  requestDetails = null, // { doctorName, patientName, priority, clinicalNotes }
 }) {
   const [selectedPatient, setSelectedPatient] = useState(prefillPatient || '');
   const [testName, setTestName] = useState(prefillTestName || '');
@@ -19,6 +20,8 @@ export default function CreateLabReportModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+
+  const isFromRequest = !!labTestRequestId;
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -125,13 +128,50 @@ export default function CreateLabReportModal({
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Request Context Banner */}
+          {isFromRequest && requestDetails && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <FileText className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-blue-900">Completing Lab Test Request</h3>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    This report will be linked to the doctor's test request
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-blue-600 font-medium">Requested by:</span>
+                  <p className="text-blue-900 mt-0.5">{requestDetails.doctorName}</p>
+                </div>
+                <div>
+                  <span className="text-blue-600 font-medium">Patient:</span>
+                  <p className="text-blue-900 mt-0.5">{requestDetails.patientName}</p>
+                </div>
+              </div>
+              {requestDetails.clinicalNotes && (
+                <div>
+                  <span className="text-blue-600 font-medium text-xs">Clinical Notes:</span>
+                  <p className="text-blue-800 text-xs mt-1 bg-blue-100/50 rounded p-2">
+                    {requestDetails.clinicalNotes}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Success Message */}
           {success && (
             <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
               <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-green-700">Lab report created successfully!</p>
-                <p className="text-xs text-green-600 mt-0.5">Patient has been notified</p>
+                <p className="text-xs text-green-600 mt-0.5">
+                  {isFromRequest
+                    ? 'Patient, doctor, and department nurses have been notified'
+                    : 'Patient has been notified'}
+                </p>
               </div>
             </div>
           )}
@@ -148,39 +188,53 @@ export default function CreateLabReportModal({
           <div>
             <label htmlFor="patient-select" className="block text-sm font-medium text-slate-700 mb-1">
               Patient <span className="text-red-500">*</span>
+              {isFromRequest && <span className="text-xs text-slate-500 ml-2">(from request)</span>}
             </label>
-            <select
-              id="patient-select"
-              value={selectedPatient}
-              onChange={(e) => setSelectedPatient(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              required
-              disabled={loading || success}
-            >
-              <option value="">Select a patient</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name || `${p.firstName} ${p.lastName}`}
-                </option>
-              ))}
-            </select>
+            {isFromRequest ? (
+              <div className="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-700">
+                {requestDetails?.patientName || 'Loading...'}
+              </div>
+            ) : (
+              <select
+                id="patient-select"
+                value={selectedPatient}
+                onChange={(e) => setSelectedPatient(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                required
+                disabled={loading || success}
+              >
+                <option value="">Select a patient</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name || `${p.firstName} ${p.lastName}`}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Test Name */}
           <div>
             <label htmlFor="test-name" className="block text-sm font-medium text-slate-700 mb-1">
               Test Name <span className="text-red-500">*</span>
+              {isFromRequest && <span className="text-xs text-slate-500 ml-2">(from request)</span>}
             </label>
-            <input
-              id="test-name"
-              type="text"
-              value={testName}
-              onChange={(e) => setTestName(e.target.value)}
-              placeholder="e.g., Complete Blood Count, X-Ray Chest"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              required
-              disabled={loading || success}
-            />
+            {isFromRequest ? (
+              <div className="px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-700">
+                {testName}
+              </div>
+            ) : (
+              <input
+                id="test-name"
+                type="text"
+                value={testName}
+                onChange={(e) => setTestName(e.target.value)}
+                placeholder="e.g., Complete Blood Count, X-Ray Chest"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                required
+                disabled={loading || success}
+              />
+            )}
           </div>
 
           {/* Result (Optional) */}
