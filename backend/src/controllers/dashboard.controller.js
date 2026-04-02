@@ -414,14 +414,14 @@ const getActivity = async (req, res, next) => {
         const statusLabel = r.status === 'pending' ? 'New request' :
                            r.status === 'in_progress' ? 'In progress' :
                            r.status === 'completed' ? 'Completed' : r.status;
-        const priorityFlag = r.priority === 'urgent' ? ' 🔴 URGENT' : '';
         activities.push({
           id: `ltr-${r.id}`,
           type: r.status === 'pending' ? 'lab-request-new' : 'lab-request',
           user: r.doctor_name,
-          description: `${statusLabel}: ${r.test_name} for ${r.patient_name}${priorityFlag}`,
+          description: `${statusLabel}: ${r.test_name} for ${r.patient_name}`,
           timestamp: r.ts,
           details: null,
+          priority: r.priority, // Pass priority separately for frontend to display icon
         });
       }
     }

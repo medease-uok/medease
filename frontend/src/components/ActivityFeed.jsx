@@ -1,6 +1,7 @@
 import {
   UserPlus, Calendar, FileText, AlertCircle, CheckCircle, Clock,
   Pill, FlaskConical, Shield, LogIn, LogOut, UserCog, Eye, Pencil, Trash2,
+  AlertTriangle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card'
 
@@ -194,6 +195,12 @@ export function ActivityFeed({ activities = [], maxItems = 10 }) {
                             `}>
                               {config.label}
                             </span>
+                            {activity.priority === 'urgent' && (
+                              <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">
+                                <AlertTriangle className="w-3 h-3" />
+                                URGENT
+                              </span>
+                            )}
                             <span className="text-xs text-slate-500">
                               {activity.user}
                             </span>
