@@ -42,4 +42,10 @@ module.exports = {
       cronSchedule: process.env.REMINDER_CRON_SCHEDULE || '*/5 * * * *',
     };
   })(),
+  cancellationPolicy: {
+    patientMinHoursBefore: parseInt(process.env.CANCELLATION_MIN_HOURS_PATIENT || '24', 10),
+    doctorMinHoursBefore: parseInt(process.env.CANCELLATION_MIN_HOURS_DOCTOR || '2', 10),
+    adminBypassPolicy: process.env.CANCELLATION_ADMIN_BYPASS !== 'false',
+    nurseBypassPolicy: process.env.CANCELLATION_NURSE_BYPASS !== 'false',
+  },
 };

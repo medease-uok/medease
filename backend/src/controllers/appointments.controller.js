@@ -1,5 +1,6 @@
 const { randomUUID } = require('crypto');
 const db = require('../config/database');
+const config = require('../config');
 const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
@@ -450,6 +451,30 @@ const cancelAppointment = async (req, res, next) => {
 
     if (appt.status === APPOINTMENT_STATUS.IN_PROGRESS) {
       throw new AppError('Cannot cancel an appointment that is currently in progress.', 400);
+    }
+
+    const now = new Date();
+    const scheduledAt = new Date(appt.scheduled_at);
+    const hoursUntilAppointment = (scheduledAt - now) / (1000 * 60 * 60);
+
+    if (req.user.role === 'patient') {
+      const minHours = config.cancellationPolicy.patientMinHoursBefore;
+      if (hoursUntilAppointment < minHours) {
+        throw new AppError(
+          `Patients cannot cancel appointments less than ${minHours} hours before the scheduled time. Please contact the clinic for assistance.`,
+          400
+        );
+      }
+    }
+
+    if (req.user.role === 'doctor') {
+      const minHours = config.cancellationPolicy.doctorMinHoursBefore;
+      if (hoursUntilAppointment < minHours) {
+        throw new AppError(
+          `Doctors cannot cancel appointments less than ${minHours} hours before the scheduled time. Please contact administration for assistance.`,
+          400
+        );
+      }
     }
 
     const result = await client.query(
