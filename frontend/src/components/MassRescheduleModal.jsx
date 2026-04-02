@@ -71,7 +71,7 @@ export default function MassRescheduleModal({ isOpen, onClose, onSuccess, doctor
         handleClose();
       }, 3000);
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to reschedule appointments';
+      const msg = err.data?.message || err.message || 'Failed to reschedule appointments';
       setError(msg);
     } finally {
       setLoading(false);

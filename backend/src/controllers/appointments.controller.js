@@ -1487,11 +1487,18 @@ const massReschedule = async (req, res, next) => {
       }
 
       // Check if new time is within doctor's schedule (O(1) lookup)
-      const { dayOfWeek, totalMinutes: newTotalMinutes } = clinicLocalTime(newTime);
+      const { dayOfWeek, totalMinutes: newTotalMinutes} = clinicLocalTime(newTime);
       const schedule = scheduleMap[dayOfWeek];
 
+      const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayName = DAY_NAMES[dayOfWeek];
+
       if (!schedule || !schedule.is_active) {
-        throw new AppError(`Doctor is not available on ${dayOfWeek}. Cannot reschedule appointments.`, 400);
+        const availableDays = Object.keys(scheduleMap).map(d => DAY_NAMES[d]).join(', ');
+        throw new AppError(
+          `Doctor is not available on ${dayName}. Available days: ${availableDays}. Please choose a different offset.`,
+          400
+        );
       }
 
       const [schStartH, schStartM] = schedule.start_time.slice(0, 5).split(':').map(Number);
@@ -1500,7 +1507,15 @@ const massReschedule = async (req, res, next) => {
       const schedEndMinutes = schEndH * 60 + schEndM;
 
       if (newTotalMinutes < schedStartMinutes || newTotalMinutes + SLOT_DURATION_MINUTES > schedEndMinutes) {
-        throw new AppError('One or more appointments would fall outside doctor\'s schedule hours.', 400);
+        const formatTime = (mins) => {
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        };
+        throw new AppError(
+          `One or more appointments would fall outside doctor's schedule hours (${formatTime(schedStartMinutes)}-${formatTime(schedEndMinutes)} on ${dayName}). Please choose a different offset or date range.`,
+          400
+        );
       }
 
       if ((newTotalMinutes - schedStartMinutes) % SLOT_DURATION_MINUTES !== 0) {
