@@ -10,6 +10,9 @@ const { sendAppointmentConfirmationEmail } = require('../utils/emailService');
 const { notifyWaitlistOnCancellation } = require('./waitlist.controller');
 const { APPOINTMENT_STATUS, UPDATEABLE_STATUSES, INACTIVE_STATUSES } = require('../constants/appointmentStatus');
 
+// No-show flagging threshold
+const NO_SHOW_FLAG_THRESHOLD = 3;
+
 const mapAppointment = (row) => ({
   id: row.id,
   patientId: row.patient_id,
@@ -1117,6 +1120,7 @@ const markNoShow = async (req, res, next) => {
     await client.query('BEGIN');
 
     // Get appointment details with patient info and doctor department
+    // Lock both appointment and patient rows to prevent race conditions
     const apptResult = await client.query(
       `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
               p.user_id AS patient_user_id, p.no_show_count, p.no_show_flagged, p.no_show_flag_date,
@@ -1129,7 +1133,7 @@ const markNoShow = async (req, res, next) => {
        JOIN doctors d ON a.doctor_id = d.id
        JOIN users du ON d.user_id = du.id
        WHERE a.id = $1
-       FOR UPDATE`,
+       FOR UPDATE OF a, p`,
       [id]
     );
 
@@ -1181,22 +1185,44 @@ const markNoShow = async (req, res, next) => {
       [APPOINTMENT_STATUS.NO_SHOW, id]
     );
 
-    // Increment patient no-show count
-    const newNoShowCount = appt.no_show_count + 1;
-    const shouldFlag = newNoShowCount >= NO_SHOW_FLAG_THRESHOLD && !appt.no_show_flagged;
-
-    await client.query(
+    // Atomic patient update: increment count and auto-flag if threshold reached
+    // Using RETURNING to get actual DB values (prevents race conditions)
+    const patientResult = await client.query(
       `UPDATE patients
-       SET no_show_count = $1,
-           no_show_flagged = $2,
-           no_show_flag_date = $3,
+       SET no_show_count = no_show_count + 1,
+           no_show_flagged = CASE
+             WHEN no_show_count + 1 >= $1 THEN true
+             ELSE no_show_flagged
+           END,
+           no_show_flag_date = CASE
+             WHEN no_show_count + 1 >= $1 AND NOT no_show_flagged THEN NOW()
+             ELSE no_show_flag_date
+           END,
            updated_at = NOW()
-       WHERE id = $4`,
+       WHERE id = $2
+       RETURNING no_show_count, no_show_flagged, no_show_flag_date`,
+      [NO_SHOW_FLAG_THRESHOLD, appt.patient_id]
+    );
+
+    const { no_show_count: newNoShowCount, no_show_flagged: nowFlagged } = patientResult.rows[0];
+    const justFlagged = nowFlagged && !appt.no_show_flagged;
+
+    // Audit log (inside transaction for compliance)
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, resource_type, resource_id, ip, details, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
       [
-        newNoShowCount,
-        shouldFlag || appt.no_show_flagged,
-        shouldFlag ? new Date() : appt.no_show_flag_date,
-        appt.patient_id,
+        req.user.id,
+        'MARK_NO_SHOW',
+        'appointment',
+        id,
+        req.ip,
+        JSON.stringify({
+          previousStatus: appt.status,
+          patientId: appt.patient_id,
+          newNoShowCount,
+          flagged: nowFlagged,
+        }),
       ]
     );
 
@@ -1233,7 +1259,7 @@ const markNoShow = async (req, res, next) => {
     });
 
     // Additional notification if patient was just flagged
-    if (shouldFlag) {
+    if (justFlagged) {
       createNotification({
         recipientId: appt.patient_user_id,
         type: 'patient_flagged_no_show',
@@ -1263,23 +1289,6 @@ const markNoShow = async (req, res, next) => {
       }
     }
 
-    // Audit log
-    auditLog({
-      userId: req.user.id,
-      action: 'MARK_NO_SHOW',
-      resourceType: 'appointment',
-      resourceId: id,
-      ip: req.ip,
-      details: {
-        previousStatus: appt.status,
-        patientId: appt.patient_id,
-        newNoShowCount,
-        flagged: shouldFlag || appt.no_show_flagged,
-      },
-    }).catch((err) => {
-      console.error('AUDIT LOG FAILURE — markNoShow', { appointmentId: id, userId: req.user.id, error: err.message });
-    });
-
     // Notify waitlist about freed slot
     notifyWaitlistOnCancellation(appt.doctor_id, appt.scheduled_at).catch((err) => {
       console.error('Failed to notify waitlist on no-show', { id, error: err.message });
@@ -1292,7 +1301,7 @@ const markNoShow = async (req, res, next) => {
         status: APPOINTMENT_STATUS.NO_SHOW,
         patient: {
           noShowCount: newNoShowCount,
-          flagged: shouldFlag || appt.no_show_flagged,
+          flagged: nowFlagged,
         },
       },
     });

@@ -1336,7 +1336,8 @@ describe('markNoShow', () => {
       .mockResolvedValueOnce(undefined) // BEGIN
       .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
       .mockResolvedValueOnce(undefined) // UPDATE appointment
-      .mockResolvedValueOnce(undefined) // UPDATE patient
+      .mockResolvedValueOnce({ rows: [{ no_show_count: 1, no_show_flagged: false, no_show_flag_date: null }] }) // UPDATE patient RETURNING
+      .mockResolvedValueOnce(undefined) // INSERT audit_logs
       .mockResolvedValueOnce(undefined) // COMMIT
 
     mockQuery.mockResolvedValueOnce({ rows: [] }) // Admin query (no admin)
@@ -1354,7 +1355,11 @@ describe('markNoShow', () => {
     )
     expect(mockClientQuery).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE patients'),
-      [1, false, null, 'pat-1']
+      [3, 'pat-1']
+    )
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO audit_logs'),
+      expect.any(Array)
     )
     expect(mockClientQuery).toHaveBeenCalledWith('COMMIT')
     expect(res.json).toHaveBeenCalledWith({
@@ -1387,11 +1392,14 @@ describe('markNoShow', () => {
       doctor_last_name: 'Perera',
     }
 
+    const flagDate = new Date()
+
     mockClientQuery
       .mockResolvedValueOnce(undefined) // BEGIN
       .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
       .mockResolvedValueOnce(undefined) // UPDATE appointment
-      .mockResolvedValueOnce(undefined) // UPDATE patient
+      .mockResolvedValueOnce({ rows: [{ no_show_count: 3, no_show_flagged: true, no_show_flag_date: flagDate }] }) // UPDATE patient RETURNING
+      .mockResolvedValueOnce(undefined) // INSERT audit_logs
       .mockResolvedValueOnce(undefined) // COMMIT
 
     mockQuery.mockResolvedValueOnce({ rows: [{ id: 'admin-1' }] }) // Admin query
@@ -1404,7 +1412,7 @@ describe('markNoShow', () => {
 
     expect(mockClientQuery).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE patients'),
-      [3, true, expect.any(Date), 'pat-1']
+      [3, 'pat-1']
     )
     expect(res.json).toHaveBeenCalledWith({
       status: 'success',
@@ -1556,7 +1564,8 @@ describe('markNoShow', () => {
       .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
       .mockResolvedValueOnce({ rows: [{ department: 'Cardiology' }] }) // SELECT nurse department
       .mockResolvedValueOnce(undefined) // UPDATE appointment
-      .mockResolvedValueOnce(undefined) // UPDATE patient
+      .mockResolvedValueOnce({ rows: [{ no_show_count: 1, no_show_flagged: false, no_show_flag_date: null }] }) // UPDATE patient RETURNING
+      .mockResolvedValueOnce(undefined) // INSERT audit_logs
       .mockResolvedValueOnce(undefined) // COMMIT
 
     mockQuery.mockResolvedValueOnce({ rows: [] }) // Admin query
