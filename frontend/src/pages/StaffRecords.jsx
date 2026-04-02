@@ -11,7 +11,7 @@ import MedicalDocuments from './MedicalDocuments';
 const ALL_TABS = [
   { id: 'records', label: 'Medical Records', icon: FileText, roles: ['doctor', 'nurse', 'admin'] },
   { id: 'lab-reports', label: 'Lab Reports', icon: FlaskConical, roles: ['doctor', 'nurse', 'admin', 'lab_technician'] },
-  { id: 'documents', label: 'Documents', icon: FolderOpen, roles: ['doctor', 'nurse', 'admin', 'lab_technician'] },
+  { id: 'documents', label: 'Documents', icon: FolderOpen, roles: ['doctor', 'nurse', 'admin'] },
 ];
 
 const TAB_COMPONENTS = {
