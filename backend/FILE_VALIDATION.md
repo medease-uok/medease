@@ -7,6 +7,64 @@ The system implements comprehensive file validation for all uploaded files, incl
 2. **File Size Validation** - Type-specific size limits
 3. **Malware Scanning** - VirusTotal cloud API integration (optional)
 
+## ⚠️ HIPAA Compliance Warning
+
+**CRITICAL for Medical Applications**: VirusTotal is a cloud service that uploads files to their servers and may share them with security research partners. This has significant implications for healthcare applications:
+
+### Privacy Concerns
+- **File Upload**: Unknown files are uploaded to VirusTotal's servers (located outside your infrastructure)
+- **Data Sharing**: Per VirusTotal's terms, uploaded files may be shared with security partners and researchers
+- **PHI/PII Risk**: Medical documents (lab reports, prescriptions, imaging) contain Protected Health Information
+- **HIPAA Violation**: Uploading PHI to third-party services without BAA (Business Associate Agreement) violates HIPAA
+
+### Safer Alternatives for Production
+
+**Option 1: Hash-Only Checking (Recommended for Dev/Testing)**
+- Current implementation checks SHA256 hash first (no upload if file is known)
+- Unknown files trigger upload → **HIPAA risk**
+- Acceptable for development/testing with sample data
+- **NOT acceptable for production with real patient data**
+
+**Option 2: Disable VirusTotal in Production**
+```env
+# .env.production
+VIRUSTOTAL_API_KEY=  # Leave empty - disables scanning
+```
+- Magic byte validation and size limits still apply
+- No PHI leaves your infrastructure
+- Reduced security (no malware detection)
+
+**Option 3: VirusTotal Enterprise with Private Scanning**
+- Requires enterprise license ($$$)
+- Files analyzed privately, not shared
+- Still requires BAA from VirusTotal
+- Contact: https://www.virustotal.com/gui/contact
+
+**Option 4: Local Malware Scanning (Recommended for Production)**
+- Use ClamAV, Windows Defender, or commercial AV locally
+- No data leaves your infrastructure
+- Requires platform-specific setup
+- Higher operational complexity
+
+**Option 5: Async Quarantine Workflow (Production Best Practice)**
+```
+1. Upload file → Store in quarantine S3 bucket (restricted access)
+2. Scan asynchronously (local AV or hash-only VirusTotal check)
+3. Move to validated bucket only after scan passes
+4. Never upload unknown files to external services
+```
+
+### Current Implementation Status
+- ✅ Hash checking (safe - only sends SHA256)
+- ⚠️ File upload for unknown files (HIPAA risk)
+- ⚠️ Synchronous scanning (UX issue - blocks 5-15 seconds)
+- ❌ No quarantine workflow
+- ❌ No async processing
+
+### Recommendations
+**For Development**: Current implementation is acceptable with sample/fake data
+**For Production**: Implement Option 4 or 5 before handling real patient data
+
 ## Security Features
 
 ### 1. Magic Byte Validation

@@ -121,13 +121,13 @@ async function validateUploadedFile(req, res, next) {
     // Step 3: Validate actual file type using magic bytes
     const detectedType = await validateFileType(buffer, allowedTypes);
 
-    // Check if detected type matches declared type
+    // Check if detected type matches declared type (strict validation for security)
     if (detectedType.mime !== mimetype) {
-      console.warn(
-        `MIME type mismatch: declared=${mimetype}, detected=${detectedType.mime}, file=${originalname}`
+      throw new AppError(
+        `File content does not match declared type. Declared: ${mimetype}, Detected: ${detectedType.mime}. ` +
+          `This may indicate file spoofing or corruption.`,
+        400
       );
-      // For safety, use the detected type
-      req.file.mimetype = detectedType.mime;
     }
 
     // Step 4: Scan for malware

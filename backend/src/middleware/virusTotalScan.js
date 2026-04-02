@@ -10,7 +10,7 @@ const VIRUSTOTAL_API_URL = 'https://www.virustotal.com/api/v3';
 
 // Scanning thresholds
 const MAX_FILE_SIZE_FOR_SCAN = 32 * 1024 * 1024; // 32 MB (VirusTotal limit)
-const MALICIOUS_THRESHOLD = 2; // Number of engines that must flag as malicious
+const MALICIOUS_THRESHOLD = parseInt(process.env.VIRUSTOTAL_MALICIOUS_THRESHOLD || '2', 10); // Number of engines that must flag as malicious
 
 /**
  * Check if VirusTotal scanning is enabled
