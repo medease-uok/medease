@@ -115,6 +115,27 @@ services:
              echo 'Database seeded successfully.'"
     restart: "no"
 
+  lab-report-seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medease-lab-report-seed
+    profiles:
+      - seed
+    depends_on:
+      - db-seed
+      - backend
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://medease_user:medease_dev_password@postgres:5432/medease
+    env_file:
+      - ./backend/.env.development
+    entrypoint: >
+      sh -c "echo 'Seeding lab report PDF files...' &&
+             node scripts/seedLabReportFiles.js &&
+             echo 'Lab report files seeded successfully.'"
+    restart: "no"
+
 volumes:
   postgres_data:
   redis_data:
