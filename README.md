@@ -13,6 +13,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 ### Key Features
 
 - Appointment scheduling with real-time doctor availability
+- Appointment rescheduling to a new time slot with conflict detection and waitlist notification
 - Appointment waitlist with automatic slot notifications when cancellations occur
 - Recurring appointment series (daily, weekly, biweekly, monthly) with conflict detection and bulk cancellation
 - Appointment confirmation emails sent to patients upon booking
@@ -30,7 +31,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Prescription refill requests with doctor approval workflow
 - Lab test request workflow with priority levels and lab technician assignment
 - Patient satisfaction and feedback system with per-doctor ratings and analytics
-- Inventory management for hospital supplies and equipment with low stock alerts and admin notifications
+- Inventory management for hospital supplies and equipment with low stock alerts, expiry date tracking, and admin notifications
 - PDF generation for medical records and prescriptions
 - Voice input (speech-to-text) for clinical notes, diagnoses, prescriptions, and other text fields
 - Role-Based Access Control (RBAC) with permissions across 6 roles
@@ -146,13 +147,3 @@ cd backend && npm run db:seed   # Seed database manually
 ---
 
 Built by the MedEase team at the University of Kelaniya, Sri Lanka
-
-## Confluence Pages Available (page ID: title)
-- 360461: Security Architecture
-- 393218: Architecture & Tech Stack
-- 393239: Scalability & Performance
-- 425985: Access Control (RBAC + ABAC)
-- 426011: API Documentation
-- 426031: Database Schema
-- 426062: Developer Guide
-- 458753: API Versioning Strategy
