@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
 import { supplierService } from '../services/supplier.service';
@@ -11,6 +11,7 @@ export default function SupplierManagement() {
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
 
@@ -20,16 +21,14 @@ export default function SupplierManagement() {
     name: '', contact_person: '', email: '', phone: '', address: '', status: 'active', notes: ''
   });
 
-  useEffect(() => {
-    fetchSuppliers();
-  }, [selectedStatus]);
-
-  const fetchSuppliers = async () => {
+  // Server-side fetch — passes search and status directly to the backend FTS endpoint
+  const fetchSuppliers = useCallback(async (search, statusFilter) => {
     try {
       setLoading(true);
       const params = {};
-      if (selectedStatus !== 'all') params.status = selectedStatus;
-      
+      if (statusFilter && statusFilter !== 'all') params.status = statusFilter;
+      if (search && search.trim()) params.search = search.trim();
+
       const fetched = await supplierService.getAll(params);
       const supplierArray = Array.isArray(fetched) ? fetched : (fetched?.data || []);
       setSuppliers(supplierArray);
@@ -40,9 +39,19 @@ export default function SupplierManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Debounce search & status changes — fires 400ms after user stops typing
+  useEffect(() => {
+    const debounced = setTimeout(() => {
+      fetchSuppliers(searchTerm, selectedStatus);
+    }, 400);
+    return () => clearTimeout(debounced);
+  }, [searchTerm, selectedStatus, fetchSuppliers]);
 
   const handleOpenModal = (supplier = null) => {
+    setFieldErrors({});
+    setError(null);
     if (supplier) {
       setEditingSupplier(supplier);
       setFormData({
@@ -64,26 +73,39 @@ export default function SupplierManagement() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingSupplier(null);
+    setFieldErrors({});
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear individual field error on change
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setFieldErrors({});
     try {
       if (editingSupplier) {
         await supplierService.update(editingSupplier.id, formData);
       } else {
         await supplierService.add(formData);
       }
-      fetchSuppliers();
+      fetchSuppliers(searchTerm, selectedStatus);
       handleCloseModal();
     } catch (err) {
       console.error('Error saving supplier:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to save supplier data');
+      const responseData = err.response?.data;
+      if (responseData?.errors) {
+        // Backend returned field-level errors — highlight specific inputs
+        setFieldErrors(responseData.errors);
+        setError(responseData.message || 'Validation failed. Please check the highlighted fields.');
+      } else {
+        setError(responseData?.message || err.message || 'Failed to save supplier data');
+      }
     }
   };
 
@@ -91,19 +113,12 @@ export default function SupplierManagement() {
     if (!window.confirm('Are you sure you want to deactivate (delete) this supplier?')) return;
     try {
       await supplierService.delete(id);
-      fetchSuppliers();
+      fetchSuppliers(searchTerm, selectedStatus);
     } catch (err) {
       console.error('Error deleting supplier:', err);
       setError('Failed to delete supplier');
     }
   };
-
-  const filteredSuppliers = suppliers.filter(s => {
-    const term = searchTerm.toLowerCase();
-    return s.name.toLowerCase().includes(term) || 
-           (s.contact_person && s.contact_person.toLowerCase().includes(term)) ||
-           (s.email && s.email.toLowerCase().includes(term));
-  });
 
   if (!isAdmin) {
     return (
@@ -154,8 +169,8 @@ export default function SupplierManagement() {
           />
         </div>
         <div className="flex gap-2 w-full md:w-auto">
-          <select 
-            value={selectedStatus} 
+          <select
+            value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
             className="input-field max-w-[150px]"
           >
@@ -171,7 +186,7 @@ export default function SupplierManagement() {
           <div className="p-12 flex justify-center items-center">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
-        ) : filteredSuppliers.length === 0 ? (
+        ) : suppliers.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
               <Truck className="w-8 h-8" />
@@ -192,7 +207,7 @@ export default function SupplierManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredSuppliers.map(supplier => (
+                {suppliers.map(supplier => (
                   <tr key={supplier.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="p-4">
                       <div className="font-medium text-slate-900">{supplier.name}</div>
@@ -200,7 +215,7 @@ export default function SupplierManagement() {
                     </td>
                     <td className="p-4">
                       <div className="text-sm text-slate-900">{supplier.contact_person || 'N/A'}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">{supplier.email} </div>
+                      <div className="text-xs text-slate-500 mt-0.5">{supplier.email}</div>
                       <div className="text-xs text-slate-500">{supplier.phone}</div>
                     </td>
                     <td className="p-4">
@@ -256,45 +271,62 @@ export default function SupplierManagement() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-medium text-slate-700">Supplier Name *</label>
-                  <input required name="name" value={formData.name} onChange={handleInputChange} className="input-field w-full" placeholder="Company Name" />
+                  <input required name="name" value={formData.name} onChange={handleInputChange}
+                    className={`input-field w-full ${fieldErrors.name ? 'border-red-400 ring-1 ring-red-400' : ''}`}
+                    placeholder="Company Name" />
+                  {fieldErrors.name && <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Contact Person *</label>
-                  <input required name="contact_person" value={formData.contact_person} onChange={handleInputChange} className="input-field w-full" placeholder="Jane Doe" />
+                  <label className="text-sm font-medium text-slate-700">Contact Person</label>
+                  <input name="contact_person" value={formData.contact_person} onChange={handleInputChange}
+                    className={`input-field w-full ${fieldErrors.contact_person ? 'border-red-400 ring-1 ring-red-400' : ''}`}
+                    placeholder="Jane Doe" />
+                  {fieldErrors.contact_person && <p className="text-xs text-red-600 mt-1">{fieldErrors.contact_person}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Phone *</label>
-                  <input required name="phone" value={formData.phone} onChange={handleInputChange} className="input-field w-full" placeholder="+1 234 567 890" />
+                  <label className="text-sm font-medium text-slate-700">Phone</label>
+                  <input name="phone" value={formData.phone} onChange={handleInputChange}
+                    className={`input-field w-full ${fieldErrors.phone ? 'border-red-400 ring-1 ring-red-400' : ''}`}
+                    placeholder="+1 234 567 890" />
+                  {fieldErrors.phone && <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>}
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700">Email *</label>
-                  <input required type="email" name="email" value={formData.email} onChange={handleInputChange} className="input-field w-full" placeholder="contact@supplier.com" />
+                  <label className="text-sm font-medium text-slate-700">Email</label>
+                  <input type="email" name="email" value={formData.email} onChange={handleInputChange}
+                    className={`input-field w-full ${fieldErrors.email ? 'border-red-400 ring-1 ring-red-400' : ''}`}
+                    placeholder="contact@supplier.com" />
+                  {fieldErrors.email && <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>}
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700">Physical Address *</label>
-                  <input required name="address" value={formData.address} onChange={handleInputChange} className="input-field w-full" placeholder="123 Industrial Way..." />
+                  <label className="text-sm font-medium text-slate-700">Physical Address</label>
+                  <input name="address" value={formData.address} onChange={handleInputChange}
+                    className="input-field w-full" placeholder="123 Industrial Way..." />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">Status *</label>
-                  <select required name="status" value={formData.status} onChange={handleInputChange} className="input-field w-full">
+                  <select required name="status" value={formData.status} onChange={handleInputChange}
+                    className={`input-field w-full ${fieldErrors.status ? 'border-red-400 ring-1 ring-red-400' : ''}`}>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
+                  {fieldErrors.status && <p className="text-xs text-red-600 mt-1">{fieldErrors.status}</p>}
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-medium text-slate-700">Additional Notes</label>
-                  <textarea name="notes" value={formData.notes || ''} onChange={handleInputChange} className="input-field w-full min-h-[80px]" placeholder="Optional notes or tags..."></textarea>
+                  <textarea name="notes" value={formData.notes || ''} onChange={handleInputChange}
+                    className="input-field w-full min-h-[80px]" placeholder="Optional notes or tags..."></textarea>
                 </div>
               </div>
 
               <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-slate-100">
-                <button type="button" onClick={handleCloseModal} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg rounded-xl transition-colors">
+                <button type="button" onClick={handleCloseModal}
+                  className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors">
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary">
