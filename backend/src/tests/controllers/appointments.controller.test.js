@@ -31,7 +31,7 @@ jest.mock('../../config', () => ({
 }))
 
 const { sendAppointmentConfirmationEmail } = require('../../utils/emailService')
-const { getAll, getById, create, updateStatus, cancelAppointment, reschedule, markNoShow } = require('../../controllers/appointments.controller')
+const { getAll, getById, create, updateStatus, cancelAppointment, reschedule, markNoShow, massReschedule } = require('../../controllers/appointments.controller')
 
 function makeReq(overrides = {}) {
   return {
@@ -1667,6 +1667,438 @@ describe('markNoShow', () => {
     const next = jest.fn()
 
     await markNoShow(req, res, next)
+
+    expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK')
+    expect(mockClientRelease).toHaveBeenCalled()
+    expect(next).toHaveBeenCalledWith(expect.any(Error))
+  })
+})
+
+describe('massReschedule', () => {
+  const DOCTOR_ID = 'd0c12345-6789-1234-5678-901234567890'
+  const START_DATE = '2026-06-15T00:00:00Z'
+  const END_DATE = '2026-06-16T00:00:00Z'
+  const OFFSET_DAYS = 1
+
+  const DOCTOR_ROW = {
+    id: DOCTOR_ID,
+    user_id: 'usr-doc',
+    department: 'Cardiology',
+  }
+
+  const APPT1 = {
+    id: 'appt-1',
+    patient_id: 'pat-1',
+    doctor_id: DOCTOR_ID,
+    status: 'scheduled',
+    scheduled_at: '2026-06-15T02:30:00Z', // Monday 08:00 Asia/Colombo
+    patient_user_id: 'usr-pat-1',
+    patient_first_name: 'John',
+    patient_last_name: 'Doe',
+    doctor_user_id: 'usr-doc',
+    doctor_first_name: 'Kamal',
+    doctor_last_name: 'Perera',
+  }
+
+  const APPT2 = {
+    id: 'appt-2',
+    patient_id: 'pat-2',
+    doctor_id: DOCTOR_ID,
+    status: 'scheduled',
+    scheduled_at: '2026-06-15T02:50:00Z', // Monday 08:20 Asia/Colombo (on slot boundary)
+    patient_user_id: 'usr-pat-2',
+    patient_first_name: 'Jane',
+    patient_last_name: 'Smith',
+    doctor_user_id: 'usr-doc',
+    doctor_first_name: 'Kamal',
+    doctor_last_name: 'Perera',
+  }
+
+  const SCHEDULE_ROW = { start_time: '08:00:00', end_time: '17:00:00', is_active: true }
+
+  beforeEach(() => {
+    mockClientQuery.mockReset()
+    mockClientRelease.mockReset()
+    mockQuery.mockReset()
+  })
+
+  test('successfully reschedules multiple appointments with offset', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }, { day_of_week: 2, ...SCHEDULE_ROW }] }) // SELECT all schedules (batch) - day 1 = Monday, day 2 = Tuesday
+      .mockResolvedValueOnce({ rows: [APPT1, APPT2] }) // SELECT appointments
+      .mockResolvedValueOnce({ rows: [] }) // batch conflict check
+      .mockResolvedValueOnce(undefined) // bulk UPDATE with UNNEST
+      .mockResolvedValueOnce(undefined) // COMMIT
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(mockClientQuery).toHaveBeenCalledWith('COMMIT')
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      data: {
+        rescheduledCount: 2,
+        appointments: expect.arrayContaining([
+          expect.objectContaining({ id: 'appt-1' }),
+          expect.objectContaining({ id: 'appt-2' }),
+        ]),
+      },
+    })
+    expect(mockClientRelease).toHaveBeenCalled()
+  })
+
+  test('returns 400 when doctorId is missing', async () => {
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: 'Valid doctorId is required.',
+    }))
+  })
+
+  test('returns 400 when dateRange is missing', async () => {
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: 'dateRange with start and end is required.',
+    }))
+  })
+
+  test('returns 400 when offsetDays is zero', async () => {
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: 0,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: 'offsetDays must be non-zero.',
+    }))
+  })
+
+  test('returns 403 when patient tries to mass reschedule', async () => {
+    const req = makeReq({
+      user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 403,
+      message: 'Patients cannot perform mass rescheduling.',
+    }))
+  })
+
+  test('returns 404 when doctor not found', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SELECT doctor - not found
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 404,
+      message: 'Doctor not found.',
+    }))
+    expect(mockClientRelease).toHaveBeenCalled()
+  })
+
+  test('returns 403 when doctor tries to reschedule another doctor\'s appointments', async () => {
+    const otherDoctorId = 'a1b2c3d4-5678-90ab-cdef-123456789012'
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ ...DOCTOR_ROW, id: otherDoctorId }] }) // Different doctor
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: otherDoctorId,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 403,
+      message: 'You can only mass reschedule your own appointments.',
+    }))
+  })
+
+  test('allows nurse to mass reschedule for doctor in same department', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockResolvedValueOnce({ rows: [{ department: 'Cardiology' }] }) // SELECT nurse department - same
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }, { day_of_week: 2, ...SCHEDULE_ROW }] }) // SELECT all schedules
+      .mockResolvedValueOnce({ rows: [APPT1] }) // SELECT appointments
+      .mockResolvedValueOnce({ rows: [] }) // batch conflict check
+      .mockResolvedValueOnce(undefined) // bulk UPDATE
+      .mockResolvedValueOnce(undefined) // COMMIT
+
+    const req = makeReq({
+      user: { id: 'usr-nurse', role: 'nurse' },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(mockClientQuery).toHaveBeenCalledWith('COMMIT')
+  })
+
+  test('returns 403 when nurse tries to reschedule for doctor in different department', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor (Cardiology)
+      .mockResolvedValueOnce({ rows: [{ department: 'Neurology' }] }) // SELECT nurse department - different
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-nurse', role: 'nurse' },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 403,
+      message: 'You can only mass reschedule appointments for doctors in your department.',
+    }))
+  })
+
+  test('returns 404 when no appointments found in date range', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }] }) // SELECT all schedules
+      .mockResolvedValueOnce({ rows: [] }) // SELECT appointments - none found
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 404,
+      message: 'No scheduled appointments found in the specified date range.',
+    }))
+  })
+
+  test('returns 409 when multiple appointments would be rescheduled to same time', async () => {
+    // Two appointments with same scheduled time
+    const appt1SameTime = { ...APPT1, scheduled_at: '2026-06-15T02:30:00Z' }
+    const appt2SameTime = { ...APPT2, scheduled_at: '2026-06-15T02:30:00Z' }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }, { day_of_week: 2, ...SCHEDULE_ROW }] }) // SELECT all schedules
+      .mockResolvedValueOnce({ rows: [appt1SameTime, appt2SameTime] }) // SELECT appointments
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 409,
+      message: expect.stringContaining('Multiple appointments would be rescheduled to the same time'),
+    }))
+  })
+
+  test('returns 400 when offsetDays is a float', async () => {
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: 1.5,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: 'offsetDays is required and must be an integer.',
+    }))
+  })
+
+  test('returns 400 when date range is too small', async () => {
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: {
+          start: '2026-06-15T00:00:00Z',
+          end: '2026-06-15T12:00:00Z', // Same day, less than 1 day span
+        },
+        offsetDays: 1,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: expect.stringContaining('must span at least'),
+    }))
+  })
+
+  test('returns 400 when batch size exceeds limit', async () => {
+    // Create 101 appointments (exceeds MAX_BATCH_SIZE of 100)
+    const manyAppointments = Array.from({ length: 101 }, (_, i) => ({
+      ...APPT1,
+      id: `appt-${i}`,
+      scheduled_at: '2026-06-15T02:30:00Z',
+    }))
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }] }) // SELECT all schedules
+      .mockResolvedValueOnce({ rows: manyAppointments }) // SELECT appointments
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: expect.stringContaining('Cannot reschedule more than 100 appointments'),
+    }))
+  })
+
+  test('rolls back transaction on error', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockRejectedValueOnce(new Error('Database error')) // SELECT schedules fails
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
 
     expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK')
     expect(mockClientRelease).toHaveBeenCalled()
