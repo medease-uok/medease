@@ -77,16 +77,17 @@ const getStats = async (req, res, next) => {
       case 'lab_technician': {
         const result = await db.query(`
           SELECT
-            (SELECT COUNT(*) FROM lab_reports) AS total_reports,
-            (SELECT COUNT(DISTINCT patient_id) FROM lab_reports) AS patients_tested,
-            (SELECT COUNT(*) FROM lab_reports WHERE report_date >= date_trunc('month', NOW())) AS tests_this_month
+            (SELECT COUNT(*) FROM lab_test_requests WHERE status IN ('pending', 'in_progress')) AS pending_requests,
+            (SELECT COUNT(*) FROM lab_reports WHERE DATE(report_date) = CURRENT_DATE) AS reports_today,
+            (SELECT COUNT(*) FROM lab_reports WHERE report_date >= date_trunc('month', NOW())) AS tests_this_month,
+            (SELECT COUNT(*) FROM lab_reports) AS total_reports
         `);
         const r = result.rows[0];
         stats = [
-          { label: 'Total Reports', value: parseInt(r.total_reports), color: '#3182ce' },
-          { label: 'Patients Tested', value: parseInt(r.patients_tested), color: '#38a169' },
+          { label: 'Pending Requests', value: parseInt(r.pending_requests), color: '#e53e3e' },
+          { label: 'Reports Today', value: parseInt(r.reports_today), color: '#38a169' },
           { label: 'Tests This Month', value: parseInt(r.tests_this_month), color: '#d69e2e' },
-          { label: 'Pending Reviews', value: 0, color: '#e53e3e' },
+          { label: 'Total Reports', value: parseInt(r.total_reports), color: '#3182ce' },
         ];
         break;
       }
@@ -383,6 +384,37 @@ const getActivity = async (req, res, next) => {
             details: null,
           });
         }
+      }
+    }
+
+    // Lab test requests for lab technicians
+    if (role === 'lab_technician') {
+      const rows = (await db.query(`
+        SELECT ltr.id, ltr.created_at AS ts, ltr.test_name, ltr.status, ltr.priority,
+               pu.first_name || ' ' || pu.last_name AS patient_name,
+               'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name
+        FROM lab_test_requests ltr
+        JOIN patients p ON ltr.patient_id = p.id
+        JOIN users pu ON p.user_id = pu.id
+        JOIN doctors d ON ltr.doctor_id = d.id
+        JOIN users du ON d.user_id = du.id
+        ORDER BY ltr.created_at DESC
+        LIMIT 15
+      `)).rows;
+
+      for (const r of rows) {
+        const statusLabel = r.status === 'pending' ? 'New request' :
+                           r.status === 'in_progress' ? 'In progress' :
+                           r.status === 'completed' ? 'Completed' : r.status;
+        const priorityFlag = r.priority === 'urgent' ? ' 🔴 URGENT' : '';
+        activities.push({
+          id: `ltr-${r.id}`,
+          type: r.status === 'pending' ? 'lab-request-new' : 'lab-request',
+          user: r.doctor_name,
+          description: `${statusLabel}: ${r.test_name} for ${r.patient_name}${priorityFlag}`,
+          timestamp: r.ts,
+          details: null,
+        });
       }
     }
 

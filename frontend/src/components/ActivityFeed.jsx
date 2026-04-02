@@ -95,6 +95,18 @@ const activityConfig = {
     bgColor: 'bg-red-100',
     label: 'Deleted'
   },
+  'lab-request': {
+    icon: FlaskConical,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100',
+    label: 'Lab Request'
+  },
+  'lab-request-new': {
+    icon: FlaskConical,
+    color: 'text-red-600',
+    bgColor: 'bg-red-100',
+    label: 'New Request'
+  },
 }
 
 function getRelativeTime(timestamp) {
