@@ -231,6 +231,7 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
       {showCancel && (
         <CancelAppointmentModal
           appointmentId={appointmentId}
+          appointment={appointment}
           onClose={() => setShowCancel(false)}
           onCancelled={() => {
             setShowCancel(false)

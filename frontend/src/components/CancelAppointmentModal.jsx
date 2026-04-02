@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X, Calendar, Clock, AlertCircle, XCircle,
@@ -7,26 +7,49 @@ import {
 import api from '../services/api'
 import { useAuth } from '../data/AuthContext'
 
-export default function CancelAppointmentModal({ appointmentId, onClose, onCancelled }) {
-  const [appointment, setAppointment] = useState(null)
-  const [loading, setLoading] = useState(true)
+const CANCELLATION_POLICY = {
+  patient: { minHoursBeforeCancel: 24 },
+  doctor: { minHoursBeforeCancel: 2 },
+}
+
+export default function CancelAppointmentModal({ appointmentId, appointment: appointmentProp, onClose, onCancelled }) {
+  const [appointment, setAppointment] = useState(appointmentProp || null)
+  const [loading, setLoading] = useState(!appointmentProp)
   const [error, setError] = useState(null)
   const [cancelling, setCancelling] = useState(false)
   const { currentUser } = useAuth()
 
-  const isPatient = currentUser?.role === 'patient'
-  const isDoctor = currentUser?.role === 'doctor'
-  const canBypassPolicy = currentUser?.role === 'nurse' || currentUser?.role === 'admin'
+  const userRole = currentUser?.role
+  const canBypassPolicy = userRole === 'nurse' || userRole === 'admin'
 
   useEffect(() => {
+    if (appointmentProp) {
+      setAppointment(appointmentProp)
+      setLoading(false)
+      return
+    }
+
     if (!appointmentId) return
+
+    const controller = new AbortController()
     setLoading(true)
     setError(null)
-    api.get(`/appointments/${appointmentId}`)
+
+    api.get(`/appointments/${appointmentId}`, { signal: controller.signal })
       .then((res) => setAppointment(res.data))
-      .catch(() => setError('Failed to load appointment details.'))
-      .finally(() => setLoading(false))
-  }, [appointmentId])
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setError('Failed to load appointment details.')
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
+      })
+
+    return () => controller.abort()
+  }, [appointmentId, appointmentProp])
 
   const calculateHoursUntil = (scheduledAt) => {
     const now = new Date()
@@ -43,15 +66,23 @@ export default function CancelAppointmentModal({ appointmentId, onClose, onCance
     return `${days} day${days !== 1 ? 's' : ''}`
   }
 
-  const getPolicyWarning = () => {
-    if (!appointment) return null
-    if (canBypassPolicy) return null
+  const policyWarning = useMemo(() => {
+    if (!appointment || canBypassPolicy) return null
 
     const hoursUntil = calculateHoursUntil(appointment.scheduledAt)
+
+    if (hoursUntil < 0) {
+      return {
+        type: 'info',
+        message: 'This appointment has already passed.',
+        canCancel: true,
+      }
+    }
+
     const timeUntilText = formatTimeUntil(hoursUntil)
 
-    if (isPatient) {
-      const minHours = 24
+    if (userRole === 'patient') {
+      const minHours = CANCELLATION_POLICY.patient.minHoursBeforeCancel
       if (hoursUntil < minHours) {
         return {
           type: 'error',
@@ -66,8 +97,8 @@ export default function CancelAppointmentModal({ appointmentId, onClose, onCance
       }
     }
 
-    if (isDoctor) {
-      const minHours = 2
+    if (userRole === 'doctor') {
+      const minHours = CANCELLATION_POLICY.doctor.minHoursBeforeCancel
       if (hoursUntil < minHours) {
         return {
           type: 'error',
@@ -83,7 +114,7 @@ export default function CancelAppointmentModal({ appointmentId, onClose, onCance
     }
 
     return { type: 'info', message: null, canCancel: true }
-  }
+  }, [appointment, userRole, canBypassPolicy])
 
   const handleCancel = async () => {
     if (cancelling) return
@@ -93,7 +124,11 @@ export default function CancelAppointmentModal({ appointmentId, onClose, onCance
 
     try {
       await api.delete(`/appointments/${appointmentId}`)
-      onCancelled()
+      try {
+        onCancelled()
+      } catch (callbackErr) {
+        console.error('Error in onCancelled callback:', callbackErr)
+      }
     } catch (err) {
       const errorMessage = err?.response?.data?.message || err?.data?.message || err.message || 'Failed to cancel appointment.'
       setError(errorMessage)
@@ -110,17 +145,18 @@ export default function CancelAppointmentModal({ appointmentId, onClose, onCance
     hour: 'numeric', minute: '2-digit',
   })
 
-  const policyWarning = appointment ? getPolicyWarning() : null
-
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancel-modal-title"
         className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">Cancel Appointment</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+          <h2 id="cancel-modal-title" className="text-lg font-semibold text-slate-900">Cancel Appointment</h2>
+          <button onClick={onClose} aria-label="Close modal" className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>
