@@ -13,13 +13,8 @@ import { Badge } from '../components/ui/badge';
 import StatusBadge from '../components/StatusBadge';
 import DataTable from '../components/DataTable';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
-
-function formatSlotTime(time) {
-  const [h, m] = time.split(':').map(Number);
-  const period = h >= 12 ? 'PM' : 'AM';
-  const hour = h % 12 || 12;
-  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
-}
+import TimeSlotPicker from '../components/TimeSlotPicker';
+import { formatSlotTime } from '../utils/timeUtils';
 
 const RECURRENCE_OPTIONS = [
   { value: '', label: 'One-time' },
@@ -78,7 +73,11 @@ function BookingModal({ doctor, onClose, onBooked, onWaitlistJoined }) {
     setError(null);
 
     try {
-      const scheduledAt = `${date}T${selectedSlot}:00Z`;
+      // Construct ISO string with explicit Sri Lanka timezone offset
+      // selectedSlot is in 24h format (e.g., "08:00") representing Sri Lanka time
+      // Sri Lanka is UTC+05:30, so we append that offset and let JavaScript convert to UTC
+      const scheduledAt = new Date(`${date}T${selectedSlot}:00+05:30`).toISOString();
+
       if (recurrencePattern) {
         await api.post('/appointments/recurring', {
           doctorId: doctor.id,
@@ -176,48 +175,43 @@ function BookingModal({ doctor, onClose, onBooked, onWaitlistJoined }) {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Available Slots
               </label>
-              {loadingSlots ? (
-                <div className="flex items-center justify-center py-6">
-                  <div className="w-6 h-6 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : slots.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-4">
-                  Doctor is not available on this day.
-                </p>
-              ) : allBooked ? (
-                showWaitlist ? (
-                  <form onSubmit={handleJoinWaitlist} className="space-y-3">
-                    <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                      <ClipboardList className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                      <p className="text-sm text-amber-700">Join the waitlist — we'll notify you when a slot opens up.</p>
+              {allBooked && showWaitlist ? (
+                <form onSubmit={handleJoinWaitlist} className="space-y-3">
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <ClipboardList className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <p className="text-sm text-amber-700">Join the waitlist — we'll notify you when a slot opens up.</p>
+                  </div>
+                  {joinError && (
+                    <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      <p className="text-xs text-red-700">{joinError}</p>
                     </div>
-                    {joinError && (
-                      <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                        <p className="text-xs text-red-700">{joinError}</p>
-                      </div>
-                    )}
-                    <textarea
-                      rows={2}
-                      maxLength={500}
-                      placeholder="Notes (optional)"
-                      value={waitlistNotes}
-                      onChange={(e) => setWaitlistNotes(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
-                    />
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => setShowWaitlist(false)} className="flex-1 px-3 py-1.5 text-sm text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
-                        Back
-                      </button>
-                      <button type="submit" disabled={joinSubmitting} className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors">
-                        {joinSubmitting ? 'Joining...' : 'Join Waitlist'}
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center space-y-3">
-                    <p className="text-sm text-amber-700 font-medium">All slots are booked for this day.</p>
-                    <p className="text-xs text-slate-500">Join the waitlist to be notified when a slot opens up.</p>
+                  )}
+                  <textarea
+                    rows={2}
+                    maxLength={500}
+                    placeholder="Notes (optional)"
+                    value={waitlistNotes}
+                    onChange={(e) => setWaitlistNotes(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setShowWaitlist(false)} className="flex-1 px-3 py-1.5 text-sm text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
+                      Back
+                    </button>
+                    <button type="submit" disabled={joinSubmitting} className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors">
+                      {joinSubmitting ? 'Joining...' : 'Join Waitlist'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <TimeSlotPicker
+                  slots={slots}
+                  selectedSlot={selectedSlot}
+                  onSelectSlot={setSelectedSlot}
+                  loading={loadingSlots}
+                  allBookedSubMessage="Join the waitlist to be notified when a slot opens up."
+                  allBookedAction={
                     <button
                       type="button"
                       onClick={() => setShowWaitlist(true)}
@@ -226,33 +220,8 @@ function BookingModal({ doctor, onClose, onBooked, onWaitlistJoined }) {
                       <ClipboardList className="w-4 h-4" />
                       Join Waitlist
                     </button>
-                  </div>
-                )
-              ) : (
-                <div className="grid grid-cols-4 gap-2">
-                  {slots.map((slot) => (
-                    <button
-                      key={slot.time}
-                      type="button"
-                      disabled={!slot.available}
-                      onClick={() => setSelectedSlot(slot.time)}
-                      className={`px-2 py-2 text-xs font-medium rounded-lg border transition-colors ${
-                        selectedSlot === slot.time
-                          ? 'bg-primary text-white border-primary'
-                          : slot.available
-                            ? 'bg-white text-slate-700 border-slate-200 hover:border-primary hover:text-primary'
-                            : 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed line-through'
-                      }`}
-                    >
-                      {formatSlotTime(slot.time)}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {availableSlots.length > 0 && (
-                <p className="text-xs text-slate-400 mt-2">
-                  {availableSlots.length} of {slots.length} slots available
-                </p>
+                  }
+                />
               )}
             </div>
           )}

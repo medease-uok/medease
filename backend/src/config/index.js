@@ -42,4 +42,22 @@ module.exports = {
       cronSchedule: process.env.REMINDER_CRON_SCHEDULE || '*/5 * * * *',
     };
   })(),
+  cancellationPolicy: (() => {
+    const patientHours = parseInt(process.env.CANCELLATION_MIN_HOURS_PATIENT || '24', 10);
+    const doctorHours = parseInt(process.env.CANCELLATION_MIN_HOURS_DOCTOR || '2', 10);
+
+    if (isNaN(patientHours) || patientHours < 0) {
+      throw new Error(`[Config] Invalid CANCELLATION_MIN_HOURS_PATIENT: "${process.env.CANCELLATION_MIN_HOURS_PATIENT}". Must be a non-negative number.`);
+    }
+    if (isNaN(doctorHours) || doctorHours < 0) {
+      throw new Error(`[Config] Invalid CANCELLATION_MIN_HOURS_DOCTOR: "${process.env.CANCELLATION_MIN_HOURS_DOCTOR}". Must be a non-negative number.`);
+    }
+
+    return {
+      patientMinHoursBefore: patientHours,
+      doctorMinHoursBefore: doctorHours,
+      adminBypassPolicy: process.env.CANCELLATION_ADMIN_BYPASS !== 'false',
+      nurseBypassPolicy: process.env.CANCELLATION_NURSE_BYPASS !== 'false',
+    };
+  })(),
 };

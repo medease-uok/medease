@@ -1,18 +1,21 @@
 import { useState, useEffect } from 'react'
 import {
   X, Calendar, Clock, Stethoscope, User, FileText,
-  Building2, BadgeCheck, AlertCircle, Repeat,
+  Building2, BadgeCheck, AlertCircle, Repeat, CalendarClock,
 } from 'lucide-react'
 import api from '../services/api'
 import { useAuth } from '../data/AuthContext'
 import StatusBadge from './StatusBadge'
+import RescheduleAppointmentModal from './RescheduleAppointmentModal'
+import CancelAppointmentModal from './CancelAppointmentModal'
 
 export default function AppointmentDetailModal({ appointmentId, onClose, onStatusChange }) {
   const [appointment, setAppointment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [cancelling, setCancelling] = useState(false)
   const [cancellingAll, setCancellingAll] = useState(false)
+  const [showReschedule, setShowReschedule] = useState(false)
+  const [showCancel, setShowCancel] = useState(false)
   const { currentUser } = useAuth()
   const isPatient = currentUser?.role === 'patient'
 
@@ -25,20 +28,6 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
       .catch(() => setError('Failed to load appointment details.'))
       .finally(() => setLoading(false))
   }, [appointmentId])
-
-  const handleCancel = async () => {
-    if (!confirm('Are you sure you want to cancel this appointment?')) return
-    setCancelling(true)
-    try {
-      await api.patch(`/appointments/${appointmentId}/status`, { status: 'cancelled' })
-      if (onStatusChange) onStatusChange()
-      onClose()
-    } catch (err) {
-      setError(err.data?.message || err.message || 'Failed to cancel appointment.')
-    } finally {
-      setCancelling(false)
-    }
-  }
 
   const handleCancelSeries = async () => {
     if (!confirm('Are you sure you want to cancel all upcoming appointments in this series?')) return
@@ -191,20 +180,28 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
                 </div>
               )}
 
-              {/* Cancel buttons */}
+              {/* Action buttons */}
               {canCancel && (
                 <div className="pt-3 border-t border-slate-100 space-y-2">
                   <button
-                    onClick={handleCancel}
-                    disabled={cancelling || cancellingAll}
+                    onClick={() => setShowReschedule(true)}
+                    disabled={cancellingAll}
+                    className="w-full px-4 py-2 text-sm font-medium text-primary bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CalendarClock className="w-4 h-4" />
+                    Reschedule Appointment
+                  </button>
+                  <button
+                    onClick={() => setShowCancel(true)}
+                    disabled={cancellingAll}
                     className="w-full px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
                   >
-                    {cancelling ? 'Cancelling...' : 'Cancel Appointment'}
+                    Cancel Appointment
                   </button>
                   {isRecurring && (
                     <button
                       onClick={handleCancelSeries}
-                      disabled={cancelling || cancellingAll}
+                      disabled={cancellingAll}
                       className="w-full px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors"
                     >
                       {cancellingAll ? 'Cancelling Series...' : 'Cancel All Upcoming in Series'}
@@ -216,6 +213,33 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
           )}
         </div>
       </div>
+
+      {/* Reschedule modal */}
+      {showReschedule && (
+        <RescheduleAppointmentModal
+          appointmentId={appointmentId}
+          onClose={() => setShowReschedule(false)}
+          onRescheduled={() => {
+            setShowReschedule(false)
+            if (onStatusChange) onStatusChange()
+            onClose()
+          }}
+        />
+      )}
+
+      {/* Cancel modal */}
+      {showCancel && (
+        <CancelAppointmentModal
+          appointmentId={appointmentId}
+          appointment={appointment}
+          onClose={() => setShowCancel(false)}
+          onCancelled={() => {
+            setShowCancel(false)
+            if (onStatusChange) onStatusChange()
+            onClose()
+          }}
+        />
+      )}
     </div>
   )
 }
