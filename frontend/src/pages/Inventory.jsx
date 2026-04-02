@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
 import { inventoryService } from '../services/inventory.service';
-import { getExpiryStatus } from '../utils/inventoryUtils';
+import { getExpiryStatus, calculateReorderSuggestion } from '../utils/inventoryUtils';
 import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download } from 'lucide-react';
 
 export default function Inventory() {
@@ -246,6 +246,7 @@ export default function Inventory() {
                 {filteredItems.map(item => {
                   const isLowStock = item.quantity <= item.reorder_level;
                   const { status: expiryStatus, daysRemaining: expiryDays } = getExpiryStatus(item.expiry_date);
+                  const suggestion = calculateReorderSuggestion(item.quantity, item.reorder_level);
 
                   return (
                     <tr key={item.id} className={`hover:bg-slate-50/50 transition-colors group ${
@@ -263,13 +264,25 @@ export default function Inventory() {
                         </span>
                       </td>
                       <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-semibold ${isLowStock ? 'text-red-600' : 'text-slate-900'}`}>
-                            {item.quantity}
-                          </span>
-                          <span className="text-slate-500 text-sm">{item.unit}</span>
+                        <div className="flex flex-col items-start justify-center">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-semibold ${isLowStock ? 'text-red-600' : 'text-slate-900'}`}>
+                              {item.quantity}
+                            </span>
+                            <span className="text-slate-500 text-sm">{item.unit}</span>
+                            {isLowStock && (
+                              <AlertCircle 
+                                className="w-4 h-4 text-red-500" 
+                                title={`Low stock! Reorder level is ${item.reorder_level}. Suggestion: Order ${suggestion} ${item.unit}.`} 
+                              />
+                            )}
+                          </div>
                           {isLowStock && (
-                            <AlertCircle className="w-4 h-4 text-red-500" title={`Low stock! Reorder level is ${item.reorder_level}`} />
+                            <div className="mt-1">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 uppercase tracking-wider">
+                                Order: {suggestion}
+                              </span>
+                            </div>
                           )}
                         </div>
                       </td>
