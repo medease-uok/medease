@@ -31,7 +31,7 @@ export default function SupplierManagement() {
       if (selectedStatus !== 'all') params.status = selectedStatus;
       
       const response = await supplierService.getAll(params);
-      setSuppliers(response.data || []);
+      setSuppliers(response || []);
       setError(null);
     } catch (err) {
       console.error('Error fetching suppliers:', err);
@@ -259,36 +259,36 @@ export default function SupplierManagement() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Contact Person</label>
-                  <input name="contact_person" value={formData.contact_person} onChange={handleInputChange} className="input-field w-full" placeholder="Jane Doe" />
+                  <label className="text-sm font-medium text-slate-700">Contact Person *</label>
+                  <input required name="contact_person" value={formData.contact_person} onChange={handleInputChange} className="input-field w-full" placeholder="Jane Doe" />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Phone</label>
-                  <input name="phone" value={formData.phone} onChange={handleInputChange} className="input-field w-full" placeholder="+1 234 567 890" />
+                  <label className="text-sm font-medium text-slate-700">Phone *</label>
+                  <input required name="phone" value={formData.phone} onChange={handleInputChange} className="input-field w-full" placeholder="+1 234 567 890" />
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700">Email</label>
-                  <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="input-field w-full" placeholder="contact@supplier.com" />
+                  <label className="text-sm font-medium text-slate-700">Email *</label>
+                  <input required type="email" name="email" value={formData.email} onChange={handleInputChange} className="input-field w-full" placeholder="contact@supplier.com" />
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700">Physical Address</label>
-                  <input name="address" value={formData.address} onChange={handleInputChange} className="input-field w-full" placeholder="123 Industrial Way..." />
+                  <label className="text-sm font-medium text-slate-700">Physical Address *</label>
+                  <input required name="address" value={formData.address} onChange={handleInputChange} className="input-field w-full" placeholder="123 Industrial Way..." />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Status</label>
-                  <select name="status" value={formData.status} onChange={handleInputChange} className="input-field w-full">
+                  <label className="text-sm font-medium text-slate-700">Status *</label>
+                  <select required name="status" value={formData.status} onChange={handleInputChange} className="input-field w-full">
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700">Additional Notes</label>
-                  <textarea name="notes" value={formData.notes} onChange={handleInputChange} className="input-field w-full min-h-[80px]" placeholder="Payment terms, special notices..."></textarea>
+                  <label className="text-sm font-medium text-slate-700">Additional Notes *</label>
+                  <textarea required name="notes" value={formData.notes} onChange={handleInputChange} className="input-field w-full min-h-[80px]" placeholder="Required notes or tags..."></textarea>
                 </div>
               </div>
 

@@ -84,8 +84,8 @@ exports.addSupplier = async (req, res, next) => {
   try {
     const { name, contact_person, email, phone, address, status, notes } = req.body;
     
-    if (!name || name.trim().length === 0) {
-      return res.status(400).json({ status: 'error', message: 'Supplier name is required.' });
+    if (!name || !contact_person || !email || !phone || !address || !notes) {
+      return res.status(400).json({ status: 'error', message: 'All supplier details are strictly required.' });
     }
     
     const query = `
@@ -96,12 +96,12 @@ exports.addSupplier = async (req, res, next) => {
     
     const values = [
       name.trim(), 
-      contact_person?.trim(), 
-      email?.trim(), 
-      phone?.trim(), 
-      address?.trim(), 
+      contact_person.trim(), 
+      email.trim(), 
+      phone.trim(), 
+      address.trim(), 
       status || 'active', 
-      notes?.trim()
+      notes.trim()
     ];
     const result = await pool.query(query, values);
 
@@ -120,8 +120,8 @@ exports.updateSupplier = async (req, res, next) => {
 
     const { name, contact_person, email, phone, address, status, notes } = req.body;
     
-    if (!name || name.trim().length === 0) {
-      return res.status(400).json({ status: 'error', message: 'Supplier name is required.' });
+    if (!name || !contact_person || !email || !phone || !address || !notes) {
+      return res.status(400).json({ status: 'error', message: 'All supplier details are strictly required.' });
     }
 
     const query = `
@@ -141,12 +141,12 @@ exports.updateSupplier = async (req, res, next) => {
     
     const values = [
        name.trim(), 
-       contact_person?.trim(), 
-       email?.trim(), 
-       phone?.trim(), 
-       address?.trim(), 
+       contact_person.trim(), 
+       email.trim(), 
+       phone.trim(), 
+       address.trim(), 
        status || 'active', 
-       notes?.trim(),
+       notes.trim(),
        id
     ];
     const result = await pool.query(query, values);
