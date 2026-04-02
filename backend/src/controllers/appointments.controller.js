@@ -8,7 +8,15 @@ const auditLog = require('../utils/auditLog');
 const { SLOT_DURATION_MINUTES, CLINIC_TIMEZONE, clinicLocalTime } = require('../utils/scheduleHelpers');
 const { sendAppointmentConfirmationEmail } = require('../utils/emailService');
 const { notifyWaitlistOnCancellation } = require('./waitlist.controller');
-const { APPOINTMENT_STATUS, UPDATEABLE_STATUSES, INACTIVE_STATUSES } = require('../constants/appointmentStatus');
+const { APPOINTMENT_STATUS, UPDATEABLE_STATUSES } = require('../constants/appointmentStatus');
+
+// No-show flagging threshold
+const NO_SHOW_FLAG_THRESHOLD = 3;
+
+// Mass reschedule constants
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MAX_BATCH_SIZE = 100;
+const MIN_DATE_RANGE_DAYS = 1;
 
 const mapAppointment = (row) => ({
   id: row.id,
@@ -1089,4 +1097,561 @@ const reschedule = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus, cancelAppointment, reschedule };
+/**
+ * POST /appointments/:id/no-show
+ * Mark an appointment as no-show and track patient no-show history
+ * - Only staff (doctor, nurse, admin) can mark appointments as no-show
+ * - Increments patient's no_show_count
+ * - Auto-flags patient when count >= 3
+ * - Sends notifications to patient and relevant staff
+ */
+const markNoShow = async (req, res, next) => {
+  let client;
+
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError('Invalid appointment ID format.', 400);
+    }
+
+    // Only staff can mark no-shows (not patients)
+    if (req.user.role === 'patient') {
+      throw new AppError('Patients cannot mark appointments as no-show.', 403);
+    }
+
+    client = await db.getClient();
+    await client.query('BEGIN');
+
+    // Get appointment details with patient info and doctor department
+    // Lock both appointment and patient rows to prevent race conditions
+    const apptResult = await client.query(
+      `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
+              p.user_id AS patient_user_id, p.no_show_count, p.no_show_flagged, p.no_show_flag_date,
+              pu.first_name AS patient_first_name, pu.last_name AS patient_last_name,
+              d.user_id AS doctor_user_id, d.department AS doctor_department,
+              du.first_name AS doctor_first_name, du.last_name AS doctor_last_name
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN users pu ON p.user_id = pu.id
+       JOIN doctors d ON a.doctor_id = d.id
+       JOIN users du ON d.user_id = du.id
+       WHERE a.id = $1
+       FOR UPDATE OF a, p`,
+      [id]
+    );
+
+    if (apptResult.rows.length === 0) {
+      throw new AppError('Appointment not found.', 404);
+    }
+
+    const appt = apptResult.rows[0];
+
+    // Nurses can only mark no-show for appointments with doctors in their department
+    if (req.user.role === 'nurse') {
+      const nurseDeptResult = await client.query(
+        'SELECT department FROM nurses WHERE user_id = $1',
+        [req.user.id]
+      );
+      if (nurseDeptResult.rows.length === 0) {
+        throw new AppError('Nurse profile not found.', 404);
+      }
+      const nurseDepartment = nurseDeptResult.rows[0].department;
+      if (nurseDepartment !== appt.doctor_department) {
+        throw new AppError('You can only mark no-shows for appointments with doctors in your department.', 403);
+      }
+    }
+
+    // Validate appointment can be marked as no-show
+    if (appt.status === APPOINTMENT_STATUS.NO_SHOW) {
+      throw new AppError('Appointment is already marked as no-show.', 400);
+    }
+
+    if (appt.status === APPOINTMENT_STATUS.CANCELLED) {
+      throw new AppError('Cannot mark a cancelled appointment as no-show.', 400);
+    }
+
+    if (appt.status === APPOINTMENT_STATUS.COMPLETED) {
+      throw new AppError('Cannot mark a completed appointment as no-show.', 400);
+    }
+
+    // Only mark past or current appointments as no-show
+    const now = new Date();
+    const scheduledAt = new Date(appt.scheduled_at);
+    if (scheduledAt > now) {
+      throw new AppError('Cannot mark a future appointment as no-show. Wait until after the scheduled time.', 400);
+    }
+
+    // Update appointment status to no-show
+    await client.query(
+      `UPDATE appointments SET status = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [APPOINTMENT_STATUS.NO_SHOW, id]
+    );
+
+    // Atomic patient update: increment count and auto-flag if threshold reached
+    // Using RETURNING to get actual DB values (prevents race conditions)
+    const patientResult = await client.query(
+      `UPDATE patients
+       SET no_show_count = no_show_count + 1,
+           no_show_flagged = CASE
+             WHEN no_show_count + 1 >= $1 THEN true
+             ELSE no_show_flagged
+           END,
+           no_show_flag_date = CASE
+             WHEN no_show_count + 1 >= $1 AND NOT no_show_flagged THEN NOW()
+             ELSE no_show_flag_date
+           END,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING no_show_count, no_show_flagged, no_show_flag_date`,
+      [NO_SHOW_FLAG_THRESHOLD, appt.patient_id]
+    );
+
+    const { no_show_count: newNoShowCount, no_show_flagged: nowFlagged } = patientResult.rows[0];
+    const justFlagged = nowFlagged && !appt.no_show_flagged;
+
+    // Audit log (inside transaction for compliance)
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, resource_type, resource_id, ip, details, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [
+        req.user.id,
+        'MARK_NO_SHOW',
+        'appointment',
+        id,
+        req.ip,
+        JSON.stringify({
+          previousStatus: appt.status,
+          patientId: appt.patient_id,
+          newNoShowCount,
+          flagged: nowFlagged,
+        }),
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    // Notify patient about no-show
+    const scheduledAtStr = new Date(appt.scheduled_at).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+      timeZone: CLINIC_TIMEZONE,
+    });
+
+    createNotification({
+      recipientId: appt.patient_user_id,
+      type: 'appointment_no_show',
+      title: 'Missed Appointment',
+      message: `You missed your appointment with Dr. ${appt.doctor_first_name} ${appt.doctor_last_name} on ${scheduledAtStr}. Total missed appointments: ${newNoShowCount}.`,
+      referenceId: id,
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send no-show notification to patient', { id, error: err.message });
+    });
+
+    // Notify doctor about no-show
+    createNotification({
+      recipientId: appt.doctor_user_id,
+      type: 'appointment_no_show',
+      title: 'Patient No-Show',
+      message: `${appt.patient_first_name} ${appt.patient_last_name} did not attend their appointment on ${scheduledAtStr}.`,
+      referenceId: id,
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send no-show notification to doctor', { id, error: err.message });
+    });
+
+    // Additional notification if patient was just flagged
+    if (justFlagged) {
+      createNotification({
+        recipientId: appt.patient_user_id,
+        type: 'patient_flagged_no_show',
+        title: 'Account Flagged for Missed Appointments',
+        message: `Your account has been flagged due to ${newNoShowCount} missed appointments. Please contact the clinic to discuss your appointment attendance.`,
+        referenceId: appt.patient_id,
+        referenceType: 'patient',
+      }).catch((err) => {
+        console.error('Failed to send flagged notification to patient', { id, error: err.message });
+      });
+
+      // Notify admin about flagged patient
+      const adminResult = await db.query(
+        `SELECT id FROM users WHERE role = 'admin' LIMIT 1`
+      );
+      if (adminResult.rows.length > 0) {
+        createNotification({
+          recipientId: adminResult.rows[0].id,
+          type: 'patient_flagged_no_show',
+          title: 'Patient Flagged for No-Shows',
+          message: `${appt.patient_first_name} ${appt.patient_last_name} has been flagged for ${newNoShowCount} missed appointments.`,
+          referenceId: appt.patient_id,
+          referenceType: 'patient',
+        }).catch((err) => {
+          console.error('Failed to send flagged notification to admin', { id, error: err.message });
+        });
+      }
+    }
+
+    // Notify waitlist about freed slot
+    notifyWaitlistOnCancellation(appt.doctor_id, appt.scheduled_at).catch((err) => {
+      console.error('Failed to notify waitlist on no-show', { id, error: err.message });
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        id,
+        status: APPOINTMENT_STATUS.NO_SHOW,
+        patient: {
+          noShowCount: newNoShowCount,
+          flagged: nowFlagged,
+        },
+      },
+    });
+  } catch (err) {
+    if (client) {
+      await client.query('ROLLBACK');
+    }
+    return next(err);
+  } finally {
+    if (client) {
+      client.release();
+    }
+  }
+};
+
+/**
+ * POST /appointments/mass-reschedule
+ * Reschedule multiple appointments at once (bulk operation)
+ * - Only staff (doctor, nurse, admin) can perform mass rescheduling
+ * - Doctors can only reschedule their own appointments
+ * - Nurses can reschedule appointments for doctors in their department
+ * - All-or-nothing transaction: if any appointment fails, rollback all changes
+ */
+const massReschedule = async (req, res, next) => {
+  let client;
+  let committed = false;
+
+  try {
+    const { doctorId, dateRange, offsetDays } = req.body;
+
+    // Validation
+    if (!doctorId || !UUID_REGEX.test(doctorId)) {
+      throw new AppError('Valid doctorId is required.', 400);
+    }
+
+    if (!dateRange || !dateRange.start || !dateRange.end) {
+      throw new AppError('dateRange with start and end is required.', 400);
+    }
+
+    if (offsetDays === undefined || typeof offsetDays !== 'number' || !Number.isInteger(offsetDays)) {
+      throw new AppError('offsetDays is required and must be an integer.', 400);
+    }
+
+    if (offsetDays === 0) {
+      throw new AppError('offsetDays must be non-zero.', 400);
+    }
+
+    if (offsetDays < -365 || offsetDays > 365) {
+      throw new AppError('offsetDays must be between -365 and 365.', 400);
+    }
+
+    const startDate = new Date(dateRange.start);
+    const endDate = new Date(dateRange.end);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new AppError('Invalid date format in dateRange.', 400);
+    }
+
+    if (startDate >= endDate) {
+      throw new AppError('dateRange.start must be before dateRange.end.', 400);
+    }
+
+    // Enforce minimum date range
+    const rangeDays = (endDate.getTime() - startDate.getTime()) / MS_PER_DAY;
+    if (rangeDays < MIN_DATE_RANGE_DAYS) {
+      throw new AppError(`dateRange must span at least ${MIN_DATE_RANGE_DAYS} day(s).`, 400);
+    }
+
+    // Role-based authorization
+    if (req.user.role === 'patient') {
+      throw new AppError('Patients cannot perform mass rescheduling.', 403);
+    }
+
+    client = await db.getClient();
+    await client.query('BEGIN');
+
+    // Check if doctor exists and validate user_id
+    const doctorResult = await client.query(
+      'SELECT id, user_id, department FROM doctors WHERE id = $1',
+      [doctorId]
+    );
+
+    if (doctorResult.rows.length === 0) {
+      throw new AppError('Doctor not found.', 404);
+    }
+
+    const doctor = doctorResult.rows[0];
+
+    if (!doctor.user_id) {
+      throw new AppError('Doctor record is invalid (missing user_id).', 500);
+    }
+
+    // Authorization checks
+    if (req.user.role === 'doctor' && req.user.doctorId !== doctorId) {
+      throw new AppError('You can only mass reschedule your own appointments.', 403);
+    }
+
+    if (req.user.role === 'nurse') {
+      const nurseDeptResult = await client.query(
+        'SELECT department FROM nurses WHERE user_id = $1',
+        [req.user.id]
+      );
+      if (nurseDeptResult.rows.length === 0) {
+        throw new AppError('Nurse profile not found.', 404);
+      }
+      const nurseDepartment = nurseDeptResult.rows[0].department;
+      if (nurseDepartment !== doctor.department) {
+        throw new AppError('You can only mass reschedule appointments for doctors in your department.', 403);
+      }
+    }
+
+    // Admins are explicitly allowed (no additional checks needed)
+
+    // Fetch all doctor schedules once (to avoid N+1 queries)
+    const allSchedulesResult = await client.query(
+      `SELECT day_of_week, start_time, end_time, is_active
+       FROM doctor_schedules
+       WHERE doctor_id = $1`,
+      [doctorId]
+    );
+
+    const scheduleMap = Object.fromEntries(
+      allSchedulesResult.rows.map(s => [s.day_of_week, s])
+    );
+
+    // Get all scheduled appointments in the date range (lightweight lock acquisition)
+    const appointmentsResult = await client.query(
+      `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
+              p.user_id AS patient_user_id,
+              pu.first_name AS patient_first_name, pu.last_name AS patient_last_name,
+              d.user_id AS doctor_user_id,
+              du.first_name AS doctor_first_name, du.last_name AS doctor_last_name
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN users pu ON p.user_id = pu.id
+       JOIN doctors d ON a.doctor_id = d.id
+       JOIN users du ON d.user_id = du.id
+       WHERE a.doctor_id = $1
+         AND a.scheduled_at >= $2
+         AND a.scheduled_at < $3
+         AND a.status = $4
+       ORDER BY a.scheduled_at
+       FOR UPDATE OF a`,
+      [doctorId, startDate.toISOString(), endDate.toISOString(), APPOINTMENT_STATUS.SCHEDULED]
+    );
+
+    const appointments = appointmentsResult.rows;
+
+    if (appointments.length === 0) {
+      throw new AppError('No scheduled appointments found in the specified date range.', 404);
+    }
+
+    // Enforce batch size limit
+    if (appointments.length > MAX_BATCH_SIZE) {
+      throw new AppError(`Cannot reschedule more than ${MAX_BATCH_SIZE} appointments at once. Found ${appointments.length} appointments.`, 400);
+    }
+
+    // Calculate new scheduled times and validate each one
+    const offsetMs = offsetDays * MS_PER_DAY;
+    const rescheduledAppointments = [];
+    const newScheduledTimes = new Set();
+    const newTimesArray = [];
+
+    const now = new Date();
+    const oneYearFromNow = new Date(now.getTime() + 365 * MS_PER_DAY);
+
+    for (const appt of appointments) {
+      const currentTime = new Date(appt.scheduled_at);
+      const newTime = new Date(currentTime.getTime() + offsetMs);
+
+      // Validate new time is in the future
+      if (newTime <= now) {
+        throw new AppError('Cannot reschedule appointments to a past time. Please adjust the offset or date range.', 400);
+      }
+
+      // Validate new time is not more than 1 year in the future
+      if (newTime > oneYearFromNow) {
+        throw new AppError('Cannot reschedule appointments to more than 1 year in the future.', 400);
+      }
+
+      // Check if new time is within doctor's schedule (O(1) lookup)
+      const { dayOfWeek, totalMinutes: newTotalMinutes} = clinicLocalTime(newTime);
+      const schedule = scheduleMap[dayOfWeek];
+
+      const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayName = DAY_NAMES[dayOfWeek];
+
+      if (!schedule || !schedule.is_active) {
+        const availableDays = Object.keys(scheduleMap).map(d => DAY_NAMES[d]).join(', ');
+        throw new AppError(
+          `Doctor is not available on ${dayName}. Available days: ${availableDays}. Please choose a different offset.`,
+          400
+        );
+      }
+
+      const [schStartH, schStartM] = schedule.start_time.slice(0, 5).split(':').map(Number);
+      const [schEndH, schEndM] = schedule.end_time.slice(0, 5).split(':').map(Number);
+      const schedStartMinutes = schStartH * 60 + schStartM;
+      const schedEndMinutes = schEndH * 60 + schEndM;
+
+      if (newTotalMinutes < schedStartMinutes || newTotalMinutes + SLOT_DURATION_MINUTES > schedEndMinutes) {
+        const formatTime = (mins) => {
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        };
+        throw new AppError(
+          `One or more appointments would fall outside doctor's schedule hours (${formatTime(schedStartMinutes)}-${formatTime(schedEndMinutes)} on ${dayName}). Please choose a different offset or date range.`,
+          400
+        );
+      }
+
+      if ((newTotalMinutes - schedStartMinutes) % SLOT_DURATION_MINUTES !== 0) {
+        throw new AppError(`One or more appointments would not align to ${SLOT_DURATION_MINUTES}-minute slot boundaries.`, 400);
+      }
+
+      // Track new times to detect internal conflicts (within the batch being rescheduled)
+      const newTimeStr = newTime.toISOString();
+      if (newScheduledTimes.has(newTimeStr)) {
+        throw new AppError('Multiple appointments would be rescheduled to the same time slot.', 409);
+      }
+      newScheduledTimes.add(newTimeStr);
+      newTimesArray.push(newTimeStr);
+
+      rescheduledAppointments.push({
+        ...appt,
+        newScheduledAt: newTime,
+        previousScheduledAt: appt.scheduled_at,
+      });
+    }
+
+    // Single batch query for external conflict detection
+    const conflictResult = await client.query(
+      `SELECT scheduled_at FROM appointments
+       WHERE doctor_id = $1
+         AND scheduled_at = ANY($2::timestamptz[])
+         AND status NOT IN ('cancelled', 'no_show')
+         AND id != ANY($3::uuid[])`,
+      [doctorId, newTimesArray, appointments.map(a => a.id)]
+    );
+
+    if (conflictResult.rows.length > 0) {
+      const conflictTimes = conflictResult.rows.map(r => r.scheduled_at).join(', ');
+      throw new AppError(`One or more time slots are already booked: ${conflictTimes}`, 409);
+    }
+
+    // All validations passed - perform bulk update
+    const appointmentIds = rescheduledAppointments.map(a => a.id);
+    const newTimes = rescheduledAppointments.map(a => a.newScheduledAt.toISOString());
+
+    await client.query(
+      `UPDATE appointments
+       SET scheduled_at = new_times.new_time, updated_at = NOW()
+       FROM (SELECT UNNEST($1::uuid[]) AS id, UNNEST($2::timestamptz[]) AS new_time) AS new_times
+       WHERE appointments.id = new_times.id`,
+      [appointmentIds, newTimes]
+    );
+
+    await client.query('COMMIT');
+    committed = true;
+
+    // Send notifications to all affected patients
+    const notificationPromises = rescheduledAppointments.map((appt) => {
+      const newDateTimeStr = new Date(appt.newScheduledAt).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+        timeZone: CLINIC_TIMEZONE,
+      });
+
+      return createNotification({
+        recipientId: appt.patient_user_id,
+        type: 'appointment_rescheduled',
+        title: 'Appointment Rescheduled',
+        message: `Your appointment with Dr. ${appt.doctor_first_name} ${appt.doctor_last_name} has been rescheduled to ${newDateTimeStr}.`,
+        referenceId: appt.id,
+        referenceType: 'appointment',
+      }).catch((err) => {
+        console.error('Failed to send reschedule notification to patient', { error: err.message });
+      });
+    });
+
+    // Send summary notification to doctor
+    const doctorNotification = createNotification({
+      recipientId: doctor.user_id,
+      type: 'appointment_rescheduled',
+      title: 'Appointments Rescheduled',
+      message: `${rescheduledAppointments.length} appointment(s) have been rescheduled by ${offsetDays} day(s).`,
+      referenceId: doctorId,
+      referenceType: 'doctor',
+    }).catch((err) => {
+      console.error('Failed to send mass reschedule notification to doctor', { error: err.message });
+    });
+
+    await Promise.allSettled([...notificationPromises, doctorNotification]);
+
+    // Audit log for each rescheduled appointment
+    const auditPromises = rescheduledAppointments.map((appt) => {
+      return auditLog({
+        userId: req.user.id,
+        action: 'MASS_RESCHEDULE_APPOINTMENT',
+        resourceType: 'appointment',
+        resourceId: appt.id,
+        ip: req.ip,
+        details: {
+          previousScheduledAt: appt.previousScheduledAt,
+          newScheduledAt: appt.newScheduledAt,
+          offsetDays,
+          batchSize: rescheduledAppointments.length,
+        },
+      }).catch((err) => {
+        console.error('AUDIT LOG FAILURE — massReschedule', { userId: req.user.id, error: err.message });
+      });
+    });
+
+    await Promise.allSettled(auditPromises);
+
+    // Notify waitlist for freed slots (old times are now available)
+    const waitlistPromises = rescheduledAppointments.map((appt) => {
+      return notifyWaitlistOnCancellation(doctorId, appt.previousScheduledAt).catch((err) => {
+        console.error('Failed to notify waitlist on mass reschedule', { error: err.message });
+      });
+    });
+
+    await Promise.allSettled(waitlistPromises);
+
+    res.json({
+      status: 'success',
+      data: {
+        rescheduledCount: rescheduledAppointments.length,
+        appointments: rescheduledAppointments.map(appt => ({
+          id: appt.id,
+          previousScheduledAt: new Date(appt.previousScheduledAt).toISOString(),
+          newScheduledAt: new Date(appt.newScheduledAt).toISOString(),
+        })),
+      },
+    });
+  } catch (err) {
+    if (client && !committed) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
+    return next(err);
+  } finally {
+    if (client) {
+      client.release();
+    }
+  }
+};
+
+module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus, cancelAppointment, reschedule, markNoShow, massReschedule };

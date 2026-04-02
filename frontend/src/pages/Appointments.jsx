@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   Calendar, AlertCircle, Search, Clock, User, Stethoscope, CalendarDays, X, FileText, List,
-  CalendarPlus, Repeat, ClipboardList, Trash2,
+  CalendarPlus, Repeat, ClipboardList, Trash2, CalendarRange,
 } from 'lucide-react';
 import { appointmentStatuses } from '../constants';
 import { useAuth } from '../data/AuthContext';
@@ -10,6 +10,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import AppointmentDetailModal from '../components/AppointmentDetailModal';
 import BookAppointmentModal from '../components/BookAppointmentModal';
+import MassRescheduleModal from '../components/MassRescheduleModal';
 import ScheduleCalendar from './ScheduleCalendar';
 
 const STATUS_STYLES = {
@@ -293,9 +294,12 @@ export default function Appointments() {
   const [selectedId, setSelectedId] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [showBooking, setShowBooking] = useState(false);
+  const [showMassReschedule, setShowMassReschedule] = useState(false);
+  const [doctors, setDoctors] = useState([]);
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
   const isDoctor = currentUser?.role === 'doctor';
+  const isStaff = ['doctor', 'nurse', 'admin'].includes(currentUser?.role);
   const deferredSearch = useDeferredValue(search);
 
   const fetchAppointments = useCallback(() => {
@@ -316,6 +320,24 @@ export default function Appointments() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  // Fetch doctors for mass reschedule (staff only)
+  useEffect(() => {
+    if (!isStaff) return;
+    let cancelled = false;
+    api.get('/doctors')
+      .then((res) => {
+        if (!cancelled) {
+          // For doctors, pre-select their own ID
+          const doctorsList = res.data || [];
+          setDoctors(doctorsList);
+        }
+      })
+      .catch(() => {
+        // Silently fail - mass reschedule button will still show but dropdown will be empty
+      });
+    return () => { cancelled = true; };
+  }, [isStaff]);
 
   const filtered = useMemo(
     () => {
@@ -389,15 +411,26 @@ export default function Appointments() {
               : 'Manage and review patient appointments.'}
           </p>
         </div>
-        {isPatient && (
-          <button
-            onClick={() => setShowBooking(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors shadow-sm flex-shrink-0"
-          >
-            <CalendarPlus className="w-4 h-4" />
-            Book Appointment
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {isPatient && (
+            <button
+              onClick={() => setShowBooking(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors shadow-sm flex-shrink-0"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              Book Appointment
+            </button>
+          )}
+          {isStaff && (
+            <button
+              onClick={() => setShowMassReschedule(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors shadow-sm flex-shrink-0"
+            >
+              <CalendarRange className="w-4 h-4" />
+              Mass Reschedule
+            </button>
+          )}
+        </div>
       </div>
 
       {/* List / Calendar / Waitlist toggle */}
@@ -628,6 +661,16 @@ export default function Appointments() {
         <BookAppointmentModal
           onClose={() => setShowBooking(false)}
           onBooked={fetchAppointments}
+        />
+      )}
+
+      {/* Mass reschedule modal */}
+      {showMassReschedule && (
+        <MassRescheduleModal
+          isOpen={showMassReschedule}
+          onClose={() => setShowMassReschedule(false)}
+          onSuccess={fetchAppointments}
+          doctors={doctors}
         />
       )}
     </div>

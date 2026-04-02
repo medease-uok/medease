@@ -16,8 +16,10 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
   const [cancellingAll, setCancellingAll] = useState(false)
   const [showReschedule, setShowReschedule] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
+  const [markingNoShow, setMarkingNoShow] = useState(false)
   const { currentUser } = useAuth()
   const isPatient = currentUser?.role === 'patient'
+  const isStaff = ['doctor', 'nurse', 'admin'].includes(currentUser?.role)
 
   useEffect(() => {
     if (!appointmentId) return
@@ -43,8 +45,36 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
     }
   }
 
+  const handleMarkNoShow = async () => {
+    const confirmMessage =
+      'Mark this appointment as no-show?\n\n' +
+      '• Patient will be notified\n' +
+      '• No-show count will increase\n' +
+      '• Patient may be flagged after 3 no-shows'
+
+    if (!confirm(confirmMessage)) return
+
+    setMarkingNoShow(true)
+    setError(null)
+    try {
+      await api.post(`/appointments/${appointmentId}/no-show`)
+      if (onStatusChange) onStatusChange()
+      onClose()
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.data?.message || err.message || 'Failed to mark as no-show.')
+    } finally {
+      setMarkingNoShow(false)
+    }
+  }
+
   const canCancel = appointment && appointment.status === 'scheduled'
   const isRecurring = appointment && appointment.seriesId
+
+  // Staff can mark past appointments as no-show
+  const isPastAppointment = appointment && new Date(appointment.scheduledAt) < new Date()
+  const canMarkNoShow = isStaff && appointment &&
+    (appointment.status === 'scheduled' || appointment.status === 'in_progress') &&
+    isPastAppointment
 
   const recurrenceLabel = {
     daily: 'Daily',
@@ -181,27 +211,43 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
               )}
 
               {/* Action buttons */}
-              {canCancel && (
+              {(canCancel || canMarkNoShow) && (
                 <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <button
-                    onClick={() => setShowReschedule(true)}
-                    disabled={cancellingAll}
-                    className="w-full px-4 py-2 text-sm font-medium text-primary bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <CalendarClock className="w-4 h-4" />
-                    Reschedule Appointment
-                  </button>
-                  <button
-                    onClick={() => setShowCancel(true)}
-                    disabled={cancellingAll}
-                    className="w-full px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-                  >
-                    Cancel Appointment
-                  </button>
-                  {isRecurring && (
+                  {canCancel && (
+                    <>
+                      <button
+                        onClick={() => setShowReschedule(true)}
+                        disabled={cancellingAll || markingNoShow}
+                        className="w-full px-4 py-2 text-sm font-medium text-primary bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <CalendarClock className="w-4 h-4" />
+                        Reschedule Appointment
+                      </button>
+                      <button
+                        onClick={() => setShowCancel(true)}
+                        disabled={cancellingAll || markingNoShow}
+                        className="w-full px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                      >
+                        Cancel Appointment
+                      </button>
+                    </>
+                  )}
+
+                  {canMarkNoShow && (
+                    <button
+                      onClick={handleMarkNoShow}
+                      disabled={markingNoShow || cancellingAll}
+                      className="w-full px-4 py-2 text-sm font-medium text-slate-700 bg-slate-50 border border-slate-300 rounded-lg hover:bg-slate-100 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <AlertCircle className="w-4 h-4" />
+                      {markingNoShow ? 'Marking as No-Show...' : 'Mark as No-Show'}
+                    </button>
+                  )}
+
+                  {canCancel && isRecurring && (
                     <button
                       onClick={handleCancelSeries}
-                      disabled={cancellingAll}
+                      disabled={cancellingAll || markingNoShow}
                       className="w-full px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors"
                     >
                       {cancellingAll ? 'Cancelling Series...' : 'Cancel All Upcoming in Series'}
