@@ -31,7 +31,7 @@ function ReportCard({ report, showPatient }) {
     try {
       setDownloading(true);
       const response = await api.get(`/lab-reports/${report.id}/download-url`);
-      const { url, fileName } = response.data;
+      const { url } = response.data;
 
       // Open in new tab
       window.open(url, '_blank');
