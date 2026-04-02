@@ -457,21 +457,26 @@ const cancelAppointment = async (req, res, next) => {
     const scheduledAt = new Date(appt.scheduled_at);
     const hoursUntilAppointment = (scheduledAt - now) / (1000 * 60 * 60);
 
-    if (req.user.role === 'patient') {
-      const minHours = config.cancellationPolicy.patientMinHoursBefore;
-      if (hoursUntilAppointment < minHours) {
-        throw new AppError(
-          `Patients cannot cancel appointments less than ${minHours} hours before the scheduled time. Please contact the clinic for assistance.`,
-          400
-        );
-      }
+    if (hoursUntilAppointment < 0) {
+      throw new AppError('Cannot cancel an appointment that has already passed.', 400);
     }
 
-    if (req.user.role === 'doctor') {
-      const minHours = config.cancellationPolicy.doctorMinHoursBefore;
-      if (hoursUntilAppointment < minHours) {
+    const { patientMinHoursBefore, doctorMinHoursBefore, adminBypassPolicy, nurseBypassPolicy } = config.cancellationPolicy;
+
+    const bypassRoles = [];
+    if (adminBypassPolicy) bypassRoles.push('admin');
+    if (nurseBypassPolicy) bypassRoles.push('nurse');
+
+    if (!bypassRoles.includes(req.user.role)) {
+      const rolePolicy = {
+        patient: { minHours: patientMinHoursBefore, message: 'Patients cannot cancel appointments less than {hours} hours before the scheduled time. Please contact the clinic for assistance.' },
+        doctor: { minHours: doctorMinHoursBefore, message: 'Doctors cannot cancel appointments less than {hours} hours before the scheduled time. Please contact administration for assistance.' },
+      };
+
+      const policy = rolePolicy[req.user.role];
+      if (policy && hoursUntilAppointment < policy.minHours) {
         throw new AppError(
-          `Doctors cannot cancel appointments less than ${minHours} hours before the scheduled time. Please contact administration for assistance.`,
+          policy.message.replace('{hours}', policy.minHours),
           400
         );
       }

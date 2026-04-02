@@ -1161,6 +1161,8 @@ describe('cancelAppointment', () => {
       statusCode: 400,
       message: expect.stringContaining('2 hours')
     }))
+    const calls = mockClientQuery.mock.calls.map((c) => c[0])
+    expect(calls).toContain('ROLLBACK')
   })
 
   it('should allow doctor to cancel appointment more than 2 hours before', async () => {
@@ -1206,6 +1208,95 @@ describe('cancelAppointment', () => {
       .mockResolvedValueOnce(undefined)
 
     const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-admin', role: 'admin' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(res.json).toHaveBeenCalledWith({ status: 'success', data: { id: VALID_UUID, status: 'cancelled' } })
+  })
+
+  it('should return 400 when trying to cancel appointment that has already passed', async () => {
+    const pastAppointment = new Date(Date.now() - 2 * 60 * 60 * 1000)
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ ...APPT_ROW, scheduled_at: pastAppointment }] })
+      .mockResolvedValueOnce(undefined)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: 'Cannot cancel an appointment that has already passed.'
+    }))
+    const calls = mockClientQuery.mock.calls.map((c) => c[0])
+    expect(calls).toContain('ROLLBACK')
+  })
+
+  it('should allow patient to cancel exactly 24 hours before (boundary - inclusive)', async () => {
+    const exactlyBoundary = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ ...APPT_ROW, scheduled_at: exactlyBoundary }] })
+      .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, status: 'cancelled' }] })
+      .mockResolvedValueOnce(undefined)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(res.json).toHaveBeenCalledWith({ status: 'success', data: { id: VALID_UUID, status: 'cancelled' } })
+  })
+
+  it('should allow patient to cancel just over 24 hours before (boundary)', async () => {
+    const justOverBoundary = new Date(Date.now() + 24.1 * 60 * 60 * 1000)
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ ...APPT_ROW, scheduled_at: justOverBoundary }] })
+      .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, status: 'cancelled' }] })
+      .mockResolvedValueOnce(undefined)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(res.json).toHaveBeenCalledWith({ status: 'success', data: { id: VALID_UUID, status: 'cancelled' } })
+  })
+
+  it('should allow doctor to cancel exactly 2 hours before (boundary - inclusive)', async () => {
+    const exactlyBoundary = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ ...APPT_ROW, scheduled_at: exactlyBoundary }] })
+      .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, status: 'cancelled' }] })
+      .mockResolvedValueOnce(undefined)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor', doctorId: 'doc-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await cancelAppointment(req, res, next)
+
+    expect(res.json).toHaveBeenCalledWith({ status: 'success', data: { id: VALID_UUID, status: 'cancelled' } })
+  })
+
+  it('should allow doctor to cancel just over 2 hours before (boundary)', async () => {
+    const justOverBoundary = new Date(Date.now() + 2.1 * 60 * 60 * 1000)
+    mockClientQuery
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ rows: [{ ...APPT_ROW, scheduled_at: justOverBoundary }] })
+      .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, status: 'cancelled' }] })
+      .mockResolvedValueOnce(undefined)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor', doctorId: 'doc-1' } })
     const res = makeRes()
     const next = jest.fn()
 
