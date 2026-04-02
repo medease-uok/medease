@@ -2,6 +2,7 @@ const pool = require('../config/database');
 const { notifyAdmins } = require('../utils/notifications.helper');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EXPIRY_WARNING_DAYS = 30;
 
 function validateInventoryInput({ item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location }) {
   const sanitizedName = item_name?.trim();
@@ -248,7 +249,9 @@ exports.getInventoryReport = async (req, res, next) => {
       SELECT 
         COUNT(*) as total_items,
         COUNT(CASE WHEN quantity <= reorder_level AND quantity > 0 THEN 1 END) as low_stock_items,
-        COUNT(CASE WHEN quantity = 0 THEN 1 END) as out_of_stock_items
+        COUNT(CASE WHEN quantity = 0 THEN 1 END) as out_of_stock_items,
+        COUNT(CASE WHEN expiry_date IS NOT NULL AND expiry_date < CURRENT_DATE THEN 1 END) as expired_items,
+        COUNT(CASE WHEN expiry_date IS NOT NULL AND expiry_date >= CURRENT_DATE AND expiry_date <= CURRENT_DATE + INTERVAL '${EXPIRY_WARNING_DAYS} days' THEN 1 END) as expiring_soon_items
       FROM inventory
       WHERE deleted_at IS NULL
     `;
@@ -282,9 +285,11 @@ exports.getInventoryReport = async (req, res, next) => {
       status: 'success',
       data: {
         overview: {
-          total_items: parseInt(overviewResult.rows[0].total_items) || 0,
-          low_stock_items: parseInt(overviewResult.rows[0].low_stock_items) || 0,
-          out_of_stock_items: parseInt(overviewResult.rows[0].out_of_stock_items) || 0
+          total_items: parseInt(overviewResult.rows[0].total_items, 10),
+          low_stock_items: parseInt(overviewResult.rows[0].low_stock_items, 10),
+          out_of_stock_items: parseInt(overviewResult.rows[0].out_of_stock_items, 10),
+          expired_items: parseInt(overviewResult.rows[0].expired_items, 10),
+          expiring_soon_items: parseInt(overviewResult.rows[0].expiring_soon_items, 10)
         },
         categories: categoryResult.rows.map(row => ({
           category: row.category,
