@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
 import { inventoryService } from '../services/inventory.service';
-import { getExpiryStatus } from '../utils/inventoryUtils';
+import { getExpiryStatus, calculateReorderSuggestion } from '../utils/inventoryUtils';
 import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download } from 'lucide-react';
+import { ReorderSuggestionBadge } from '../components/ReorderSuggestionBadge';
 
 export default function Inventory() {
   const { currentUser } = useAuth();
@@ -246,6 +247,7 @@ export default function Inventory() {
                 {filteredItems.map(item => {
                   const isLowStock = item.quantity <= item.reorder_level;
                   const { status: expiryStatus, daysRemaining: expiryDays } = getExpiryStatus(item.expiry_date);
+                  const suggestion = (isAdmin && isLowStock) ? calculateReorderSuggestion(item.quantity, item.reorder_level) : 0;
 
                   return (
                     <tr key={item.id} className={`hover:bg-slate-50/50 transition-colors group ${
@@ -263,13 +265,21 @@ export default function Inventory() {
                         </span>
                       </td>
                       <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-semibold ${isLowStock ? 'text-red-600' : 'text-slate-900'}`}>
-                            {item.quantity}
-                          </span>
-                          <span className="text-slate-500 text-sm">{item.unit}</span>
-                          {isLowStock && (
-                            <AlertCircle className="w-4 h-4 text-red-500" title={`Low stock! Reorder level is ${item.reorder_level}`} />
+                        <div className="flex flex-col items-start justify-center">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-semibold ${isLowStock ? 'text-red-600' : 'text-slate-900'}`}>
+                              {item.quantity}
+                            </span>
+                            <span className="text-slate-500 text-sm">{item.unit}</span>
+                            {isLowStock && (
+                              <AlertCircle 
+                                className="w-4 h-4 text-red-500" 
+                                aria-label={`Low stock! Reorder level is ${item.reorder_level}.`}
+                              />
+                            )}
+                          </div>
+                          {isAdmin && isLowStock && (
+                            <ReorderSuggestionBadge suggestion={suggestion} unit={item.unit} />
                           )}
                         </div>
                       </td>

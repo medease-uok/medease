@@ -17,6 +17,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { inventoryService } from '../services/inventory.service';
+import { calculateReorderSuggestion } from '../utils/inventoryUtils';
+import { ReorderSuggestionBadge } from '../components/ReorderSuggestionBadge';
 
 const iconMap = {
   'Total Patients': Users,
@@ -428,17 +430,23 @@ export default function DashboardEnhanced() {
           </CardHeader>
           <CardContent className="pt-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {lowStockItems.map(item => (
-                <div key={item.id} className="p-3 border border-red-100 rounded-lg bg-red-50/30 flex justify-between items-center transition-colors hover:bg-red-50/80">
-                  <div>
-                    <p className="font-semibold text-slate-900 text-sm whitespace-nowrap overflow-hidden text-ellipsis">{item.item_name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Threshold: <span className="font-medium text-slate-700">{item.reorder_level}</span> {item.unit}</p>
+              {lowStockItems.map(item => {
+                const suggestion = isAdmin ? calculateReorderSuggestion(item.quantity, item.reorder_level) : 0;
+                return (
+                  <div key={item.id} className="p-3 border border-red-100 rounded-lg bg-red-50/30 flex justify-between items-center transition-colors hover:bg-red-50/80">
+                    <div>
+                      <p className="font-semibold text-slate-900 text-sm whitespace-nowrap overflow-hidden text-ellipsis">{item.item_name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Threshold: <span className="font-medium text-slate-700">{item.reorder_level}</span> {item.unit}</p>
+                    </div>
+                    <div className="text-right min-w-fit ml-4 flex flex-col items-end">
+                      <p className="font-bold text-red-600 text-lg leading-tight">{item.quantity} <span className="text-xs font-semibold text-red-500/80 uppercase tracking-wider">{item.unit}</span></p>
+                      {isAdmin && (
+                        <ReorderSuggestionBadge suggestion={suggestion} unit={item.unit} />
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right min-w-fit ml-4">
-                    <p className="font-bold text-red-600 text-lg leading-tight">{item.quantity} <span className="text-xs font-semibold text-red-500/80 uppercase tracking-wider">{item.unit}</span></p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
