@@ -43,6 +43,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Email verification, multi-step login with OTP, and password reset
 - Real-time in-app notifications
 - Profile image uploads with cropping
+- File upload security with magic-byte validation and optional VirusTotal malware scanning
 - Data privacy controls with role-based field masking
 - Audit logging and CAPTCHA protection
 
@@ -59,6 +60,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 | PDF | PDFKit |
 | Scheduler | node-cron |
 | CAPTCHA | Cloudflare Turnstile |
+| Malware Scanning | VirusTotal API (optional) |
 | Container | Docker & Docker Compose |
 | Cloud | AWS (Fargate, S3, CloudFront) |
 | IaC | Terraform |
