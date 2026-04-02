@@ -6,13 +6,7 @@ import {
 } from 'lucide-react'
 import api from '../services/api'
 import VoiceNoteButton from './VoiceNoteButton'
-
-function formatSlotTime(time) {
-  const [h, m] = time.split(':').map(Number)
-  const period = h >= 12 ? 'PM' : 'AM'
-  const hour = h % 12 || 12
-  return `${hour}:${String(m).padStart(2, '0')} ${period}`
-}
+import TimeSlotPicker from './TimeSlotPicker'
 
 const RECURRENCE_OPTIONS = [
   { value: '', label: 'One-time' },
@@ -251,7 +245,11 @@ function SlotBooking({ doctor, onBack, onBooked, onWaitlistJoined }) {
     setError(null)
 
     try {
-      const scheduledAt = `${date}T${selectedSlot}:00Z`
+      // Construct ISO string with explicit Sri Lanka timezone offset
+      // selectedSlot is in 24h format (e.g., "08:00") representing Sri Lanka time
+      // Sri Lanka is UTC+05:30, so we append that offset and let JavaScript convert to UTC
+      const scheduledAt = new Date(`${date}T${selectedSlot}:00+05:30`).toISOString()
+
       if (recurrencePattern) {
         await api.post('/appointments/recurring', {
           doctorId: doctor.id,
@@ -335,18 +333,13 @@ function SlotBooking({ doctor, onBack, onBooked, onWaitlistJoined }) {
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Available Slots
           </label>
-          {loadingSlots ? (
-            <div className="flex items-center justify-center py-6">
-              <div className="w-6 h-6 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : slots.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-4">
-              Doctor is not available on this day.
-            </p>
-          ) : allBooked ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center space-y-3">
-              <p className="text-sm text-amber-700 font-medium">All slots are booked for this day.</p>
-              <p className="text-xs text-slate-500">Join the waitlist to be notified when a slot opens up.</p>
+          <TimeSlotPicker
+            slots={slots}
+            selectedSlot={selectedSlot}
+            onSelectSlot={setSelectedSlot}
+            loading={loadingSlots}
+            allBookedSubMessage="Join the waitlist to be notified when a slot opens up."
+            allBookedAction={
               <button
                 type="button"
                 onClick={() => setShowWaitlist(true)}
@@ -355,33 +348,8 @@ function SlotBooking({ doctor, onBack, onBooked, onWaitlistJoined }) {
                 <ClipboardList className="w-4 h-4" />
                 Join Waitlist
               </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-4 gap-2">
-              {slots.map((slot) => (
-                <button
-                  key={slot.time}
-                  type="button"
-                  disabled={!slot.available}
-                  onClick={() => setSelectedSlot(slot.time)}
-                  className={`px-2 py-2 text-xs font-medium rounded-lg border transition-colors ${
-                    selectedSlot === slot.time
-                      ? 'bg-primary text-white border-primary'
-                      : slot.available
-                        ? 'bg-white text-slate-700 border-slate-200 hover:border-primary hover:text-primary'
-                        : 'bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed line-through'
-                  }`}
-                >
-                  {formatSlotTime(slot.time)}
-                </button>
-              ))}
-            </div>
-          )}
-          {availableSlots.length > 0 && (
-            <p className="text-xs text-slate-400 mt-2">
-              {availableSlots.length} of {slots.length} slots available
-            </p>
-          )}
+            }
+          />
         </div>
       )}
 

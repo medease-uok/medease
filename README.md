@@ -18,6 +18,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Recurring appointment series (daily, weekly, biweekly, monthly) with conflict detection and bulk cancellation
 - Appointment confirmation emails sent to patients upon booking
 - Automated appointment reminder emails and in-app notifications sent before upcoming appointments
+- Role-based appointment cancellation policy (patients: 24-hour minimum notice, doctors: 2-hour minimum notice, with admin/nurse bypass)
 - Electronic medical records, prescriptions, and lab reports
 - ICD-10 code lookup and assignment on medical records
 - Digital structured prescriptions with multi-medicine line items
@@ -31,7 +32,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Prescription refill requests with doctor approval workflow
 - Lab test request workflow with priority levels and lab technician assignment
 - Patient satisfaction and feedback system with per-doctor ratings and analytics
-- Inventory management for hospital supplies and equipment with low stock alerts, expiry date tracking, and admin notifications
+- Inventory management for hospital supplies and equipment with low stock alerts, expiry date tracking, admin notifications, and reorder quantity suggestions for admins
 - PDF generation for medical records and prescriptions
 - Voice input (speech-to-text) for clinical notes, diagnoses, prescriptions, and other text fields
 - Role-Based Access Control (RBAC) with permissions across 6 roles
