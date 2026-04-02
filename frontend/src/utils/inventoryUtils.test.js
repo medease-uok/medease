@@ -66,5 +66,15 @@ describe('inventoryUtils', () => {
     it('returns a baseline of 10 if reorder level is 0 and current is 0', () => {
       expect(calculateReorderSuggestion(0, 0)).toBe(10);
     });
+
+    it('handles negative current quantity gracefully by clamping to 0', () => {
+      expect(calculateReorderSuggestion(-5, 10)).toBe(30); // 10 * 3 - 0 = 30
+      expect(calculateReorderSuggestion(-10, 5)).toBe(15); // 5 * 3 - 0 = 15
+    });
+
+    it('returns 0 if invalid types are passed', () => {
+      expect(calculateReorderSuggestion(undefined, 10)).toBe(0);
+      expect(calculateReorderSuggestion('5', '10')).toBe(0);
+    });
   });
 });
