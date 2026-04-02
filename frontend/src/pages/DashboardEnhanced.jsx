@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/ui/badge';
 import { inventoryService } from '../services/inventory.service';
 import { calculateReorderSuggestion } from '../utils/inventoryUtils';
+import { ReorderSuggestionBadge } from '../components/ReorderSuggestionBadge';
 
 const iconMap = {
   'Total Patients': Users,
@@ -430,7 +431,7 @@ export default function DashboardEnhanced() {
           <CardContent className="pt-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {lowStockItems.map(item => {
-                const suggestion = calculateReorderSuggestion(item.quantity, item.reorder_level);
+                const suggestion = isAdmin ? calculateReorderSuggestion(item.quantity, item.reorder_level) : 0;
                 return (
                   <div key={item.id} className="p-3 border border-red-100 rounded-lg bg-red-50/30 flex justify-between items-center transition-colors hover:bg-red-50/80">
                     <div>
@@ -439,7 +440,9 @@ export default function DashboardEnhanced() {
                     </div>
                     <div className="text-right min-w-fit ml-4 flex flex-col items-end">
                       <p className="font-bold text-red-600 text-lg leading-tight">{item.quantity} <span className="text-xs font-semibold text-red-500/80 uppercase tracking-wider">{item.unit}</span></p>
-                      <p className="text-[10px] font-bold text-red-700 bg-red-100 px-1 py-0.5 rounded mt-1 shadow-sm border border-red-200">Order: {suggestion}</p>
+                      {isAdmin && (
+                        <ReorderSuggestionBadge suggestion={suggestion} unit={item.unit} />
+                      )}
                     </div>
                   </div>
                 );

@@ -4,6 +4,7 @@ import { ROLES } from '../data/roles';
 import { inventoryService } from '../services/inventory.service';
 import { getExpiryStatus, calculateReorderSuggestion } from '../utils/inventoryUtils';
 import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download } from 'lucide-react';
+import { ReorderSuggestionBadge } from '../components/ReorderSuggestionBadge';
 
 export default function Inventory() {
   const { currentUser } = useAuth();
@@ -246,7 +247,7 @@ export default function Inventory() {
                 {filteredItems.map(item => {
                   const isLowStock = item.quantity <= item.reorder_level;
                   const { status: expiryStatus, daysRemaining: expiryDays } = getExpiryStatus(item.expiry_date);
-                  const suggestion = calculateReorderSuggestion(item.quantity, item.reorder_level);
+                  const suggestion = (isAdmin && isLowStock) ? calculateReorderSuggestion(item.quantity, item.reorder_level) : 0;
 
                   return (
                     <tr key={item.id} className={`hover:bg-slate-50/50 transition-colors group ${
@@ -273,16 +274,12 @@ export default function Inventory() {
                             {isLowStock && (
                               <AlertCircle 
                                 className="w-4 h-4 text-red-500" 
-                                title={`Low stock! Reorder level is ${item.reorder_level}. Suggestion: Order ${suggestion} ${item.unit}.`} 
+                                aria-label={`Low stock! Reorder level is ${item.reorder_level}.`}
                               />
                             )}
                           </div>
-                          {isLowStock && (
-                            <div className="mt-1">
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 uppercase tracking-wider">
-                                Order: {suggestion}
-                              </span>
-                            </div>
+                          {isAdmin && isLowStock && (
+                            <ReorderSuggestionBadge suggestion={suggestion} unit={item.unit} />
                           )}
                         </div>
                       </td>

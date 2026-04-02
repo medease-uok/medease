@@ -6,7 +6,7 @@ const CACHE_TTL = 300; // 5 minutes
 const ROLE_PERMISSIONS_FALLBACK = {
   admin: [
     'view_patients', 'view_own_profile', 'edit_own_profile', 'edit_patient',
-    'view_appointments', 'view_own_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status',
+    'view_appointments', 'view_own_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status', 'reschedule_appointment',
     'create_waitlist_entry', 'view_own_waitlist', 'view_waitlist', 'manage_waitlist',
     'view_medical_records', 'view_own_medical_records', 'create_medical_record', 'edit_medical_record',
     'view_prescriptions', 'view_own_prescriptions', 'create_prescription', 'dispense_prescription', 'cancel_prescription',
@@ -19,7 +19,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
   ],
   doctor: [
     'view_patients', 'edit_patient',
-    'view_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status',
+    'view_appointments', 'create_appointment', 'cancel_appointment', 'update_appointment_status', 'reschedule_appointment',
     'view_medical_records', 'create_medical_record', 'edit_medical_record',
     'view_prescriptions', 'create_prescription', 'cancel_prescription',
     'view_refill_requests', 'respond_refill_request',
@@ -31,7 +31,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
   ],
   nurse: [
     'view_patients',
-    'view_appointments', 'update_appointment_status',
+    'view_appointments', 'update_appointment_status', 'reschedule_appointment',
     'view_medical_records',
     'view_prescriptions',
     'view_refill_requests',
@@ -43,7 +43,7 @@ const ROLE_PERMISSIONS_FALLBACK = {
   ],
   patient: [
     'view_own_profile', 'edit_own_profile',
-    'view_own_appointments', 'create_appointment', 'cancel_appointment',
+    'view_own_appointments', 'create_appointment', 'cancel_appointment', 'reschedule_appointment',
     'view_own_medical_records',
     'view_own_prescriptions',
     'request_refill', 'view_own_refill_requests',
