@@ -1327,6 +1327,7 @@ describe('markNoShow', () => {
       patient_first_name: 'John',
       patient_last_name: 'Doe',
       doctor_user_id: 'usr-doc',
+      doctor_department: 'Cardiology',
       doctor_first_name: 'Kamal',
       doctor_last_name: 'Perera',
     }
@@ -1381,6 +1382,7 @@ describe('markNoShow', () => {
       patient_first_name: 'John',
       patient_last_name: 'Doe',
       doctor_user_id: 'usr-doc',
+      doctor_department: 'Cardiology',
       doctor_first_name: 'Kamal',
       doctor_last_name: 'Perera',
     }
@@ -1530,6 +1532,103 @@ describe('markNoShow', () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Cannot mark a future appointment as no-show. Wait until after the scheduled time.', statusCode: 400 }))
   })
 
+  test('allows nurse to mark no-show for appointment in their department', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      patient_id: 'pat-1',
+      doctor_id: 'doc-1',
+      status: 'scheduled',
+      scheduled_at: PAST_DATE,
+      patient_user_id: 'usr-pat',
+      no_show_count: 0,
+      no_show_flagged: false,
+      no_show_flag_date: null,
+      patient_first_name: 'John',
+      patient_last_name: 'Doe',
+      doctor_user_id: 'usr-doc',
+      doctor_department: 'Cardiology',
+      doctor_first_name: 'Kamal',
+      doctor_last_name: 'Perera',
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
+      .mockResolvedValueOnce({ rows: [{ department: 'Cardiology' }] }) // SELECT nurse department
+      .mockResolvedValueOnce(undefined) // UPDATE appointment
+      .mockResolvedValueOnce(undefined) // UPDATE patient
+      .mockResolvedValueOnce(undefined) // COMMIT
+
+    mockQuery.mockResolvedValueOnce({ rows: [] }) // Admin query
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-nurse', role: 'nurse' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      data: {
+        id: VALID_UUID,
+        status: 'no_show',
+        patient: { noShowCount: 1, flagged: false },
+      },
+    })
+  })
+
+  test('returns 403 when nurse tries to mark no-show for appointment in different department', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      doctor_department: 'Cardiology',
+      status: 'scheduled',
+      scheduled_at: PAST_DATE,
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
+      .mockResolvedValueOnce({ rows: [{ department: 'Neurology' }] }) // SELECT nurse department (different)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-nurse', role: 'nurse' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'You can only mark no-shows for appointments with doctors in your department.',
+      statusCode: 403
+    }))
+    expect(mockClientRelease).toHaveBeenCalled()
+  })
+
+  test('returns 404 when nurse profile not found', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      doctor_department: 'Cardiology',
+      status: 'scheduled',
+      scheduled_at: PAST_DATE,
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
+      .mockResolvedValueOnce({ rows: [] }) // SELECT nurse department (not found)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-nurse', role: 'nurse' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Nurse profile not found.',
+      statusCode: 404
+    }))
+    expect(mockClientRelease).toHaveBeenCalled()
+  })
+
   test('rolls back transaction on error', async () => {
     const apptRow = {
       id: VALID_UUID,
@@ -1543,6 +1642,7 @@ describe('markNoShow', () => {
       patient_first_name: 'John',
       patient_last_name: 'Doe',
       doctor_user_id: 'usr-doc',
+      doctor_department: 'Cardiology',
       doctor_first_name: 'Kamal',
       doctor_last_name: 'Perera',
     }

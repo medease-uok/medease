@@ -1116,12 +1116,12 @@ const markNoShow = async (req, res, next) => {
     client = await db.getClient();
     await client.query('BEGIN');
 
-    // Get appointment details with patient info
+    // Get appointment details with patient info and doctor department
     const apptResult = await client.query(
       `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
-              p.user_id AS patient_user_id, p.no_show_count, p.no_show_flagged,
+              p.user_id AS patient_user_id, p.no_show_count, p.no_show_flagged, p.no_show_flag_date,
               pu.first_name AS patient_first_name, pu.last_name AS patient_last_name,
-              d.user_id AS doctor_user_id,
+              d.user_id AS doctor_user_id, d.department AS doctor_department,
               du.first_name AS doctor_first_name, du.last_name AS doctor_last_name
        FROM appointments a
        JOIN patients p ON a.patient_id = p.id
@@ -1138,6 +1138,21 @@ const markNoShow = async (req, res, next) => {
     }
 
     const appt = apptResult.rows[0];
+
+    // Nurses can only mark no-show for appointments with doctors in their department
+    if (req.user.role === 'nurse') {
+      const nurseDeptResult = await client.query(
+        'SELECT department FROM nurses WHERE user_id = $1',
+        [req.user.id]
+      );
+      if (nurseDeptResult.rows.length === 0) {
+        throw new AppError('Nurse profile not found.', 404);
+      }
+      const nurseDepartment = nurseDeptResult.rows[0].department;
+      if (nurseDepartment !== appt.doctor_department) {
+        throw new AppError('You can only mark no-shows for appointments with doctors in your department.', 403);
+      }
+    }
 
     // Validate appointment can be marked as no-show
     if (appt.status === APPOINTMENT_STATUS.NO_SHOW) {
