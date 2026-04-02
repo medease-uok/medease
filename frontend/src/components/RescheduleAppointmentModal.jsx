@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   X, Calendar, Clock, AlertCircle, CheckCircle,
   Stethoscope,
@@ -25,35 +26,53 @@ export default function RescheduleAppointmentModal({ appointmentId, onClose, onR
     api.get(`/appointments/${appointmentId}`)
       .then((res) => {
         setAppointment(res.data)
-        // Pre-fill current date
+        // Pre-fill current date, but clamp to today if appointment is in the past
         const currentDate = new Date(res.data.scheduledAt)
-        setDate(currentDate.toISOString().split('T')[0])
+        const apptDate = currentDate.toISOString().split('T')[0]
+        setDate(apptDate >= today ? apptDate : today)
       })
       .catch(() => setError('Failed to load appointment details.'))
       .finally(() => setLoading(false))
-  }, [appointmentId])
+  }, [appointmentId, today])
 
   useEffect(() => {
-    if (!date || !appointment) {
+    if (!date || !appointment?.doctorId) {
       setSlots([])
       setSelectedSlot(null)
       return
     }
+
+    const controller = new AbortController()
     setLoadingSlots(true)
     setSelectedSlot(null)
     setError(null)
-    api.get(`/schedules/${appointment.doctorId}/slots?date=${date}`)
+
+    api.get(`/schedules/${appointment.doctorId}/slots?date=${date}`, { signal: controller.signal })
       .then((res) => setSlots(res.data?.slots || []))
-      .catch(() => {
-        setError('Failed to load available slots.')
-        setSlots([])
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          setError('Failed to load available slots.')
+          setSlots([])
+        }
       })
-      .finally(() => setLoadingSlots(false))
-  }, [date, appointment])
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoadingSlots(false)
+        }
+      })
+
+    return () => controller.abort()
+  }, [date, appointment?.doctorId])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!date || !selectedSlot) return
+    if (!date || !selectedSlot || submitting) return
+
+    // Validate slot format
+    if (!/^\d{2}:\d{2}$/.test(selectedSlot)) {
+      setError('Invalid time slot selected.')
+      return
+    }
 
     setSubmitting(true)
     setError(null)
@@ -81,7 +100,7 @@ export default function RescheduleAppointmentModal({ appointmentId, onClose, onR
     hour: 'numeric', minute: '2-digit',
   })
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
         className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
@@ -204,4 +223,6 @@ export default function RescheduleAppointmentModal({ appointmentId, onClose, onR
       </div>
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }
