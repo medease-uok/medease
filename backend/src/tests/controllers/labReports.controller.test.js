@@ -5,6 +5,15 @@ const mockClient = {
 }
 const mockGetClient = jest.fn()
 
+// UUID constants for test data
+const PATIENT_UUID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+const PATIENT_NONEXISTENT_UUID = 'a1aabb99-9c0b-4ef8-bb6d-6bb9bd380a99'
+const USER_LAB_UUID = 'b1ffcc99-9c0b-4ef8-bb6d-6bb9bd380a22'
+const USER_PAT_UUID = 'c2ffdd99-9c0b-4ef8-bb6d-6bb9bd380a33'
+const DOCTOR_UUID = 'd3aaee99-9c0b-4ef8-bb6d-6bb9bd380a44'
+const REPORT_UUID = 'e4bbff99-9c0b-4ef8-bb6d-6bb9bd380a55'
+const REQUEST_UUID = 'f5ccaa99-9c0b-4ef8-bb6d-6bb9bd380a66'
+
 jest.mock('../../config/database', () => ({
   query: (...args) => mockQuery(...args),
   getClient: () => mockGetClient(),
@@ -18,15 +27,16 @@ jest.mock('../../controllers/notifications.controller', () => ({
   createNotification: jest.fn().mockResolvedValue(undefined),
 }))
 jest.mock('../../middleware/upload', () => ({
-  uploadLabReportToS3: jest.fn().mockResolvedValue('lab-reports/pat-1/file.pdf'),
+  uploadLabReportToS3: jest.fn().mockResolvedValue(`lab-reports/${PATIENT_UUID}/file.pdf`),
   getPresignedImageUrl: jest.fn().mockResolvedValue('https://s3.example.com/presigned'),
+  deleteFromS3: jest.fn().mockResolvedValue(undefined),
 }))
 
 const { getAll, create, update } = require('../../controllers/labReports.controller')
 
 function makeReq(overrides = {}) {
   return {
-    user: { id: 'usr-lab', role: 'lab_technician', patientId: null },
+    user: { id: USER_LAB_UUID, role: 'lab_technician', patientId: null },
     params: {},
     body: {},
     ip: '127.0.0.1',
@@ -51,7 +61,7 @@ beforeEach(() => {
 // ──────────────────────────────────────────────────────────────
 describe('getAll', () => {
   const REPORT_ROW = {
-    id: 'lr-1', patient_id: 'pat-1', technician_id: 'usr-lab',
+    id: REPORT_UUID, patient_id: PATIENT_UUID, technician_id: USER_LAB_UUID,
     test_name: 'Blood CBC', result: 'Normal', notes: null,
     report_date: '2026-03-20', patient_name: 'John Doe', technician_name: 'Nimal W',
   }
@@ -93,7 +103,7 @@ describe('getAll', () => {
 // CREATE
 // ──────────────────────────────────────────────────────────────
 describe('create', () => {
-  const PATIENT_ROW = { id: 'pat-1', user_id: 'usr-pat', first_name: 'John', last_name: 'Doe' }
+  const PATIENT_ROW = { id: PATIENT_UUID, user_id: USER_PAT_UUID, first_name: 'John', last_name: 'Doe' }
 
   test('creates a lab report successfully', async () => {
     mockClient.query
@@ -103,7 +113,7 @@ describe('create', () => {
       .mockResolvedValueOnce({ rows: [] })                              // COMMIT
 
     const req = makeReq({
-      body: { patientId: 'pat-1', testName: 'Blood CBC', result: 'Normal', notes: null },
+      body: { patientId: PATIENT_UUID, testName: 'Blood CBC', result: 'Normal', notes: null },
     })
     const res = makeRes()
     const next = jest.fn()
@@ -126,7 +136,7 @@ describe('create', () => {
   })
 
   test('returns 400 when testName is missing', async () => {
-    const req = makeReq({ body: { patientId: 'pat-1' } })
+    const req = makeReq({ body: { patientId: PATIENT_UUID } })
     const res = makeRes()
     const next = jest.fn()
 
@@ -141,7 +151,7 @@ describe('create', () => {
       .mockResolvedValueOnce({ rows: [] })                              // patientCheck - empty
       .mockResolvedValueOnce({ rows: [] })                              // ROLLBACK
 
-    const req = makeReq({ body: { patientId: 'pat-nonexistent', testName: 'Blood CBC' } })
+    const req = makeReq({ body: { patientId: PATIENT_NONEXISTENT_UUID, testName: 'Blood CBC' } })
     const res = makeRes()
     const next = jest.fn()
 
@@ -159,22 +169,22 @@ describe('create', () => {
       .mockResolvedValueOnce({ rows: [] })                              // COMMIT
 
     const req = makeReq({
-      user: { id: 'usr-lab-99', role: 'lab_technician' },
-      body: { patientId: 'pat-1', testName: 'Lipid Panel', result: 'High cholesterol' },
+      user: { id: USER_LAB_UUID, role: 'lab_technician' },
+      body: { patientId: PATIENT_UUID, testName: 'Lipid Panel', result: 'High cholesterol' },
     })
     const res = makeRes()
     await create(req, res, jest.fn())
 
     const insertCall = mockClient.query.mock.calls[2]  // 0=BEGIN, 1=patientCheck, 2=INSERT
-    expect(insertCall[1]).toContain('usr-lab-99')
+    expect(insertCall[1]).toContain(USER_LAB_UUID)
   })
 
   test('links lab report to test request when labTestRequestId provided', async () => {
     const REQUEST_ROW = {
       id: 'ltr-1',
-      doctor_id: 'doc-1',
+      doctor_id: DOCTOR_UUID,
       test_name: 'Blood CBC',
-      patient_id: 'pat-1',
+      patient_id: PATIENT_UUID,
       department: 'Cardiology',
       doctor_user_id: 'usr-doc',
       doctor_first_name: 'Kamal',
@@ -193,7 +203,7 @@ describe('create', () => {
 
     const req = makeReq({
       body: {
-        patientId: 'pat-1',
+        patientId: PATIENT_UUID,
         testName: 'Blood CBC',
         result: 'Normal',
         labTestRequestId: 'ltr-1',
@@ -220,9 +230,9 @@ describe('create', () => {
 
     const req = makeReq({
       body: {
-        patientId: 'pat-1',
+        patientId: PATIENT_UUID,
         testName: 'Blood CBC',
-        labTestRequestId: 'ltr-nonexistent',
+        labTestRequestId: REQUEST_UUID,
       },
     })
     const res = makeRes()
@@ -239,9 +249,9 @@ describe('create', () => {
 
     const REQUEST_ROW = {
       id: 'ltr-1',
-      doctor_id: 'doc-1',
+      doctor_id: DOCTOR_UUID,
       test_name: 'Blood CBC',
-      patient_id: 'pat-1',
+      patient_id: PATIENT_UUID,
       department: 'Cardiology',
       doctor_user_id: 'usr-doc',
       doctor_first_name: 'Kamal',
@@ -260,7 +270,7 @@ describe('create', () => {
 
     const req = makeReq({
       body: {
-        patientId: 'pat-1',
+        patientId: PATIENT_UUID,
         testName: 'Blood CBC',
         result: 'Normal',
         labTestRequestId: 'ltr-1',
@@ -272,7 +282,7 @@ describe('create', () => {
     // Should notify patient
     expect(createNotification).toHaveBeenCalledWith(
       expect.objectContaining({
-        recipientId: 'usr-pat',
+        recipientId: USER_PAT_UUID,
         type: 'lab_report_ready',
       })
     )
@@ -303,18 +313,18 @@ describe('create', () => {
       .mockResolvedValueOnce({ rows: [] })                              // COMMIT
 
     const req = makeReq({
-      body: { patientId: 'pat-1', testName: 'Blood CBC', result: 'Normal' },
+      body: { patientId: PATIENT_UUID, testName: 'Blood CBC', result: 'Normal' },
       file: { buffer: Buffer.from('test'), originalname: 'report.pdf', mimetype: 'application/pdf' },
     })
     const res = makeRes()
     await create(req, res, jest.fn())
 
-    expect(uploadLabReportToS3).toHaveBeenCalledWith(req.file, 'pat-1')
+    expect(uploadLabReportToS3).toHaveBeenCalledWith(req.file, PATIENT_UUID)
 
     // Verify INSERT includes file_key and file_name
     const insertCall = mockClient.query.mock.calls[2]
-    expect(insertCall[1]).toContain('lab-reports/pat-1/file.pdf')  // file_key
-    expect(insertCall[1]).toContain('report.pdf')                   // file_name
+    expect(insertCall[1]).toContain(`lab-reports/${PATIENT_UUID}/file.pdf`)  // file_key
+    expect(insertCall[1]).toContain('report.pdf')                              // file_name
   })
 })
 
@@ -322,15 +332,15 @@ describe('create', () => {
 // UPDATE
 // ──────────────────────────────────────────────────────────────
 describe('update', () => {
-  const VALID_UUID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  const REPORT_UUID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
 
   test('updates lab report result', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, patient_id: 'pat-1', test_name: 'Blood CBC' }] })
-      .mockResolvedValue({ rows: [{ user_id: 'usr-pat' }] })
+      .mockResolvedValueOnce({ rows: [{ id: REPORT_UUID, patient_id: PATIENT_UUID, test_name: 'Blood CBC' }] })
+      .mockResolvedValue({ rows: [{ user_id: USER_PAT_UUID }] })
 
     const req = makeReq({
-      params: { id: VALID_UUID },
+      params: { id: REPORT_UUID },
       body: { result: 'Elevated WBC', notes: 'Follow up needed' },
     })
     const res = makeRes()
@@ -338,16 +348,16 @@ describe('update', () => {
 
     await update(req, res, next)
 
-    expect(res.json.mock.calls[0][0].data.id).toBe(VALID_UUID)
+    expect(res.json.mock.calls[0][0].data.id).toBe(REPORT_UUID)
   })
 
   test('updates notes only', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ id: VALID_UUID, patient_id: 'pat-1', test_name: 'Blood CBC' }] })
+      .mockResolvedValueOnce({ rows: [{ id: REPORT_UUID, patient_id: PATIENT_UUID, test_name: 'Blood CBC' }] })
       .mockResolvedValue({ rows: [] })
 
     const req = makeReq({
-      params: { id: VALID_UUID },
+      params: { id: REPORT_UUID },
       body: { notes: 'Additional note' },
     })
     const res = makeRes()
@@ -362,7 +372,7 @@ describe('update', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] })
 
     const req = makeReq({
-      params: { id: VALID_UUID },
+      params: { id: REPORT_UUID },
       body: { result: 'Normal' },
     })
     const res = makeRes()

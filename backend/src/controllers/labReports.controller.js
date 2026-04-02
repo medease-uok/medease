@@ -3,9 +3,12 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
-const { uploadLabReportToS3, getPresignedImageUrl } = require('../middleware/upload');
+const { uploadLabReportToS3, getPresignedImageUrl, deleteFromS3 } = require('../middleware/upload');
+const path = require('path');
 
-const mapReport = async (row) => ({
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const mapReport = (row) => ({
   id: row.id,
   patientId: row.patient_id,
   technicianId: row.technician_id,
@@ -17,7 +20,6 @@ const mapReport = async (row) => ({
   reportDate: row.report_date,
   fileKey: row.file_key,
   fileName: row.file_name,
-  fileUrl: row.file_key ? await getPresignedImageUrl(row.file_key) : null,
 });
 
 const getAll = async (req, res, next) => {
@@ -51,7 +53,7 @@ const getAll = async (req, res, next) => {
 
     await auditLog({ userId: req.user.id, action: 'VIEW_LAB_REPORTS', resourceType: 'lab_report', ip: req.ip });
 
-    const mappedReports = await Promise.all(result.rows.map(mapReport));
+    const mappedReports = result.rows.map(mapReport);
 
     res.json({ status: 'success', data: mappedReports });
   } catch (err) {
@@ -61,11 +63,22 @@ const getAll = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   let client;
+  let fileKey = null;
   try {
     const { patientId, testName, result: testResult, notes, labTestRequestId } = req.body;
 
     if (!patientId || !testName) {
       throw new AppError('patientId and testName are required.', 400);
+    }
+
+    // Validate patientId is UUID
+    if (!UUID_REGEX.test(patientId)) {
+      throw new AppError('Invalid patientId format.', 400);
+    }
+
+    // Validate labTestRequestId if provided
+    if (labTestRequestId && !UUID_REGEX.test(labTestRequestId)) {
+      throw new AppError('Invalid labTestRequestId format.', 400);
     }
 
     const technicianId = req.user.id;
@@ -106,14 +119,17 @@ const create = async (req, res, next) => {
       };
     }
 
-    let fileKey = null;
+    // Sanitize filename and upload to S3 before transaction
     let fileName = null;
-
     if (req.file) {
+      const basename = path.basename(req.file.originalname);
+      fileName = basename.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 255);
+      // Upload to S3 before DB transaction
+      // If transaction fails, we clean up in catch block
       fileKey = await uploadLabReportToS3(req.file, patientId);
-      fileName = req.file.originalname;
     }
 
+    // Insert report with file key
     const insertResult = await client.query(
       `INSERT INTO lab_reports (patient_id, technician_id, test_name, result, notes, file_key, file_name)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
@@ -179,10 +195,14 @@ const create = async (req, res, next) => {
 
     await auditLog({ userId: req.user.id, action: 'CREATE_LAB_REPORT', resourceType: 'lab_report', resourceId: insertResult.rows[0].id, ip: req.ip, details: { patientId, testName } });
 
-    res.status(201).json({ status: 'success', data: { id: insertResult.rows[0].id } });
+    res.status(201).json({ status: 'success', data: { id: labReportId } });
   } catch (err) {
     if (client) {
       await client.query('ROLLBACK').catch((rollbackErr) => console.error('Rollback error:', rollbackErr));
+    }
+    // Clean up S3 file if it was uploaded but DB transaction failed
+    if (fileKey) {
+      deleteFromS3(fileKey).catch((deleteErr) => console.error('Failed to clean up S3 file:', deleteErr));
     }
     return next(err);
   } finally {
@@ -231,4 +251,57 @@ const update = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, create, update };
+const getDownloadUrl = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError('Invalid report ID format.', 400);
+    }
+
+    const subject = {
+      id: req.user.id,
+      role: req.user.role,
+      patientId: req.user.patientId,
+    };
+
+    const columnMap = {
+      patient_id: 'lr.patient_id',
+      technician_id: 'lr.technician_id',
+    };
+
+    const { clause, params } = await buildAccessFilter('lab_report', subject, columnMap);
+
+    const result = await db.query(
+      `SELECT lr.id, lr.file_key, lr.file_name
+       FROM lab_reports lr
+       WHERE lr.id = $1 AND ${clause}`,
+      [id, ...params]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Lab report not found or access denied.', 404);
+    }
+
+    const report = result.rows[0];
+
+    if (!report.file_key) {
+      throw new AppError('No file attached to this report.', 404);
+    }
+
+    const url = await getPresignedImageUrl(report.file_key);
+
+    res.json({
+      status: 'success',
+      data: {
+        url,
+        fileName: report.file_name,
+        expiresIn: 3600, // 1 hour
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, create, update, getDownloadUrl };

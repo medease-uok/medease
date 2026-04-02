@@ -3,6 +3,12 @@
  * This will update lab reports that don't have file_key to include S3-stored PDFs
  */
 
+// Guard against running in production
+if (process.env.NODE_ENV === 'production') {
+  console.error('ERROR: Seed scripts cannot run in production environment');
+  process.exit(1);
+}
+
 const db = require('../src/config/database');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');

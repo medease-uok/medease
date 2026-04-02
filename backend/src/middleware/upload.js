@@ -162,6 +162,12 @@ const labReportUpload = multer({
 });
 
 async function uploadLabReportToS3(file, patientId) {
+  // Validate patientId to prevent path traversal in S3 key
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_REGEX.test(patientId)) {
+    throw new Error('Invalid patientId format for S3 upload');
+  }
+
   const ext = path.extname(file.originalname).toLowerCase() || '.pdf';
   const hash = crypto.randomBytes(16).toString('hex');
   const key = `lab-reports/${patientId}/${hash}${ext}`;

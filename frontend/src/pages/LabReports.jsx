@@ -25,6 +25,23 @@ const matchesSearch = (r, query) => {
 };
 
 function ReportCard({ report, showPatient }) {
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    try {
+      setDownloading(true);
+      const response = await api.get(`/lab-reports/${report.id}/download-url`);
+      const { url, fileName } = response.data;
+
+      // Open in new tab
+      window.open(url, '_blank');
+    } catch (err) {
+      alert(err.data?.message || 'Failed to download file');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="group relative rounded-xl border border-slate-200 bg-white p-5 hover:shadow-lg hover:border-slate-300 transition-all duration-200">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -62,18 +79,17 @@ function ReportCard({ report, showPatient }) {
       </div>
 
       {/* File attachment */}
-      {report.fileUrl && (
+      {report.fileKey && (
         <div className="mt-3 pt-3 border-t border-slate-100">
-          <a
-            href={report.fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-primary hover:text-primary-dark bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-primary hover:text-primary-dark bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FileText className="w-4 h-4" />
-            <span>{report.fileName || 'View Report File'}</span>
+            <span>{downloading ? 'Loading...' : (report.fileName || 'View Report File')}</span>
             <Download className="w-3.5 h-3.5 ml-1" />
-          </a>
+          </button>
         </div>
       )}
     </div>
