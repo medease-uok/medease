@@ -6,7 +6,6 @@
 const db = require('../src/config/database');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const crypto = require('crypto');
-const path = require('path');
 const config = require('../src/config');
 
 // Initialize S3 client
