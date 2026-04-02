@@ -3,7 +3,7 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
-const { uploadLabReportToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
+const { uploadLabReportToS3, getPresignedImageUrl } = require('../middleware/upload');
 
 const mapReport = async (row) => ({
   id: row.id,
