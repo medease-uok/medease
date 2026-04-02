@@ -48,7 +48,13 @@ const upload = multer({
 });
 
 async function uploadToS3(file, patientId) {
-  const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+  // Sanitize file extension
+  let ext = path.extname(file.originalname).toLowerCase();
+  ext = ext.replace(/[^a-z0-9.]/g, '') || '.jpg';
+  if (!ext.startsWith('.') || ext.length > 10) {
+    ext = '.jpg';
+  }
+
   const hash = crypto.randomBytes(16).toString('hex');
   const key = `profile-images/${patientId}/${hash}${ext}`;
 
@@ -79,7 +85,8 @@ async function deleteFromS3(key) {
       Key: key,
     }));
   } catch (err) {
-    console.warn(`Failed to delete S3 object "${key}":`, err.message);
+    // Don't include key in error message to prevent log injection
+    console.warn('Failed to delete S3 object:', err.message);
   }
 }
 
@@ -96,7 +103,13 @@ const documentUpload = multer({
 });
 
 async function uploadDocumentToS3(file, patientId) {
-  const ext = path.extname(file.originalname).toLowerCase() || '.pdf';
+  // Sanitize file extension
+  let ext = path.extname(file.originalname).toLowerCase();
+  ext = ext.replace(/[^a-z0-9.]/g, '') || '.pdf';
+  if (!ext.startsWith('.') || ext.length > 10) {
+    ext = '.pdf';
+  }
+
   const hash = crypto.randomBytes(16).toString('hex');
   const key = `medical-documents/${patientId}/${hash}${ext}`;
 
@@ -126,7 +139,13 @@ const prescriptionImageUpload = multer({
 });
 
 async function uploadPrescriptionImageToS3(file, patientId) {
-  const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+  // Sanitize file extension
+  let ext = path.extname(file.originalname).toLowerCase();
+  ext = ext.replace(/[^a-z0-9.]/g, '') || '.jpg';
+  if (!ext.startsWith('.') || ext.length > 10) {
+    ext = '.jpg';
+  }
+
   const hash = crypto.randomBytes(16).toString('hex');
   const key = `prescription-images/${patientId}/${hash}${ext}`;
 
@@ -140,4 +159,54 @@ async function uploadPrescriptionImageToS3(file, patientId) {
   return key;
 }
 
-module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl, documentUpload, uploadDocumentToS3, prescriptionImageUpload, uploadPrescriptionImageToS3 };
+// Lab Report File Upload
+const LAB_REPORT_FILE_TYPES = [
+  'application/pdf',
+  'image/jpeg', 'image/png', 'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+const MAX_LAB_REPORT_SIZE = 25 * 1024 * 1024; // 25 MB
+
+const labReportUpload = multer({
+  storage,
+  limits: { fileSize: MAX_LAB_REPORT_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (LAB_REPORT_FILE_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new AppError('Unsupported file type. Allowed: PDF, JPEG, PNG, WebP, DOC, DOCX.', 400));
+    }
+  },
+});
+
+async function uploadLabReportToS3(file, patientId) {
+  // Validate patientId to prevent path traversal in S3 key
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_REGEX.test(patientId)) {
+    throw new Error('Invalid patientId format for S3 upload');
+  }
+
+  // Sanitize file extension to prevent log injection
+  let ext = path.extname(file.originalname).toLowerCase();
+  // Only allow alphanumeric and dot, default to .pdf
+  ext = ext.replace(/[^a-z0-9.]/g, '') || '.pdf';
+  // Ensure it starts with a dot and is reasonable length
+  if (!ext.startsWith('.') || ext.length > 10) {
+    ext = '.pdf';
+  }
+
+  const hash = crypto.randomBytes(16).toString('hex');
+  const key = `lab-reports/${patientId}/${hash}${ext}`;
+
+  await s3.send(new PutObjectCommand({
+    Bucket: config.s3.bucket,
+    Key: key,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  }));
+
+  return key;
+}
+
+module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl, documentUpload, uploadDocumentToS3, prescriptionImageUpload, uploadPrescriptionImageToS3, labReportUpload, uploadLabReportToS3 };

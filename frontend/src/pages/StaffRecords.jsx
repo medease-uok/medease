@@ -3,14 +3,15 @@ import { useSearchParams } from 'react-router-dom';
 import {
   FileText, FlaskConical, FolderOpen,
 } from 'lucide-react';
+import { useAuth } from '../data/AuthContext';
 import MedicalRecords from './MedicalRecords';
 import LabReports from './LabReports';
 import MedicalDocuments from './MedicalDocuments';
 
-const TABS = [
-  { id: 'records', label: 'Medical Records', icon: FileText },
-  { id: 'lab-reports', label: 'Lab Reports', icon: FlaskConical },
-  { id: 'documents', label: 'Documents', icon: FolderOpen },
+const ALL_TABS = [
+  { id: 'records', label: 'Medical Records', icon: FileText, roles: ['doctor', 'nurse', 'admin'] },
+  { id: 'lab-reports', label: 'Lab Reports', icon: FlaskConical, roles: ['doctor', 'nurse', 'admin', 'lab_technician'] },
+  { id: 'documents', label: 'Documents', icon: FolderOpen, roles: ['doctor', 'nurse', 'admin'] },
 ];
 
 const TAB_COMPONENTS = {
@@ -20,8 +21,18 @@ const TAB_COMPONENTS = {
 };
 
 export default function StaffRecords() {
+  const { currentUser } = useAuth();
+  const userRole = currentUser?.role;
+
+  // Filter tabs based on user role
+  const TABS = ALL_TABS.filter(tab => !tab.roles || tab.roles.includes(userRole));
+
+  // Default to first available tab for the user
+  const defaultTab = TABS[0]?.id || 'lab-reports';
+
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = TABS.find((t) => t.id === searchParams.get('tab'))?.id || 'records';
+  const requestedTab = searchParams.get('tab');
+  const initialTab = (requestedTab && TABS.find((t) => t.id === requestedTab)?.id) || defaultTab;
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const handleTabChange = (tabId) => {
