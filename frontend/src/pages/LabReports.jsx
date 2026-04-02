@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
-  FlaskConical, AlertCircle, Search, Clock, User, CalendarDays, X, Stethoscope,
+  FlaskConical, AlertCircle, Search, Clock, User, CalendarDays, X, Stethoscope, Download, FileText, Plus,
 } from 'lucide-react';
 import { useAuth } from '../data/AuthContext';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
+import CreateLabReportModal from '../components/CreateLabReportModal';
 
 const SKELETON_COUNT = 6;
 
@@ -59,6 +60,22 @@ function ReportCard({ report, showPatient }) {
           </div>
         )}
       </div>
+
+      {/* File attachment */}
+      {report.fileUrl && (
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <a
+            href={report.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-primary hover:text-primary-dark bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"
+          >
+            <FileText className="w-4 h-4" />
+            <span>{report.fileName || 'View Report File'}</span>
+            <Download className="w-3.5 h-3.5 ml-1" />
+          </a>
+        </div>
+      )}
     </div>
   );
 }
@@ -92,8 +109,12 @@ export default function LabReports({ embedded = false }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [patients, setPatients] = useState([]);
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
+  const isLabTech = currentUser?.role === 'lab_technician';
+  const canCreate = isLabTech || currentUser?.role === 'admin';
   const deferredSearch = useDeferredValue(search);
 
   const fetchReports = useCallback(() => {
@@ -115,6 +136,14 @@ export default function LabReports({ embedded = false }) {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    if (showCreateModal && canCreate) {
+      api.get('/patients')
+        .then((res) => setPatients(res.data || []))
+        .catch((err) => console.error('Failed to load patients:', err));
+    }
+  }, [showCreateModal, canCreate]);
+
   const filtered = useMemo(
     () => reports.filter((r) => {
       if (deferredSearch && !matchesSearch(r, deferredSearch)) return false;
@@ -134,15 +163,26 @@ export default function LabReports({ embedded = false }) {
   return (
     <div className="space-y-6">
       {!embedded && (
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
-            {isPatient ? 'My Lab Reports' : 'Lab Reports'}
-          </h1>
-          <p className="text-slate-500 mt-1">
-            {isPatient
-              ? 'View your laboratory test results.'
-              : 'Manage and review patient lab reports.'}
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight font-heading text-slate-900">
+              {isPatient ? 'My Lab Reports' : 'Lab Reports'}
+            </h1>
+            <p className="text-slate-500 mt-1">
+              {isPatient
+                ? 'View your laboratory test results.'
+                : 'Manage and review patient lab reports.'}
+            </p>
+          </div>
+          {canCreate && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create Lab Report
+            </button>
+          )}
         </div>
       )}
 
@@ -260,6 +300,14 @@ export default function LabReports({ embedded = false }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Create Lab Report Modal */}
+      <CreateLabReportModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={fetchReports}
+        patients={patients}
+      />
     </div>
   );
 }

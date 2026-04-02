@@ -3,8 +3,9 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
+const { uploadLabReportToS3, deleteFromS3, getPresignedImageUrl } = require('../middleware/upload');
 
-const mapReport = (row) => ({
+const mapReport = async (row) => ({
   id: row.id,
   patientId: row.patient_id,
   technicianId: row.technician_id,
@@ -14,6 +15,9 @@ const mapReport = (row) => ({
   result: row.result,
   notes: row.notes,
   reportDate: row.report_date,
+  fileKey: row.file_key,
+  fileName: row.file_name,
+  fileUrl: row.file_key ? await getPresignedImageUrl(row.file_key) : null,
 });
 
 const getAll = async (req, res, next) => {
@@ -33,7 +37,7 @@ const getAll = async (req, res, next) => {
 
     const query = `
       SELECT lr.id, lr.patient_id, lr.technician_id, lr.test_name, lr.result,
-             lr.notes, lr.report_date,
+             lr.notes, lr.report_date, lr.file_key, lr.file_name,
              pu.first_name || ' ' || pu.last_name AS patient_name,
              tu.first_name || ' ' || tu.last_name AS technician_name
       FROM lab_reports lr
@@ -47,7 +51,9 @@ const getAll = async (req, res, next) => {
 
     await auditLog({ userId: req.user.id, action: 'VIEW_LAB_REPORTS', resourceType: 'lab_report', ip: req.ip });
 
-    res.json({ status: 'success', data: result.rows.map(mapReport) });
+    const mappedReports = await Promise.all(result.rows.map(mapReport));
+
+    res.json({ status: 'success', data: mappedReports });
   } catch (err) {
     return next(err);
   }
@@ -71,10 +77,18 @@ const create = async (req, res, next) => {
     if (patientCheck.rows.length === 0) throw new AppError('Patient not found.', 404);
     const patient = patientCheck.rows[0];
 
+    let fileKey = null;
+    let fileName = null;
+
+    if (req.file) {
+      fileKey = await uploadLabReportToS3(req.file, patientId);
+      fileName = req.file.originalname;
+    }
+
     const insertResult = await db.query(
-      `INSERT INTO lab_reports (patient_id, technician_id, test_name, result, notes)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [patientId, technicianId, testName, testResult || null, notes || null]
+      `INSERT INTO lab_reports (patient_id, technician_id, test_name, result, notes, file_key, file_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [patientId, technicianId, testName, testResult || null, notes || null, fileKey, fileName]
     );
 
     createNotification({

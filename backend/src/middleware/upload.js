@@ -140,4 +140,40 @@ async function uploadPrescriptionImageToS3(file, patientId) {
   return key;
 }
 
-module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl, documentUpload, uploadDocumentToS3, prescriptionImageUpload, uploadPrescriptionImageToS3 };
+// Lab Report File Upload
+const LAB_REPORT_FILE_TYPES = [
+  'application/pdf',
+  'image/jpeg', 'image/png', 'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+const MAX_LAB_REPORT_SIZE = 25 * 1024 * 1024; // 25 MB
+
+const labReportUpload = multer({
+  storage,
+  limits: { fileSize: MAX_LAB_REPORT_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (LAB_REPORT_FILE_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new AppError('Unsupported file type. Allowed: PDF, JPEG, PNG, WebP, DOC, DOCX.', 400));
+    }
+  },
+});
+
+async function uploadLabReportToS3(file, patientId) {
+  const ext = path.extname(file.originalname).toLowerCase() || '.pdf';
+  const hash = crypto.randomBytes(16).toString('hex');
+  const key = `lab-reports/${patientId}/${hash}${ext}`;
+
+  await s3.send(new PutObjectCommand({
+    Bucket: config.s3.bucket,
+    Key: key,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  }));
+
+  return key;
+}
+
+module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl, documentUpload, uploadDocumentToS3, prescriptionImageUpload, uploadPrescriptionImageToS3, labReportUpload, uploadLabReportToS3 };
