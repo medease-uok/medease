@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
 import { inventoryService } from '../services/inventory.service';
+import { getExpiryStatus } from '../utils/inventoryUtils';
 import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download } from 'lucide-react';
 
 export default function Inventory() {
@@ -119,7 +120,9 @@ export default function Inventory() {
       csvContent += "Overview\n";
       csvContent += `Total Items,${reportData.overview.total_items}\n`;
       csvContent += `Low Stock Items,${reportData.overview.low_stock_items}\n`;
-      csvContent += `Out of Stock Items,${reportData.overview.out_of_stock_items}\n\n`;
+      csvContent += `Out of Stock Items,${reportData.overview.out_of_stock_items}\n`;
+      csvContent += `Expired Items,${reportData.overview.expired_items || 0}\n`;
+      csvContent += `Expiring Soon Items (within 30 days),${reportData.overview.expiring_soon_items || 0}\n\n`;
       
       // Categories Section
       csvContent += "Category Distribution\n";
@@ -242,9 +245,14 @@ export default function Inventory() {
               <tbody className="divide-y divide-slate-100">
                 {filteredItems.map(item => {
                   const isLowStock = item.quantity <= item.reorder_level;
+                  const { status: expiryStatus, daysRemaining: expiryDays } = getExpiryStatus(item.expiry_date);
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={item.id} className={`hover:bg-slate-50/50 transition-colors group ${
+                      expiryStatus === 'danger' ? 'bg-red-50/30' : 
+                      expiryStatus === 'critical' ? 'bg-red-50/10' :
+                      expiryStatus === 'warning' ? 'bg-amber-50/10' : ''
+                    }`}>
                       <td className="p-4">
                         <div className="font-medium text-slate-900">{item.item_name}</div>
                         <div className="text-sm text-slate-500 hidden sm:block">Supplier: {item.supplier || 'N/A'}</div>
@@ -267,8 +275,25 @@ export default function Inventory() {
                       </td>
                       <td className="p-4 hidden md:table-cell">
                         <div className="text-sm">
-                          {item.expiry_date && <div className="text-slate-900">Exp: {new Date(item.expiry_date).toLocaleDateString()}</div>}
-                          {item.location && <div className="text-slate-500">Loc: {item.location}</div>}
+                          {item.expiry_date && (
+                            <div className={`flex items-center gap-1 ${
+                              expiryStatus === 'danger' ? 'text-red-600 font-semibold' : 
+                              expiryStatus === 'critical' ? 'text-red-500 font-medium' :
+                              expiryStatus === 'warning' ? 'text-amber-600 font-semibold' : 
+                              'text-slate-900'
+                            }`}>
+                              Exp: {new Date(item.expiry_date).toLocaleDateString()}
+                              {expiryStatus !== 'normal' && (
+                                <AlertCircle 
+                                  className={`w-3.5 h-3.5 ${expiryStatus === 'warning' ? 'text-amber-500' : ''}`}
+                                  title={expiryStatus === 'danger' ? 'Expired' : expiryStatus === 'critical' ? 'Expires today' : `Expiring in ${expiryDays} days`}
+                                  aria-label={expiryStatus === 'danger' ? 'Expired' : expiryStatus === 'critical' ? 'Expires today' : `Expiring in ${expiryDays} days`}
+                                  role="img"
+                                />
+                              )}
+                            </div>
+                          )}
+                          {item.location && <div className="text-slate-500 mt-0.5">Loc: {item.location}</div>}
                         </div>
                       </td>
                       {isAdmin && (
