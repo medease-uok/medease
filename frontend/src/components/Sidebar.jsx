@@ -15,6 +15,7 @@ import {
   FolderOpen,
   Star,
   Archive,
+  Truck,
 } from 'lucide-react';
 
 
@@ -38,6 +39,7 @@ const navConfig = [
   { path: '/prescriptions', label: 'Prescriptions', icon: Pill, roles: [ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN] },
   { path: '/records', label: 'Records', icon: FileText, roles: [...ROLE_GROUPS.CLINICAL, ROLES.LAB_TECHNICIAN] },
   { path: '/inventory', label: 'Inventory', icon: Archive, roles: [...ROLE_GROUPS.CLINICAL, ROLES.PHARMACIST, ROLES.LAB_TECHNICIAN] },
+  { path: '/suppliers', label: 'Suppliers', icon: Truck, roles: [ROLES.ADMIN] },
 ];
 
 const roleColors = {

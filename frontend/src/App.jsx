@@ -22,6 +22,7 @@ import MedicalDocuments from './pages/MedicalDocuments';
 import Vaccinations from './pages/Vaccinations';
 import ChronicConditions from './pages/ChronicConditions';
 import Inventory from './pages/Inventory';
+import SupplierManagement from './pages/SupplierManagement';
 import ScheduleCalendar from './pages/ScheduleCalendar';
 import DoctorDashboard from './pages/DoctorDashboard';
 import MyRecords from './pages/MyRecords';
@@ -72,6 +73,7 @@ function App() {
             <Route path="chronic-conditions" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><ChronicConditions /></R>} />
             <Route path="inventory" element={<R roles={[...ROLE_GROUPS.CLINICAL, ROLES.PHARMACIST, ROLES.LAB_TECHNICIAN]}><Inventory /></R>} />
             <Route path="patient-satisfaction" element={<R roles={[ROLES.DOCTOR, ROLES.ADMIN]}><PatientSatisfaction /></R>} />
+            <Route path="suppliers" element={<R roles={[ROLES.ADMIN]}><SupplierManagement /></R>} />
             <Route path="permissions" element={<R roles={[ROLES.ADMIN]}><PermissionManagement /></R>} />
             <Route path="admin" element={<DashboardRedirect />} />
           </Route>
