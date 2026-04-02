@@ -59,6 +59,24 @@ const PORT = config.port || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${config.nodeEnv}`);
+
+  // Security: Warn about malware scanning status
+  if (config.nodeEnv === 'production' && !process.env.VIRUSTOTAL_API_KEY) {
+    console.warn('⚠️  WARNING: VirusTotal malware scanning is DISABLED in production.');
+    console.warn('⚠️  Uploaded files will NOT be scanned for malware.');
+    console.warn('⚠️  Set VIRUSTOTAL_API_KEY environment variable to enable scanning.');
+    console.warn('⚠️  See backend/FILE_VALIDATION.md for HIPAA compliance considerations.');
+  } else if (process.env.VIRUSTOTAL_API_KEY) {
+    console.log('✓ VirusTotal malware scanning: ENABLED');
+    if (config.nodeEnv === 'production') {
+      console.warn('⚠️  HIPAA WARNING: VirusTotal uploads files to cloud service.');
+      console.warn('⚠️  Ensure compliance with PHI data handling requirements.');
+      console.warn('⚠️  See backend/FILE_VALIDATION.md for details.');
+    }
+  } else {
+    console.log('VirusTotal malware scanning: disabled (development)');
+  }
+
   startReminderScheduler();
 });
 
