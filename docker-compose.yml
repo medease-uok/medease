@@ -73,6 +73,7 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-600}
       OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-3}
+      VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
     volumes:
       - ./backend/src:/app/src
     depends_on:
