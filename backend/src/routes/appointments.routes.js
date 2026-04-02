@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAll, getById, create, createRecurring, cancelSeries, updateStatus, cancelAppointment, reschedule, markNoShow } = require('../controllers/appointments.controller');
+const { getAll, getById, create, createRecurring, cancelSeries, updateStatus, cancelAppointment, reschedule, markNoShow, massReschedule } = require('../controllers/appointments.controller');
 const authenticate = require('../middleware/authenticate');
 const { requirePermission } = require('../middleware/authorize');
 const resolveSubject = require('../middleware/resolveSubject');
@@ -18,5 +18,6 @@ router.patch('/series/:seriesId/cancel', apiLimiter, requirePermission('update_a
 router.patch('/:id/status', apiLimiter, requirePermission('update_appointment_status', 'cancel_appointment'), updateStatus);
 router.delete('/:id', apiLimiter, requirePermission('update_appointment_status', 'cancel_appointment'), cancelAppointment);
 router.put('/:id/reschedule', apiLimiter, requirePermission('reschedule_appointment'), reschedule);
+router.post('/mass-reschedule', apiLimiter, requirePermission('reschedule_appointment'), massReschedule);
 
 module.exports = router;
