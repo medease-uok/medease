@@ -8,7 +8,10 @@ const auditLog = require('../utils/auditLog');
 const { SLOT_DURATION_MINUTES, CLINIC_TIMEZONE, clinicLocalTime } = require('../utils/scheduleHelpers');
 const { sendAppointmentConfirmationEmail } = require('../utils/emailService');
 const { notifyWaitlistOnCancellation } = require('./waitlist.controller');
-const { APPOINTMENT_STATUS, UPDATEABLE_STATUSES, INACTIVE_STATUSES } = require('../constants/appointmentStatus');
+const { APPOINTMENT_STATUS, UPDATEABLE_STATUSES } = require('../constants/appointmentStatus');
+
+// No-show flagging threshold
+const NO_SHOW_FLAG_THRESHOLD = 3;
 
 const mapAppointment = (row) => ({
   id: row.id,
@@ -1089,4 +1092,228 @@ const reschedule = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus, cancelAppointment, reschedule };
+/**
+ * POST /appointments/:id/no-show
+ * Mark an appointment as no-show and track patient no-show history
+ * - Only staff (doctor, nurse, admin) can mark appointments as no-show
+ * - Increments patient's no_show_count
+ * - Auto-flags patient when count >= 3
+ * - Sends notifications to patient and relevant staff
+ */
+const markNoShow = async (req, res, next) => {
+  let client;
+
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError('Invalid appointment ID format.', 400);
+    }
+
+    // Only staff can mark no-shows (not patients)
+    if (req.user.role === 'patient') {
+      throw new AppError('Patients cannot mark appointments as no-show.', 403);
+    }
+
+    client = await db.getClient();
+    await client.query('BEGIN');
+
+    // Get appointment details with patient info and doctor department
+    // Lock both appointment and patient rows to prevent race conditions
+    const apptResult = await client.query(
+      `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
+              p.user_id AS patient_user_id, p.no_show_count, p.no_show_flagged, p.no_show_flag_date,
+              pu.first_name AS patient_first_name, pu.last_name AS patient_last_name,
+              d.user_id AS doctor_user_id, d.department AS doctor_department,
+              du.first_name AS doctor_first_name, du.last_name AS doctor_last_name
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       JOIN users pu ON p.user_id = pu.id
+       JOIN doctors d ON a.doctor_id = d.id
+       JOIN users du ON d.user_id = du.id
+       WHERE a.id = $1
+       FOR UPDATE OF a, p`,
+      [id]
+    );
+
+    if (apptResult.rows.length === 0) {
+      throw new AppError('Appointment not found.', 404);
+    }
+
+    const appt = apptResult.rows[0];
+
+    // Nurses can only mark no-show for appointments with doctors in their department
+    if (req.user.role === 'nurse') {
+      const nurseDeptResult = await client.query(
+        'SELECT department FROM nurses WHERE user_id = $1',
+        [req.user.id]
+      );
+      if (nurseDeptResult.rows.length === 0) {
+        throw new AppError('Nurse profile not found.', 404);
+      }
+      const nurseDepartment = nurseDeptResult.rows[0].department;
+      if (nurseDepartment !== appt.doctor_department) {
+        throw new AppError('You can only mark no-shows for appointments with doctors in your department.', 403);
+      }
+    }
+
+    // Validate appointment can be marked as no-show
+    if (appt.status === APPOINTMENT_STATUS.NO_SHOW) {
+      throw new AppError('Appointment is already marked as no-show.', 400);
+    }
+
+    if (appt.status === APPOINTMENT_STATUS.CANCELLED) {
+      throw new AppError('Cannot mark a cancelled appointment as no-show.', 400);
+    }
+
+    if (appt.status === APPOINTMENT_STATUS.COMPLETED) {
+      throw new AppError('Cannot mark a completed appointment as no-show.', 400);
+    }
+
+    // Only mark past or current appointments as no-show
+    const now = new Date();
+    const scheduledAt = new Date(appt.scheduled_at);
+    if (scheduledAt > now) {
+      throw new AppError('Cannot mark a future appointment as no-show. Wait until after the scheduled time.', 400);
+    }
+
+    // Update appointment status to no-show
+    await client.query(
+      `UPDATE appointments SET status = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [APPOINTMENT_STATUS.NO_SHOW, id]
+    );
+
+    // Atomic patient update: increment count and auto-flag if threshold reached
+    // Using RETURNING to get actual DB values (prevents race conditions)
+    const patientResult = await client.query(
+      `UPDATE patients
+       SET no_show_count = no_show_count + 1,
+           no_show_flagged = CASE
+             WHEN no_show_count + 1 >= $1 THEN true
+             ELSE no_show_flagged
+           END,
+           no_show_flag_date = CASE
+             WHEN no_show_count + 1 >= $1 AND NOT no_show_flagged THEN NOW()
+             ELSE no_show_flag_date
+           END,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING no_show_count, no_show_flagged, no_show_flag_date`,
+      [NO_SHOW_FLAG_THRESHOLD, appt.patient_id]
+    );
+
+    const { no_show_count: newNoShowCount, no_show_flagged: nowFlagged } = patientResult.rows[0];
+    const justFlagged = nowFlagged && !appt.no_show_flagged;
+
+    // Audit log (inside transaction for compliance)
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, resource_type, resource_id, ip, details, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [
+        req.user.id,
+        'MARK_NO_SHOW',
+        'appointment',
+        id,
+        req.ip,
+        JSON.stringify({
+          previousStatus: appt.status,
+          patientId: appt.patient_id,
+          newNoShowCount,
+          flagged: nowFlagged,
+        }),
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    // Notify patient about no-show
+    const scheduledAtStr = new Date(appt.scheduled_at).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+      timeZone: CLINIC_TIMEZONE,
+    });
+
+    createNotification({
+      recipientId: appt.patient_user_id,
+      type: 'appointment_no_show',
+      title: 'Missed Appointment',
+      message: `You missed your appointment with Dr. ${appt.doctor_first_name} ${appt.doctor_last_name} on ${scheduledAtStr}. Total missed appointments: ${newNoShowCount}.`,
+      referenceId: id,
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send no-show notification to patient', { id, error: err.message });
+    });
+
+    // Notify doctor about no-show
+    createNotification({
+      recipientId: appt.doctor_user_id,
+      type: 'appointment_no_show',
+      title: 'Patient No-Show',
+      message: `${appt.patient_first_name} ${appt.patient_last_name} did not attend their appointment on ${scheduledAtStr}.`,
+      referenceId: id,
+      referenceType: 'appointment',
+    }).catch((err) => {
+      console.error('Failed to send no-show notification to doctor', { id, error: err.message });
+    });
+
+    // Additional notification if patient was just flagged
+    if (justFlagged) {
+      createNotification({
+        recipientId: appt.patient_user_id,
+        type: 'patient_flagged_no_show',
+        title: 'Account Flagged for Missed Appointments',
+        message: `Your account has been flagged due to ${newNoShowCount} missed appointments. Please contact the clinic to discuss your appointment attendance.`,
+        referenceId: appt.patient_id,
+        referenceType: 'patient',
+      }).catch((err) => {
+        console.error('Failed to send flagged notification to patient', { id, error: err.message });
+      });
+
+      // Notify admin about flagged patient
+      const adminResult = await db.query(
+        `SELECT id FROM users WHERE role = 'admin' LIMIT 1`
+      );
+      if (adminResult.rows.length > 0) {
+        createNotification({
+          recipientId: adminResult.rows[0].id,
+          type: 'patient_flagged_no_show',
+          title: 'Patient Flagged for No-Shows',
+          message: `${appt.patient_first_name} ${appt.patient_last_name} has been flagged for ${newNoShowCount} missed appointments.`,
+          referenceId: appt.patient_id,
+          referenceType: 'patient',
+        }).catch((err) => {
+          console.error('Failed to send flagged notification to admin', { id, error: err.message });
+        });
+      }
+    }
+
+    // Notify waitlist about freed slot
+    notifyWaitlistOnCancellation(appt.doctor_id, appt.scheduled_at).catch((err) => {
+      console.error('Failed to notify waitlist on no-show', { id, error: err.message });
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        id,
+        status: APPOINTMENT_STATUS.NO_SHOW,
+        patient: {
+          noShowCount: newNoShowCount,
+          flagged: nowFlagged,
+        },
+      },
+    });
+  } catch (err) {
+    if (client) {
+      await client.query('ROLLBACK');
+    }
+    return next(err);
+  } finally {
+    if (client) {
+      client.release();
+    }
+  }
+};
+
+module.exports = { getAll, getById, create, createRecurring, cancelSeries, updateStatus, cancelAppointment, reschedule, markNoShow };

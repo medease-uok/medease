@@ -47,4 +47,19 @@ const exportLimiter = rateLimit({
   },
 });
 
-module.exports = { sensitiveDataLimiter, authLimiter, exportLimiter };
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new RedisStore({
+    sendCommand: (...args) => redis.call(...args),
+    prefix: 'rl:api:',
+  }),
+  message: {
+    status: 'error',
+    message: 'Too many requests. Please try again later.',
+  },
+});
+
+module.exports = { sensitiveDataLimiter, authLimiter, exportLimiter, apiLimiter };

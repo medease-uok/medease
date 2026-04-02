@@ -31,7 +31,7 @@ jest.mock('../../config', () => ({
 }))
 
 const { sendAppointmentConfirmationEmail } = require('../../utils/emailService')
-const { getAll, getById, create, updateStatus, cancelAppointment, reschedule } = require('../../controllers/appointments.controller')
+const { getAll, getById, create, updateStatus, cancelAppointment, reschedule, markNoShow } = require('../../controllers/appointments.controller')
 
 function makeReq(overrides = {}) {
   return {
@@ -1303,5 +1303,373 @@ describe('cancelAppointment', () => {
     await cancelAppointment(req, res, next)
 
     expect(res.json).toHaveBeenCalledWith({ status: 'success', data: { id: VALID_UUID, status: 'cancelled' } })
+  })
+})
+
+// ──────────────────────────────────────────────────────────────
+// MARK NO-SHOW
+// ──────────────────────────────────────────────────────────────
+describe('markNoShow', () => {
+  const VALID_UUID = '12345678-1234-1234-1234-123456789012'
+  const PAST_DATE = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() // 2 hours ago
+
+  test('marks scheduled appointment as no-show and increments count', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      patient_id: 'pat-1',
+      doctor_id: 'doc-1',
+      status: 'scheduled',
+      scheduled_at: PAST_DATE,
+      patient_user_id: 'usr-pat',
+      no_show_count: 0,
+      no_show_flagged: false,
+      no_show_flag_date: null,
+      patient_first_name: 'John',
+      patient_last_name: 'Doe',
+      doctor_user_id: 'usr-doc',
+      doctor_department: 'Cardiology',
+      doctor_first_name: 'Kamal',
+      doctor_last_name: 'Perera',
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
+      .mockResolvedValueOnce(undefined) // UPDATE appointment
+      .mockResolvedValueOnce({ rows: [{ no_show_count: 1, no_show_flagged: false, no_show_flag_date: null }] }) // UPDATE patient RETURNING
+      .mockResolvedValueOnce(undefined) // INSERT audit_logs
+      .mockResolvedValueOnce(undefined) // COMMIT
+
+    mockQuery.mockResolvedValueOnce({ rows: [] }) // Admin query (no admin)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(mockClientQuery).toHaveBeenCalledWith('BEGIN')
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE appointments SET status'),
+      ['no_show', VALID_UUID]
+    )
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE patients'),
+      [3, 'pat-1']
+    )
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO audit_logs'),
+      expect.any(Array)
+    )
+    expect(mockClientQuery).toHaveBeenCalledWith('COMMIT')
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      data: {
+        id: VALID_UUID,
+        status: 'no_show',
+        patient: { noShowCount: 1, flagged: false },
+      },
+    })
+    expect(mockClientRelease).toHaveBeenCalled()
+  })
+
+  test('flags patient when no-show count reaches 3', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      patient_id: 'pat-1',
+      doctor_id: 'doc-1',
+      status: 'scheduled',
+      scheduled_at: PAST_DATE,
+      patient_user_id: 'usr-pat',
+      no_show_count: 2, // This will be the 3rd no-show
+      no_show_flagged: false,
+      no_show_flag_date: null,
+      patient_first_name: 'John',
+      patient_last_name: 'Doe',
+      doctor_user_id: 'usr-doc',
+      doctor_department: 'Cardiology',
+      doctor_first_name: 'Kamal',
+      doctor_last_name: 'Perera',
+    }
+
+    const flagDate = new Date()
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
+      .mockResolvedValueOnce(undefined) // UPDATE appointment
+      .mockResolvedValueOnce({ rows: [{ no_show_count: 3, no_show_flagged: true, no_show_flag_date: flagDate }] }) // UPDATE patient RETURNING
+      .mockResolvedValueOnce(undefined) // INSERT audit_logs
+      .mockResolvedValueOnce(undefined) // COMMIT
+
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: 'admin-1' }] }) // Admin query
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE patients'),
+      [3, 'pat-1']
+    )
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      data: {
+        id: VALID_UUID,
+        status: 'no_show',
+        patient: { noShowCount: 3, flagged: true },
+      },
+    })
+  })
+
+  test('returns 403 when patient tries to mark no-show', async () => {
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-pat', role: 'patient', patientId: 'pat-1' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Patients cannot mark appointments as no-show.', statusCode: 403 }))
+  })
+
+  test('returns 400 for invalid UUID format', async () => {
+    const req = makeReq({ params: { id: 'not-a-uuid' }, user: { id: 'usr-doc', role: 'doctor' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Invalid appointment ID format.', statusCode: 400 }))
+  })
+
+  test('returns 404 when appointment not found', async () => {
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SELECT - not found
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Appointment not found.', statusCode: 404 }))
+    expect(mockClientRelease).toHaveBeenCalled()
+  })
+
+  test('returns 400 when appointment already marked as no-show', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      status: 'no_show',
+      scheduled_at: PAST_DATE,
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Appointment is already marked as no-show.', statusCode: 400 }))
+  })
+
+  test('returns 400 when appointment is cancelled', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      status: 'cancelled',
+      scheduled_at: PAST_DATE,
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Cannot mark a cancelled appointment as no-show.', statusCode: 400 }))
+  })
+
+  test('returns 400 when appointment is completed', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      status: 'completed',
+      scheduled_at: PAST_DATE,
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Cannot mark a completed appointment as no-show.', statusCode: 400 }))
+  })
+
+  test('returns 400 when appointment is in the future', async () => {
+    const futureDate = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+    const apptRow = {
+      id: VALID_UUID,
+      status: 'scheduled',
+      scheduled_at: futureDate,
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Cannot mark a future appointment as no-show. Wait until after the scheduled time.', statusCode: 400 }))
+  })
+
+  test('allows nurse to mark no-show for appointment in their department', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      patient_id: 'pat-1',
+      doctor_id: 'doc-1',
+      status: 'scheduled',
+      scheduled_at: PAST_DATE,
+      patient_user_id: 'usr-pat',
+      no_show_count: 0,
+      no_show_flagged: false,
+      no_show_flag_date: null,
+      patient_first_name: 'John',
+      patient_last_name: 'Doe',
+      doctor_user_id: 'usr-doc',
+      doctor_department: 'Cardiology',
+      doctor_first_name: 'Kamal',
+      doctor_last_name: 'Perera',
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
+      .mockResolvedValueOnce({ rows: [{ department: 'Cardiology' }] }) // SELECT nurse department
+      .mockResolvedValueOnce(undefined) // UPDATE appointment
+      .mockResolvedValueOnce({ rows: [{ no_show_count: 1, no_show_flagged: false, no_show_flag_date: null }] }) // UPDATE patient RETURNING
+      .mockResolvedValueOnce(undefined) // INSERT audit_logs
+      .mockResolvedValueOnce(undefined) // COMMIT
+
+    mockQuery.mockResolvedValueOnce({ rows: [] }) // Admin query
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-nurse', role: 'nurse' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      data: {
+        id: VALID_UUID,
+        status: 'no_show',
+        patient: { noShowCount: 1, flagged: false },
+      },
+    })
+  })
+
+  test('returns 403 when nurse tries to mark no-show for appointment in different department', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      doctor_department: 'Cardiology',
+      status: 'scheduled',
+      scheduled_at: PAST_DATE,
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
+      .mockResolvedValueOnce({ rows: [{ department: 'Neurology' }] }) // SELECT nurse department (different)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-nurse', role: 'nurse' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'You can only mark no-shows for appointments with doctors in your department.',
+      statusCode: 403
+    }))
+    expect(mockClientRelease).toHaveBeenCalled()
+  })
+
+  test('returns 404 when nurse profile not found', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      doctor_department: 'Cardiology',
+      status: 'scheduled',
+      scheduled_at: PAST_DATE,
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT appointment
+      .mockResolvedValueOnce({ rows: [] }) // SELECT nurse department (not found)
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-nurse', role: 'nurse' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Nurse profile not found.',
+      statusCode: 404
+    }))
+    expect(mockClientRelease).toHaveBeenCalled()
+  })
+
+  test('rolls back transaction on error', async () => {
+    const apptRow = {
+      id: VALID_UUID,
+      patient_id: 'pat-1',
+      status: 'scheduled',
+      scheduled_at: PAST_DATE,
+      patient_user_id: 'usr-pat',
+      no_show_count: 0,
+      no_show_flagged: false,
+      no_show_flag_date: null,
+      patient_first_name: 'John',
+      patient_last_name: 'Doe',
+      doctor_user_id: 'usr-doc',
+      doctor_department: 'Cardiology',
+      doctor_first_name: 'Kamal',
+      doctor_last_name: 'Perera',
+    }
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [apptRow] }) // SELECT
+      .mockRejectedValueOnce(new Error('Database error')) // UPDATE fails
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({ params: { id: VALID_UUID }, user: { id: 'usr-doc', role: 'doctor' } })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await markNoShow(req, res, next)
+
+    expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK')
+    expect(mockClientRelease).toHaveBeenCalled()
+    expect(next).toHaveBeenCalledWith(expect.any(Error))
   })
 })
