@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import {
   X, Calendar, Clock, Stethoscope, User, FileText,
-  Building2, BadgeCheck, AlertCircle, Repeat,
+  Building2, BadgeCheck, AlertCircle, Repeat, CalendarClock,
 } from 'lucide-react'
 import api from '../services/api'
 import { useAuth } from '../data/AuthContext'
 import StatusBadge from './StatusBadge'
+import RescheduleAppointmentModal from './RescheduleAppointmentModal'
 
 export default function AppointmentDetailModal({ appointmentId, onClose, onStatusChange }) {
   const [appointment, setAppointment] = useState(null)
@@ -13,6 +14,7 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
   const [error, setError] = useState(null)
   const [cancelling, setCancelling] = useState(false)
   const [cancellingAll, setCancellingAll] = useState(false)
+  const [showReschedule, setShowReschedule] = useState(false)
   const { currentUser } = useAuth()
   const isPatient = currentUser?.role === 'patient'
 
@@ -191,9 +193,17 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
                 </div>
               )}
 
-              {/* Cancel buttons */}
+              {/* Action buttons */}
               {canCancel && (
                 <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <button
+                    onClick={() => setShowReschedule(true)}
+                    disabled={cancelling || cancellingAll}
+                    className="w-full px-4 py-2 text-sm font-medium text-primary bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CalendarClock className="w-4 h-4" />
+                    Reschedule Appointment
+                  </button>
                   <button
                     onClick={handleCancel}
                     disabled={cancelling || cancellingAll}
@@ -216,6 +226,19 @@ export default function AppointmentDetailModal({ appointmentId, onClose, onStatu
           )}
         </div>
       </div>
+
+      {/* Reschedule modal */}
+      {showReschedule && (
+        <RescheduleAppointmentModal
+          appointmentId={appointmentId}
+          onClose={() => setShowReschedule(false)}
+          onRescheduled={() => {
+            setShowReschedule(false)
+            if (onStatusChange) onStatusChange()
+            onClose()
+          }}
+        />
+      )}
     </div>
   )
 }
