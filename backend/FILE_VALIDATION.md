@@ -5,7 +5,7 @@
 The system implements comprehensive file validation for all uploaded files, including:
 1. **File Type Validation** - Using magic bytes (not just MIME type)
 2. **File Size Validation** - Type-specific size limits
-3. **Malware Scanning** - ClamAV integration (optional)
+3. **Malware Scanning** - VirusTotal cloud API integration (optional)
 
 ## Security Features
 
@@ -38,84 +38,56 @@ Type-specific size limits prevent resource exhaustion:
 
 ### 3. Malware Scanning
 
-Optional ClamAV integration scans files for viruses and malware.
+Optional VirusTotal cloud API integration scans files using 70+ antivirus engines.
 
-**If ClamAV is available:**
+**If VirusTotal API key is configured:**
 - ✅ All uploaded files are scanned
-- ✅ Infected files are rejected immediately
-- ✅ Scan results logged
+- ✅ Files scanned by 70+ antivirus engines simultaneously
+- ✅ Smart hash-checking (files already known to VirusTotal are instant)
+- ✅ Infected files are rejected if 2+ engines flag as malicious
+- ✅ Scan results logged with detailed statistics
+- ✅ Works on all platforms (Linux, Windows, macOS, ARM64, x86_64)
 
-**If ClamAV is NOT available:**
+**If VirusTotal API key is NOT configured:**
 - ⚠️ Warning logged
 - ✅ Upload continues (other validations still apply)
-- 💡 Recommended for production
+- 💡 Recommended for production (free tier: 500 requests/day)
 
 ## Setup
 
-### Option 1: Docker (Recommended)
+### Get VirusTotal API Key (Free)
 
-Add ClamAV service to `docker-compose.yml`:
+1. **Create account**: Visit [https://www.virustotal.com](https://www.virustotal.com)
+2. **Sign up**: Free account gives you 500 requests/day
+3. **Get API key**: Go to [https://www.virustotal.com/gui/my-apikey](https://www.virustotal.com/gui/my-apikey)
+4. **Copy your API key**
 
-```yaml
-clamav:
-  image: clamav/clamav:stable
-  container_name: medease-clamav
-  ports:
-    - "3310:3310"
-  volumes:
-    - clamav-data:/var/lib/clamav
-  environment:
-    - CLAMAV_NO_FRESHCLAM=false
-  healthcheck:
-    test: ["CMD", "clamdcheck.sh"]
-    interval: 30s
-    timeout: 10s
-    retries: 3
+### Configure Backend
 
-volumes:
-  clamav-data:
-```
-
-Then add to backend `.env`:
+Add to `backend/.env.development`:
 ```env
-CLAMAV_HOST=clamav
-CLAMAV_PORT=3310
+# VirusTotal - Malware Scanning (Optional)
+# Get a free API key at: https://www.virustotal.com/gui/my-apikey
+# Works on all platforms (Linux, Windows, macOS, ARM64, x86_64)
+# Leave empty to disable malware scanning
+VIRUSTOTAL_API_KEY=your_api_key_here
 ```
 
-Start services:
-```bash
-docker-compose up -d clamav
-docker-compose restart backend
-```
+### No Additional Installation Required
 
-### Option 2: Local Installation
+✅ **Works on all platforms** - No Docker containers or daemons needed
+✅ **Cloud-based** - Scans happen on VirusTotal servers
+✅ **ARM64 compatible** - Works on Apple Silicon Macs
+✅ **Cross-platform** - Linux, Windows, macOS all supported
+✅ **70+ antivirus engines** - More comprehensive than single scanner
+✅ **Smart caching** - Known files are checked instantly via hash lookup
 
-#### Ubuntu/Debian:
-```bash
-sudo apt-get update
-sudo apt-get install clamav clamav-daemon
-sudo systemctl start clamav-daemon
-sudo systemctl enable clamav-daemon
-```
+### Optional: Skip Malware Scanning (Development Only)
 
-#### macOS:
-```bash
-brew install clamav
-brew services start clamav
-```
-
-Backend `.env`:
-```env
-CLAMAV_HOST=localhost
-CLAMAV_PORT=3310
-```
-
-### Option 3: No ClamAV (Development Only)
-
-Simply don't configure ClamAV. The system will:
+Simply leave `VIRUSTOTAL_API_KEY` empty in your `.env` file. The system will:
 - Log a warning on startup
 - Skip malware scanning
-- Continue with other validations
+- Continue with magic byte validation and size limits
 
 **⚠️ NOT recommended for production!**
 
@@ -154,7 +126,7 @@ curl -X POST http://localhost:5001/api/lab-reports \
 ### Test Malware Detection
 
 ```bash
-# EICAR test file (safe test virus signature)
+# EICAR test file (safe test virus signature recognized by all antivirus engines)
 echo 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' > eicar.pdf
 
 curl -X POST http://localhost:5001/api/lab-reports \
@@ -163,7 +135,8 @@ curl -X POST http://localhost:5001/api/lab-reports \
   -F "patientId=$PATIENT_ID" \
   -F "testName=Blood Test"
 
-# Expected: 400 - "File rejected: malware detected"
+# Expected: 400 - "File rejected: X antivirus engines detected malware"
+# (where X is the number of engines that flagged it, typically 50+)
 ```
 
 ### Test Valid Upload
@@ -206,10 +179,21 @@ User uploads file
     │
     ├─→ If mismatch: log warning, use detected type
     │
-    └─→ [ClamAV] Scan for malware (if available)
+    └─→ [VirusTotal] Scan for malware (if API key configured)
             │
-            ├─→ Clean: Continue
-            └─→ Infected: REJECT (400 error)
+            ├─→ Calculate SHA256 hash
+            │
+            ├─→ Check if hash already known (fast path)
+            │   ├─→ Found: Use cached results (instant)
+            │   └─→ Not found: Upload for scanning
+            │
+            ├─→ Wait for analysis (70+ engines)
+            │
+            ├─→ Check malicious threshold (2+ engines)
+            │   ├─→ Below threshold: Continue
+            │   └─→ Above threshold: REJECT (400 error)
+            │
+            └─→ Log results (malicious, suspicious, clean counts)
     ↓
 [Controller] Process upload to S3
     ↓
@@ -224,14 +208,16 @@ Success
 | `File size exceeds X MB limit` | File too large for its type | Reduce file size or compress |
 | `Could not determine file type` | Corrupted or unrecognizable file | Use a valid file |
 | `Invalid file type detected: X` | Magic bytes don't match allowed types | File content is not what it claims to be |
-| `File rejected: malware detected` | ClamAV found malware | File contains malicious code |
+| `File rejected: X antivirus engines detected malware` | VirusTotal engines flagged file as malicious | File contains malicious code |
 
 ## Logs
 
 ### Successful Validation
 ```
+Scanning file: report.pdf (SHA256: abc123...)
+File found in VirusTotal database: report.pdf
+Scan results: 0 malicious, 0 suspicious, 73 clean (73 engines)
 File validated successfully: report.pdf (application/pdf, 2456789 bytes)
-File "report.pdf" scanned: clean
 ```
 
 ### MIME Type Mismatch
@@ -242,71 +228,89 @@ File validated successfully: scan.pdf (image/jpeg, 1234567 bytes)
 
 ### Malware Detected
 ```
-Malware detected in file "infected.pdf": ["Eicar-Test-Signature"]
+Scanning file: infected.pdf (SHA256: def456...)
+Analysis complete: 52 malicious, 3 suspicious, 18 clean (73 engines)
+MALWARE DETECTED: infected.pdf - File rejected: 52 antivirus engines detected malware
 ```
 
-### ClamAV Not Available
+### VirusTotal Not Configured
 ```
-ClamAV not available, malware scanning disabled: connect ECONNREFUSED 127.0.0.1:3310
-Malware scanning skipped (ClamAV not available)
+VirusTotal scanning disabled (no API key configured)
+Malware scanning skipped (API key not configured)
+```
+
+### VirusTotal API Error
+```
+VirusTotal rate limit exceeded
+Malware scanning skipped (Rate limit exceeded)
+Proceeding without malware scan due to scanner error
 ```
 
 ## Production Checklist
 
-- [ ] ClamAV installed and running
-- [ ] Virus definitions up to date (`freshclam`)
-- [ ] Environment variables configured
+- [ ] VirusTotal API key obtained and configured
+- [ ] VIRUSTOTAL_API_KEY set in production environment
 - [ ] Test EICAR file detection
-- [ ] Monitor ClamAV logs
+- [ ] Monitor rate limit usage (500 requests/day for free tier)
 - [ ] Set up alerting for malware detections
 - [ ] Document incident response procedure
+- [ ] Consider paid tier if > 500 files/day (or implement queueing)
+- [ ] Review VirusTotal detection threshold (default: 2 engines)
 
 ## Maintenance
 
-### Update Virus Definitions
+### Monitor API Usage
 
-**Docker:**
+**Check rate limit usage:**
 ```bash
-docker exec medease-clamav freshclam
+# VirusTotal free tier: 500 requests/day
+# Check your usage in VirusTotal dashboard
+# https://www.virustotal.com/gui/user/[username]/apikey
 ```
 
-**Local:**
-```bash
-sudo freshclam
-```
+**Rate limit handling:**
+- The system automatically handles rate limit errors gracefully
+- Uploads continue with other validations if rate limit exceeded
+- Consider paid tier for high-volume production use
 
-**Automatic updates** are enabled by default in the Docker image.
+### Performance Optimization
 
-### Monitor ClamAV Status
+VirusTotal scanning is optimized but network-dependent:
 
-```bash
-# Docker
-docker logs medease-clamav
+1. **Hash-based caching (automatic):**
+   - Files already known to VirusTotal are checked instantly
+   - No upload needed if hash found in database
+   - Saves time and API quota
 
-# Local
-sudo systemctl status clamav-daemon
-```
+2. **File size limits:**
+   - Files > 32 MB skip VirusTotal scanning (VirusTotal limit)
+   - Magic byte validation still applies
 
-### Performance Tuning
-
-ClamAV scanning can be resource-intensive. For high-volume systems:
-
-1. **Increase ClamAV memory:**
-   ```yaml
-   clamav:
-     deploy:
-       resources:
-         limits:
-           memory: 2G
-   ```
-
-2. **Use async scanning:**
+3. **Async scanning (future enhancement):**
    - Current implementation is synchronous
-   - Consider background job queue for large files
+   - Consider background job queue for better UX
+   - Allows immediate upload with post-scan verification
 
-3. **Skip scanning for trusted sources:**
-   - Add role-based exemptions if needed
-   - Document security trade-offs
+4. **Configurable threshold:**
+   - Default: 2 engines must flag as malicious
+   - Adjust `MALICIOUS_THRESHOLD` in virusTotalScan.js
+   - Lower = stricter, Higher = more permissive
+
+### Upgrade to Paid Tier
+
+If you need more than 500 requests/day:
+
+**VirusTotal Premium:**
+- 20,000+ requests/day
+- Priority scanning
+- Advanced API features
+- Contact: https://www.virustotal.com/gui/contact
+
+**VirusTotal Enterprise:**
+- Unlimited requests
+- Private scanning (files not shared)
+- Custom integrations
+- Contact sales team
 
 ## Security Best Practices
 
@@ -319,40 +323,86 @@ ClamAV scanning can be resource-intensive. For high-volume systems:
 
 ## Troubleshooting
 
-### "ClamAV not available"
+### "VirusTotal scanning disabled"
 
-**Check if ClamAV is running:**
+**Check if API key is configured:**
 ```bash
-# Docker
-docker ps | grep clamav
+# Check environment variable
+echo $VIRUSTOTAL_API_KEY
 
-# Local
-netstat -an | grep 3310
+# Should not be empty
 ```
 
-**Check connectivity:**
+**Verify API key is valid:**
 ```bash
-telnet localhost 3310
+# Test with curl
+curl -H "x-apikey: YOUR_API_KEY" \
+  https://www.virustotal.com/api/v3/files/44d88612fea8a8f36de82e1278abb02f
+
+# Should return 200 OK (or 404 if file not found)
+# Should NOT return 401 Unauthorized
 ```
 
-**Check environment variables:**
-```bash
-echo $CLAMAV_HOST
-echo $CLAMAV_PORT
+### "Rate limit exceeded"
+
+**Symptoms:**
 ```
+VirusTotal rate limit exceeded
+Malware scanning skipped (Rate limit exceeded)
+```
+
+**Solutions:**
+1. **Check usage:** Visit https://www.virustotal.com/gui/user/[username]/apikey
+2. **Wait:** Free tier resets daily (500 requests/day)
+3. **Upgrade:** Consider paid tier for high-volume production
+4. **Optimize:** Most requests should use hash-checking (faster, counts toward quota)
 
 ### "File validation taking too long"
 
-- ClamAV scanning can take 1-5 seconds per file
-- For large files (>10 MB), consider async processing
-- Check ClamAV container resources
+**Normal timing:**
+- Hash check (file known): < 1 second
+- Full scan (new file): 5-15 seconds (network + analysis time)
+- Large files: May take longer depending on upload speed
+
+**Solutions:**
+1. **Check network connectivity** to VirusTotal servers
+2. **Consider async scanning** for better UX (background job queue)
+3. **Increase timeouts** in virusTotalScan.js if needed
 
 ### "False positives"
 
-- Update virus definitions: `freshclam`
-- Check ClamAV logs for signature name
-- Report false positives to ClamAV team
-- Whitelist specific signatures (use with caution)
+**Symptoms:**
+- Legitimate files flagged by 1-2 engines
+- Different engines disagree
+
+**Understanding results:**
+```
+malicious: 2    ← Engines that found threats
+suspicious: 1   ← Engines that found suspicious patterns
+harmless: 60    ← Engines that found nothing
+undetected: 10  ← Engines that couldn't analyze
+```
+
+**Current threshold: 2 malicious engines**
+
+**Solutions:**
+1. **Review the specific file** - Is it actually safe?
+2. **Check which engines flagged it** - Some are more aggressive
+3. **Adjust threshold** if needed (edit `MALICIOUS_THRESHOLD` in virusTotalScan.js)
+4. **Report false positives** to antivirus vendors via VirusTotal
+
+### "Invalid API key"
+
+**Symptoms:**
+```
+VirusTotal API key invalid
+Malware scanning skipped (Invalid API key)
+```
+
+**Solutions:**
+1. **Regenerate key:** https://www.virustotal.com/gui/my-apikey
+2. **Check for spaces:** API keys should have no leading/trailing spaces
+3. **Verify environment:** Ensure correct .env file is loaded
 
 ## API Response Examples
 
@@ -370,7 +420,7 @@ echo $CLAMAV_PORT
 ```json
 {
   "status": "error",
-  "message": "File rejected: malware detected.",
+  "message": "File rejected: 52 antivirus engines detected malware",
   "statusCode": 400
 }
 ```

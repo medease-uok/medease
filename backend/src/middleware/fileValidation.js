@@ -1,6 +1,6 @@
 const { fileTypeFromBuffer } = require('file-type');
-const NodeClam = require('clamscan');
 const AppError = require('../utils/AppError');
+const { scanFileWithVirusTotal, isVirusTotalEnabled } = require('./virusTotalScan');
 
 // File type definitions with magic bytes
 const ALLOWED_FILE_TYPES = {
@@ -15,40 +15,7 @@ const ALLOWED_FILE_TYPES = {
   }, // 20 MB
 };
 
-// Initialize ClamAV scanner (singleton)
-let clamScanInstance = null;
-let clamScanEnabled = false;
-
-async function initClamScan() {
-  if (clamScanInstance) return clamScanInstance;
-
-  try {
-    const clamscan = await new NodeClam().init({
-      removeInfected: false,
-      quarantineInfected: false,
-      scanLog: null,
-      debugMode: false,
-      clamdscan: {
-        host: process.env.CLAMAV_HOST || 'localhost',
-        port: process.env.CLAMAV_PORT || 3310,
-        timeout: 60000,
-        localFallback: false,
-      },
-    });
-
-    clamScanInstance = clamscan;
-    clamScanEnabled = true;
-    console.log('ClamAV malware scanner initialized successfully');
-    return clamscan;
-  } catch (err) {
-    console.warn('ClamAV not available, malware scanning disabled:', err.message);
-    clamScanEnabled = false;
-    return null;
-  }
-}
-
-// Initialize on module load
-initClamScan().catch((err) => console.warn('Failed to initialize ClamAV:', err.message));
+// Malware scanning now uses VirusTotal (cloud-based, works on all platforms)
 
 /**
  * Validate file type using magic bytes (not just MIME type)
@@ -90,35 +57,40 @@ function validateFileSize(size, mimeType) {
 }
 
 /**
- * Scan file for malware using ClamAV
- * Only scans if ClamAV is available
+ * Scan file for malware using VirusTotal
+ * Cloud-based scanning that works on all platforms
  */
 async function scanForMalware(buffer, filename) {
-  // Skip if ClamAV not enabled
-  if (!clamScanEnabled || !clamScanInstance) {
-    console.log('Malware scanning skipped (ClamAV not available)');
-    return { isInfected: false, viruses: [] };
+  if (!isVirusTotalEnabled()) {
+    console.log('Malware scanning skipped (VirusTotal API key not configured)');
+    return { isInfected: false, scanned: false };
   }
 
   try {
-    const { isInfected, viruses } = await clamScanInstance.scanStream(buffer);
+    const result = await scanFileWithVirusTotal(buffer, filename);
 
-    if (isInfected) {
-      console.error(`Malware detected in file "${filename}":`, viruses);
-      throw new AppError('File rejected: malware detected.', 400);
+    if (!result.scanned) {
+      console.warn(`VirusTotal scan skipped for "${filename}": ${result.reason}`);
+      return { isInfected: false, scanned: false, reason: result.reason };
     }
 
-    console.log(`File "${filename}" scanned: clean`);
-    return { isInfected, viruses };
+    return {
+      isInfected: !result.clean,
+      scanned: true,
+      malicious: result.malicious,
+      suspicious: result.suspicious,
+      totalEngines: result.totalEngines,
+      sha256: result.sha256,
+    };
   } catch (err) {
     if (err instanceof AppError) {
       throw err; // Re-throw malware detection errors
     }
 
     // Log scan errors but don't fail the upload if scanner has issues
-    console.error('Malware scan error:', err.message);
+    console.error('VirusTotal scan error:', err.message);
     console.warn('Proceeding without malware scan due to scanner error');
-    return { isInfected: false, viruses: [], error: err.message };
+    return { isInfected: false, scanned: false, error: err.message };
   }
 }
 
@@ -173,7 +145,7 @@ async function validateUploadedFile(req, res, next) {
  * Check if malware scanning is available
  */
 function isMalwareScanningEnabled() {
-  return clamScanEnabled;
+  return isVirusTotalEnabled();
 }
 
 module.exports = {
