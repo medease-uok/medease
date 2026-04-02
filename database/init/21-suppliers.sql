@@ -33,3 +33,6 @@ CREATE TRIGGER update_suppliers_updated_at
     BEFORE UPDATE ON suppliers
     FOR EACH ROW
     EXECUTE FUNCTION update_suppliers_updated_at_column();
+
+-- Add Full Text Search (GIN) Index for advanced search capabilities
+CREATE INDEX IF NOT EXISTS idx_suppliers_fts ON suppliers USING GIN(to_tsvector('english', name || ' ' || COALESCE(contact_person,'') || ' ' || COALESCE(email,'')));
