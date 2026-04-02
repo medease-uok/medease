@@ -19,5 +19,16 @@ export const getExpiryStatus = (expiryDate, threshold = EXPIRY_WARNING_THRESHOLD
   if (daysRemaining < 0) return { status: 'danger', daysRemaining };
   if (daysRemaining === 0) return { status: 'critical', daysRemaining };
   if (daysRemaining <= threshold) return { status: 'warning', daysRemaining };
-  return { status: 'normal', daysRemaining };
+};
+
+export const calculateReorderSuggestion = (currentQuantity, reorderLevel) => {
+  if (currentQuantity > reorderLevel) {
+    return 0;
+  }
+  
+  // Suggest reordering to reach 3 times the reorder level.
+  // We ensure a minimum base suggestion just in case reorder_level is 0.
+  const targetStock = reorderLevel > 0 ? reorderLevel * 3 : 10;
+  const suggestion = targetStock - currentQuantity;
+  return suggestion > 0 ? suggestion : 0;
 };

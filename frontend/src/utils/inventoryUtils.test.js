@@ -1,4 +1,4 @@
-import { parseLocalDate, getExpiryStatus } from './inventoryUtils';
+import { parseLocalDate, getExpiryStatus, calculateReorderSuggestion } from './inventoryUtils';
 
 describe('inventoryUtils', () => {
   describe('parseLocalDate', () => {
@@ -48,6 +48,23 @@ describe('inventoryUtils', () => {
 
     it('returns normal when well in the future', () => {
       expect(getExpiryStatus('2025-02-15')).toEqual({ status: 'normal', daysRemaining: 31 });
+    });
+  });
+
+  describe('calculateReorderSuggestion', () => {
+    it('returns 0 when current quantity is strictly above reorder level', () => {
+      expect(calculateReorderSuggestion(15, 10)).toBe(0);
+      expect(calculateReorderSuggestion(11, 10)).toBe(0);
+    });
+
+    it('returns suggested amount to reach 3x reorder level when current is at or below reorder level', () => {
+      expect(calculateReorderSuggestion(10, 10)).toBe(20); // 10 * 3 - 10 = 20
+      expect(calculateReorderSuggestion(5, 10)).toBe(25);  // 10 * 3 - 5 = 25
+      expect(calculateReorderSuggestion(0, 5)).toBe(15);   // 5 * 3 - 0 = 15
+    });
+
+    it('returns a baseline of 10 if reorder level is 0 and current is 0', () => {
+      expect(calculateReorderSuggestion(0, 0)).toBe(10);
     });
   });
 });
