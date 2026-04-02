@@ -19,6 +19,8 @@ export const getExpiryStatus = (expiryDate, threshold = EXPIRY_WARNING_THRESHOLD
   if (daysRemaining < 0) return { status: 'danger', daysRemaining };
   if (daysRemaining === 0) return { status: 'critical', daysRemaining };
   if (daysRemaining <= threshold) return { status: 'warning', daysRemaining };
+  
+  return { status: 'normal', daysRemaining };
 };
 
 export const calculateReorderSuggestion = (currentQuantity, reorderLevel) => {
