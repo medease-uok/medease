@@ -14,6 +14,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 
 - Appointment scheduling with real-time doctor availability
 - Appointment rescheduling to a new time slot with conflict detection and waitlist notification
+- Bulk (mass) appointment rescheduling by date range and day offset, with role-based authorization, conflict detection, and all-or-nothing transaction semantics
 - Appointment waitlist with automatic slot notifications when cancellations occur
 - Recurring appointment series (daily, weekly, biweekly, monthly) with conflict detection and bulk cancellation
 - Appointment confirmation emails sent to patients upon booking
