@@ -13,6 +13,11 @@ const { APPOINTMENT_STATUS, UPDATEABLE_STATUSES } = require('../constants/appoin
 // No-show flagging threshold
 const NO_SHOW_FLAG_THRESHOLD = 3;
 
+// Mass reschedule constants
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MAX_BATCH_SIZE = 100;
+const MIN_DATE_RANGE_DAYS = 1;
+
 const mapAppointment = (row) => ({
   id: row.id,
   patientId: row.patient_id,
@@ -1326,6 +1331,7 @@ const markNoShow = async (req, res, next) => {
  */
 const massReschedule = async (req, res, next) => {
   let client;
+  let committed = false;
 
   try {
     const { doctorId, dateRange, offsetDays } = req.body;
@@ -1339,8 +1345,8 @@ const massReschedule = async (req, res, next) => {
       throw new AppError('dateRange with start and end is required.', 400);
     }
 
-    if (offsetDays === undefined || typeof offsetDays !== 'number') {
-      throw new AppError('offsetDays is required and must be a number.', 400);
+    if (offsetDays === undefined || typeof offsetDays !== 'number' || !Number.isInteger(offsetDays)) {
+      throw new AppError('offsetDays is required and must be an integer.', 400);
     }
 
     if (offsetDays === 0) {
@@ -1362,6 +1368,12 @@ const massReschedule = async (req, res, next) => {
       throw new AppError('dateRange.start must be before dateRange.end.', 400);
     }
 
+    // Enforce minimum date range
+    const rangeDays = (endDate.getTime() - startDate.getTime()) / MS_PER_DAY;
+    if (rangeDays < MIN_DATE_RANGE_DAYS) {
+      throw new AppError(`dateRange must span at least ${MIN_DATE_RANGE_DAYS} day(s).`, 400);
+    }
+
     // Role-based authorization
     if (req.user.role === 'patient') {
       throw new AppError('Patients cannot perform mass rescheduling.', 403);
@@ -1370,7 +1382,7 @@ const massReschedule = async (req, res, next) => {
     client = await db.getClient();
     await client.query('BEGIN');
 
-    // Check if doctor exists
+    // Check if doctor exists and validate user_id
     const doctorResult = await client.query(
       'SELECT id, user_id, department FROM doctors WHERE id = $1',
       [doctorId]
@@ -1381,6 +1393,10 @@ const massReschedule = async (req, res, next) => {
     }
 
     const doctor = doctorResult.rows[0];
+
+    if (!doctor.user_id) {
+      throw new AppError('Doctor record is invalid (missing user_id).', 500);
+    }
 
     // Authorization checks
     if (req.user.role === 'doctor' && req.user.doctorId !== doctorId) {
@@ -1401,7 +1417,21 @@ const massReschedule = async (req, res, next) => {
       }
     }
 
-    // Get all scheduled appointments in the date range
+    // Admins are explicitly allowed (no additional checks needed)
+
+    // Fetch all doctor schedules once (to avoid N+1 queries)
+    const allSchedulesResult = await client.query(
+      `SELECT day_of_week, start_time, end_time, is_active
+       FROM doctor_schedules
+       WHERE doctor_id = $1`,
+      [doctorId]
+    );
+
+    const scheduleMap = Object.fromEntries(
+      allSchedulesResult.rows.map(s => [s.day_of_week, s])
+    );
+
+    // Get all scheduled appointments in the date range (lightweight lock acquisition)
     const appointmentsResult = await client.query(
       `SELECT a.id, a.patient_id, a.doctor_id, a.status, a.scheduled_at,
               p.user_id AS patient_user_id,
@@ -1428,75 +1458,62 @@ const massReschedule = async (req, res, next) => {
       throw new AppError('No scheduled appointments found in the specified date range.', 404);
     }
 
+    // Enforce batch size limit
+    if (appointments.length > MAX_BATCH_SIZE) {
+      throw new AppError(`Cannot reschedule more than ${MAX_BATCH_SIZE} appointments at once. Found ${appointments.length} appointments.`, 400);
+    }
+
     // Calculate new scheduled times and validate each one
-    const offsetMs = offsetDays * 24 * 60 * 60 * 1000;
+    const offsetMs = offsetDays * MS_PER_DAY;
     const rescheduledAppointments = [];
     const newScheduledTimes = new Set();
+    const newTimesArray = [];
+
+    const now = new Date();
+    const oneYearFromNow = new Date(now.getTime() + 365 * MS_PER_DAY);
 
     for (const appt of appointments) {
       const currentTime = new Date(appt.scheduled_at);
       const newTime = new Date(currentTime.getTime() + offsetMs);
 
       // Validate new time is in the future
-      const now = new Date();
       if (newTime <= now) {
-        throw new AppError(`Cannot reschedule appointment ${appt.id} to a past time (${newTime.toISOString()}).`, 400);
+        throw new AppError('Cannot reschedule appointments to a past time. Please adjust the offset or date range.', 400);
       }
 
       // Validate new time is not more than 1 year in the future
-      const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
       if (newTime > oneYearFromNow) {
-        throw new AppError(`Cannot reschedule appointment ${appt.id} to more than 1 year in the future.`, 400);
+        throw new AppError('Cannot reschedule appointments to more than 1 year in the future.', 400);
       }
 
-      // Check if new time is within doctor's schedule
+      // Check if new time is within doctor's schedule (O(1) lookup)
       const { dayOfWeek, totalMinutes: newTotalMinutes } = clinicLocalTime(newTime);
+      const schedule = scheduleMap[dayOfWeek];
 
-      const scheduleResult = await client.query(
-        `SELECT start_time, end_time, is_active
-         FROM doctor_schedules
-         WHERE doctor_id = $1 AND day_of_week = $2`,
-        [doctorId, dayOfWeek]
-      );
-
-      if (scheduleResult.rows.length === 0 || !scheduleResult.rows[0].is_active) {
-        throw new AppError(`Doctor is not available on ${dayOfWeek} for appointment ${appt.id}.`, 400);
+      if (!schedule || !schedule.is_active) {
+        throw new AppError(`Doctor is not available on ${dayOfWeek}. Cannot reschedule appointments.`, 400);
       }
 
-      const schedule = scheduleResult.rows[0];
       const [schStartH, schStartM] = schedule.start_time.slice(0, 5).split(':').map(Number);
       const [schEndH, schEndM] = schedule.end_time.slice(0, 5).split(':').map(Number);
       const schedStartMinutes = schStartH * 60 + schStartM;
       const schedEndMinutes = schEndH * 60 + schEndM;
 
       if (newTotalMinutes < schedStartMinutes || newTotalMinutes + SLOT_DURATION_MINUTES > schedEndMinutes) {
-        throw new AppError(`New time for appointment ${appt.id} is outside doctor's schedule hours.`, 400);
+        throw new AppError('One or more appointments would fall outside doctor\'s schedule hours.', 400);
       }
 
       if ((newTotalMinutes - schedStartMinutes) % SLOT_DURATION_MINUTES !== 0) {
-        throw new AppError(`New time for appointment ${appt.id} must be on a ${SLOT_DURATION_MINUTES}-minute slot boundary.`, 400);
+        throw new AppError(`One or more appointments would not align to ${SLOT_DURATION_MINUTES}-minute slot boundaries.`, 400);
       }
 
       // Track new times to detect internal conflicts (within the batch being rescheduled)
       const newTimeStr = newTime.toISOString();
       if (newScheduledTimes.has(newTimeStr)) {
-        throw new AppError(`Multiple appointments would be rescheduled to the same time: ${newTimeStr}.`, 409);
+        throw new AppError('Multiple appointments would be rescheduled to the same time slot.', 409);
       }
       newScheduledTimes.add(newTimeStr);
-
-      // Check for external conflicts (appointments not in this batch)
-      const conflictResult = await client.query(
-        `SELECT id FROM appointments
-         WHERE doctor_id = $1
-           AND scheduled_at = $2
-           AND status NOT IN ('cancelled', 'no_show')
-           AND id != ANY($3::uuid[])`,
-        [doctorId, newTimeStr, appointments.map(a => a.id)]
-      );
-
-      if (conflictResult.rows.length > 0) {
-        throw new AppError(`Time slot ${newTimeStr} is already booked by another appointment.`, 409);
-      }
+      newTimesArray.push(newTimeStr);
 
       rescheduledAppointments.push({
         ...appt,
@@ -1505,15 +1522,35 @@ const massReschedule = async (req, res, next) => {
       });
     }
 
-    // All validations passed - perform the updates
-    for (const appt of rescheduledAppointments) {
-      await client.query(
-        `UPDATE appointments SET scheduled_at = $1, updated_at = NOW() WHERE id = $2`,
-        [appt.newScheduledAt, appt.id]
-      );
+    // Single batch query for external conflict detection
+    const conflictResult = await client.query(
+      `SELECT scheduled_at FROM appointments
+       WHERE doctor_id = $1
+         AND scheduled_at = ANY($2::timestamptz[])
+         AND status NOT IN ('cancelled', 'no_show')
+         AND id != ANY($3::uuid[])`,
+      [doctorId, newTimesArray, appointments.map(a => a.id)]
+    );
+
+    if (conflictResult.rows.length > 0) {
+      const conflictTimes = conflictResult.rows.map(r => r.scheduled_at).join(', ');
+      throw new AppError(`One or more time slots are already booked: ${conflictTimes}`, 409);
     }
 
+    // All validations passed - perform bulk update
+    const appointmentIds = rescheduledAppointments.map(a => a.id);
+    const newTimes = rescheduledAppointments.map(a => a.newScheduledAt.toISOString());
+
+    await client.query(
+      `UPDATE appointments
+       SET scheduled_at = new_times.new_time, updated_at = NOW()
+       FROM (SELECT UNNEST($1::uuid[]) AS id, UNNEST($2::timestamptz[]) AS new_time) AS new_times
+       WHERE appointments.id = new_times.id`,
+      [appointmentIds, newTimes]
+    );
+
     await client.query('COMMIT');
+    committed = true;
 
     // Send notifications to all affected patients
     const notificationPromises = rescheduledAppointments.map((appt) => {
@@ -1531,7 +1568,7 @@ const massReschedule = async (req, res, next) => {
         referenceId: appt.id,
         referenceType: 'appointment',
       }).catch((err) => {
-        console.error('Failed to send reschedule notification to patient', { appointmentId: appt.id, error: err.message });
+        console.error('Failed to send reschedule notification to patient', { error: err.message });
       });
     });
 
@@ -1544,7 +1581,7 @@ const massReschedule = async (req, res, next) => {
       referenceId: doctorId,
       referenceType: 'doctor',
     }).catch((err) => {
-      console.error('Failed to send mass reschedule notification to doctor', { doctorId, error: err.message });
+      console.error('Failed to send mass reschedule notification to doctor', { error: err.message });
     });
 
     await Promise.allSettled([...notificationPromises, doctorNotification]);
@@ -1564,7 +1601,7 @@ const massReschedule = async (req, res, next) => {
           batchSize: rescheduledAppointments.length,
         },
       }).catch((err) => {
-        console.error('AUDIT LOG FAILURE — massReschedule', { appointmentId: appt.id, userId: req.user.id, error: err.message });
+        console.error('AUDIT LOG FAILURE — massReschedule', { userId: req.user.id, error: err.message });
       });
     });
 
@@ -1573,7 +1610,7 @@ const massReschedule = async (req, res, next) => {
     // Notify waitlist for freed slots (old times are now available)
     const waitlistPromises = rescheduledAppointments.map((appt) => {
       return notifyWaitlistOnCancellation(doctorId, appt.previousScheduledAt).catch((err) => {
-        console.error('Failed to notify waitlist on mass reschedule', { appointmentId: appt.id, error: err.message });
+        console.error('Failed to notify waitlist on mass reschedule', { error: err.message });
       });
     });
 
@@ -1591,8 +1628,8 @@ const massReschedule = async (req, res, next) => {
       },
     });
   } catch (err) {
-    if (client) {
-      await client.query('ROLLBACK');
+    if (client && !committed) {
+      await client.query('ROLLBACK').catch(() => {});
     }
     return next(err);
   } finally {

@@ -1726,13 +1726,10 @@ describe('massReschedule', () => {
     mockClientQuery
       .mockResolvedValueOnce(undefined) // BEGIN
       .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }, { day_of_week: 2, ...SCHEDULE_ROW }] }) // SELECT all schedules (batch) - day 1 = Monday, day 2 = Tuesday
       .mockResolvedValueOnce({ rows: [APPT1, APPT2] }) // SELECT appointments
-      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] }) // schedule check for APPT1
-      .mockResolvedValueOnce({ rows: [] }) // no conflict for APPT1
-      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] }) // schedule check for APPT2
-      .mockResolvedValueOnce({ rows: [] }) // no conflict for APPT2
-      .mockResolvedValueOnce(undefined) // UPDATE APPT1
-      .mockResolvedValueOnce(undefined) // UPDATE APPT2
+      .mockResolvedValueOnce({ rows: [] }) // batch conflict check
+      .mockResolvedValueOnce(undefined) // bulk UPDATE with UNNEST
       .mockResolvedValueOnce(undefined) // COMMIT
 
     const req = makeReq({
@@ -1899,10 +1896,10 @@ describe('massReschedule', () => {
       .mockResolvedValueOnce(undefined) // BEGIN
       .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
       .mockResolvedValueOnce({ rows: [{ department: 'Cardiology' }] }) // SELECT nurse department - same
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }, { day_of_week: 2, ...SCHEDULE_ROW }] }) // SELECT all schedules
       .mockResolvedValueOnce({ rows: [APPT1] }) // SELECT appointments
-      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] }) // schedule check
-      .mockResolvedValueOnce({ rows: [] }) // no conflict
-      .mockResolvedValueOnce(undefined) // UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // batch conflict check
+      .mockResolvedValueOnce(undefined) // bulk UPDATE
       .mockResolvedValueOnce(undefined) // COMMIT
 
     const req = makeReq({
@@ -1952,6 +1949,7 @@ describe('massReschedule', () => {
     mockClientQuery
       .mockResolvedValueOnce(undefined) // BEGIN
       .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }] }) // SELECT all schedules
       .mockResolvedValueOnce({ rows: [] }) // SELECT appointments - none found
       .mockResolvedValueOnce(undefined) // ROLLBACK
 
@@ -1982,10 +1980,8 @@ describe('massReschedule', () => {
     mockClientQuery
       .mockResolvedValueOnce(undefined) // BEGIN
       .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }, { day_of_week: 2, ...SCHEDULE_ROW }] }) // SELECT all schedules
       .mockResolvedValueOnce({ rows: [appt1SameTime, appt2SameTime] }) // SELECT appointments
-      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] }) // schedule check for APPT1
-      .mockResolvedValueOnce({ rows: [] }) // no external conflict for APPT1
-      .mockResolvedValueOnce({ rows: [SCHEDULE_ROW] }) // schedule check for APPT2
       .mockResolvedValueOnce(undefined) // ROLLBACK
 
     const req = makeReq({
@@ -2007,11 +2003,88 @@ describe('massReschedule', () => {
     }))
   })
 
+  test('returns 400 when offsetDays is a float', async () => {
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: 1.5,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: 'offsetDays is required and must be an integer.',
+    }))
+  })
+
+  test('returns 400 when date range is too small', async () => {
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: {
+          start: '2026-06-15T00:00:00Z',
+          end: '2026-06-15T12:00:00Z', // Same day, less than 1 day span
+        },
+        offsetDays: 1,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: expect.stringContaining('must span at least'),
+    }))
+  })
+
+  test('returns 400 when batch size exceeds limit', async () => {
+    // Create 101 appointments (exceeds MAX_BATCH_SIZE of 100)
+    const manyAppointments = Array.from({ length: 101 }, (_, i) => ({
+      ...APPT1,
+      id: `appt-${i}`,
+      scheduled_at: '2026-06-15T02:30:00Z',
+    }))
+
+    mockClientQuery
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
+      .mockResolvedValueOnce({ rows: [{ day_of_week: 1, ...SCHEDULE_ROW }] }) // SELECT all schedules
+      .mockResolvedValueOnce({ rows: manyAppointments }) // SELECT appointments
+      .mockResolvedValueOnce(undefined) // ROLLBACK
+
+    const req = makeReq({
+      user: { id: 'usr-doc', role: 'doctor', doctorId: DOCTOR_ID },
+      body: {
+        doctorId: DOCTOR_ID,
+        dateRange: { start: START_DATE, end: END_DATE },
+        offsetDays: OFFSET_DAYS,
+      },
+    })
+    const res = makeRes()
+    const next = jest.fn()
+
+    await massReschedule(req, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 400,
+      message: expect.stringContaining('Cannot reschedule more than 100 appointments'),
+    }))
+  })
+
   test('rolls back transaction on error', async () => {
     mockClientQuery
       .mockResolvedValueOnce(undefined) // BEGIN
       .mockResolvedValueOnce({ rows: [DOCTOR_ROW] }) // SELECT doctor
-      .mockRejectedValueOnce(new Error('Database error')) // SELECT appointments fails
+      .mockRejectedValueOnce(new Error('Database error')) // SELECT schedules fails
       .mockResolvedValueOnce(undefined) // ROLLBACK
 
     const req = makeReq({
