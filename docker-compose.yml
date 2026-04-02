@@ -73,6 +73,8 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-600}
       OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-3}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
     volumes:
       - ./backend/src:/app/src
     depends_on:
@@ -153,8 +155,6 @@ services:
       retries: 3
       start_period: 120s
     restart: unless-stopped
-    networks:
-      - medease-network
 
 volumes:
   postgres_data:
