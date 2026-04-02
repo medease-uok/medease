@@ -30,8 +30,9 @@ export default function SupplierManagement() {
       const params = {};
       if (selectedStatus !== 'all') params.status = selectedStatus;
       
-      const response = await supplierService.getAll(params);
-      setSuppliers(response || []);
+      const fetched = await supplierService.getAll(params);
+      const supplierArray = Array.isArray(fetched) ? fetched : (fetched?.data || []);
+      setSuppliers(supplierArray);
       setError(null);
     } catch (err) {
       console.error('Error fetching suppliers:', err);
@@ -287,8 +288,8 @@ export default function SupplierManagement() {
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700">Additional Notes *</label>
-                  <textarea required name="notes" value={formData.notes} onChange={handleInputChange} className="input-field w-full min-h-[80px]" placeholder="Required notes or tags..."></textarea>
+                  <label className="text-sm font-medium text-slate-700">Additional Notes</label>
+                  <textarea name="notes" value={formData.notes || ''} onChange={handleInputChange} className="input-field w-full min-h-[80px]" placeholder="Optional notes or tags..."></textarea>
                 </div>
               </div>
 
