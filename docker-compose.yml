@@ -136,6 +136,27 @@ services:
              echo 'Lab report files seeded successfully.'"
     restart: "no"
 
+  # ClamAV - Malware Scanner (Optional)
+  clamav:
+    image: clamav/clamav:stable
+    container_name: medease-clamav
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    environment:
+      - CLAMAV_NO_FRESHCLAM=false
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - medease-network
+
 volumes:
   postgres_data:
   redis_data:
+  clamav_data:
