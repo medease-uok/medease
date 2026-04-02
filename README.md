@@ -19,6 +19,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Appointment confirmation emails sent to patients upon booking
 - Automated appointment reminder emails and in-app notifications sent before upcoming appointments
 - Role-based appointment cancellation policy (patients: 24-hour minimum notice, doctors: 2-hour minimum notice, with admin/nurse bypass)
+- No-show tracking with automatic patient flagging after 3 missed appointments and notifications to patient, doctor, and admin
 - Electronic medical records, prescriptions, and lab reports
 - ICD-10 code lookup and assignment on medical records
 - Digital structured prescriptions with multi-medicine line items
