@@ -158,6 +158,11 @@ const getStats = async (req, res, next) => {
     let filterParams = [];
     const emptyResponse = { stats, todayAppointments: [], upcomingAppointments: [], recentAppointments: [] };
 
+    // Lab technicians and pharmacists don't have access to appointments
+    if (role === 'lab_technician' || role === 'pharmacist') {
+      return res.json({ status: 'success', data: emptyResponse });
+    }
+
     if (role === 'patient') {
       const patientResult = await db.query(
         'SELECT id FROM patients WHERE user_id = $1', [userId]
@@ -179,6 +184,7 @@ const getStats = async (req, res, next) => {
       roleFilter = 'AND a.doctor_id = $1';
       filterParams = [doctorId];
     }
+    // Nurse and admin see all appointments (no filter)
 
     const limitIdx = filterParams.length + 1;
 
@@ -258,9 +264,11 @@ const getActivity = async (req, res, next) => {
       } else if (role === 'doctor') {
         const did = await doctorId();
         if (did) { q = `${base} WHERE a.doctor_id = $1 ORDER BY a.scheduled_at DESC LIMIT 15`; params = [did]; }
-      } else {
+      } else if (role === 'nurse' || role === 'admin') {
+        // Nurse and admin see all appointments
         q = `${base} ORDER BY a.scheduled_at DESC LIMIT 15`;
       }
+      // Lab technicians and pharmacists don't see appointments (q remains undefined)
 
       if (q) {
         const rows = (await db.query(q, params)).rows;
