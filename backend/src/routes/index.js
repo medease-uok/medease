@@ -25,6 +25,7 @@ const doctorTaskRoutes = require('./doctorTasks.routes');
 const icd10Routes = require('./icd10.routes');
 const inventoryRoutes = require('./inventory.routes');
 const waitlistRoutes = require('./waitlist.routes');
+const supplierRoutes = require('./supplier.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -59,5 +60,6 @@ router.use('/doctor-tasks', doctorTaskRoutes);
 router.use('/icd10', icd10Routes);
 router.use('/inventory', inventoryRoutes);
 router.use('/waitlist', waitlistRoutes);
+router.use('/suppliers', supplierRoutes);
 
 module.exports = router;
