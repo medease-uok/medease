@@ -245,7 +245,17 @@ function SlotBooking({ doctor, onBack, onBooked, onWaitlistJoined }) {
     setError(null)
 
     try {
-      const scheduledAt = `${date}T${selectedSlot}:00Z`
+      // Construct local time string and convert to UTC
+      // selectedSlot is in 24h format (e.g., "08:00") representing Sri Lanka time
+      // We need to convert this to UTC by subtracting 5:30 hours (Sri Lanka offset)
+      const [hours, minutes] = selectedSlot.split(':').map(Number)
+      const localDate = new Date(`${date}T00:00:00`)
+      localDate.setHours(hours, minutes, 0, 0)
+
+      // Subtract Sri Lanka offset (5 hours 30 minutes = 330 minutes)
+      const utcDate = new Date(localDate.getTime() - (330 * 60 * 1000))
+      const scheduledAt = utcDate.toISOString()
+
       if (recurrencePattern) {
         await api.post('/appointments/recurring', {
           doctorId: doctor.id,
