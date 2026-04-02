@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { AlertCircle, FlaskConical, Clock, AlertTriangle, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { AlertCircle, FlaskConical, Clock, AlertTriangle, FileText, CheckCircle, XCircle, Play, User } from 'lucide-react';
 import api from '../services/api';
 import CreateLabReportModal from '../components/CreateLabReportModal';
+import { useAuth } from '../contexts/AuthContext';
 
 const PRIORITY_COLORS = {
   urgent: 'bg-red-100 text-red-800',
@@ -24,12 +25,14 @@ const STATUS_ICONS = {
 };
 
 export default function LabTestRequests() {
+  const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [patients, setPatients] = useState([]);
+  const [updatingStatus, setUpdatingStatus] = useState({});
 
   const fetchRequests = async () => {
     try {
@@ -72,6 +75,35 @@ export default function LabTestRequests() {
     setShowCreateModal(false);
     setSelectedRequest(null);
     fetchRequests(); // Refresh the list
+  };
+
+  const handleStartWorking = async (requestId) => {
+    try {
+      setUpdatingStatus((prev) => ({ ...prev, [requestId]: true }));
+      await api.patch(`/lab-test-requests/${requestId}`, {
+        status: 'in_progress',
+        assignedTo: user.id, // Self-assign
+      });
+      await fetchRequests();
+    } catch (err) {
+      alert(err.data?.message || 'Failed to update request status');
+    } finally {
+      setUpdatingStatus((prev) => ({ ...prev, [requestId]: false }));
+    }
+  };
+
+  const handleStatusChange = async (requestId, newStatus) => {
+    try {
+      setUpdatingStatus((prev) => ({ ...prev, [requestId]: true }));
+      await api.patch(`/lab-test-requests/${requestId}`, {
+        status: newStatus,
+      });
+      await fetchRequests();
+    } catch (err) {
+      alert(err.data?.message || 'Failed to update request status');
+    } finally {
+      setUpdatingStatus((prev) => ({ ...prev, [requestId]: false }));
+    }
   };
 
   const pendingRequests = requests.filter((r) => r.status === 'pending' || r.status === 'in_progress');
@@ -165,6 +197,15 @@ export default function LabTestRequests() {
                           <p className="text-slate-500">Requested by</p>
                           <p className="font-medium text-slate-900">{request.doctorName}</p>
                         </div>
+                        {request.assignedToName && (
+                          <div>
+                            <p className="text-slate-500">Assigned to</p>
+                            <p className="font-medium text-slate-900 flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {request.assignedToName}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {request.clinicalNotes && (
@@ -179,13 +220,37 @@ export default function LabTestRequests() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleCreateReport(request)}
-                      className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Upload Report
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      {request.status === 'pending' ? (
+                        <button
+                          onClick={() => handleStartWorking(request.id)}
+                          disabled={updatingStatus[request.id]}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Play className="w-4 h-4" />
+                          {updatingStatus[request.id] ? 'Starting...' : 'Start Working'}
+                        </button>
+                      ) : (
+                        <>
+                          <select
+                            value={request.status}
+                            onChange={(e) => handleStatusChange(request.id, e.target.value)}
+                            disabled={updatingStatus[request.id]}
+                            className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                          >
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                          </select>
+                          <button
+                            onClick={() => handleCreateReport(request)}
+                            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+                          >
+                            <FileText className="w-4 h-4" />
+                            Upload Report
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
