@@ -35,11 +35,20 @@ export default function CancelAppointmentModal({ appointmentId, onClose, onCance
     return Math.floor(diffMs / (1000 * 60 * 60))
   }
 
+  const formatTimeUntil = (hours) => {
+    if (hours < 48) {
+      return `${hours} hour${hours !== 1 ? 's' : ''}`
+    }
+    const days = Math.floor(hours / 24)
+    return `${days} day${days !== 1 ? 's' : ''}`
+  }
+
   const getPolicyWarning = () => {
     if (!appointment) return null
     if (canBypassPolicy) return null
 
     const hoursUntil = calculateHoursUntil(appointment.scheduledAt)
+    const timeUntilText = formatTimeUntil(hoursUntil)
 
     if (isPatient) {
       const minHours = 24
@@ -52,7 +61,7 @@ export default function CancelAppointmentModal({ appointmentId, onClose, onCance
       }
       return {
         type: 'warning',
-        message: `This appointment is in ${hoursUntil} hours. You can cancel it now, but please note our 24-hour cancellation policy for future reference.`,
+        message: `This appointment is in ${timeUntilText}. You can cancel it now, but please note our 24-hour cancellation policy for future reference.`,
         canCancel: true,
       }
     }
@@ -68,7 +77,7 @@ export default function CancelAppointmentModal({ appointmentId, onClose, onCance
       }
       return {
         type: 'warning',
-        message: `This appointment is in ${hoursUntil} hours. Please ensure you notify the patient and administration.`,
+        message: `This appointment is in ${timeUntilText}. Please ensure you notify the patient and administration.`,
         canCancel: true,
       }
     }
