@@ -2,9 +2,17 @@ import { useState } from 'react';
 import { X, Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import api from '../services/api';
 
-export default function CreateLabReportModal({ isOpen, onClose, onSuccess, patients = [] }) {
-  const [selectedPatient, setSelectedPatient] = useState('');
-  const [testName, setTestName] = useState('');
+export default function CreateLabReportModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  patients = [],
+  labTestRequestId = null,
+  prefillPatient = null,
+  prefillTestName = null,
+}) {
+  const [selectedPatient, setSelectedPatient] = useState(prefillPatient || '');
+  const [testName, setTestName] = useState(prefillTestName || '');
   const [result, setResult] = useState('');
   const [notes, setNotes] = useState('');
   const [file, setFile] = useState(null);
@@ -64,6 +72,7 @@ export default function CreateLabReportModal({ isOpen, onClose, onSuccess, patie
       if (result.trim()) formData.append('result', result.trim());
       if (notes.trim()) formData.append('notes', notes.trim());
       if (file) formData.append('file', file);
+      if (labTestRequestId) formData.append('labTestRequestId', labTestRequestId);
 
       await api.upload('/lab-reports', formData);
 

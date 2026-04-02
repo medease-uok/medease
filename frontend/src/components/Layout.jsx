@@ -15,6 +15,7 @@ const pageTitles = {
   '/medical-records': 'Medical Records',
   '/prescriptions': 'Prescriptions',
   '/lab-reports': 'Lab Reports',
+  '/lab-test-requests': 'Lab Test Requests',
   '/vaccinations': 'Vaccinations',
   '/chronic-conditions': 'Chronic Conditions',
   '/documents': 'Medical Documents',

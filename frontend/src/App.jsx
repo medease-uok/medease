@@ -15,6 +15,7 @@ import Appointments from './pages/Appointments';
 import MedicalRecords from './pages/MedicalRecords';
 import Prescriptions from './pages/Prescriptions';
 import LabReports from './pages/LabReports';
+import LabTestRequests from './pages/LabTestRequests';
 import PermissionManagement from './pages/PermissionManagement';
 import PatientDashboard from './pages/PatientDashboard';
 import MedicalHistory from './pages/MedicalHistory';
@@ -67,6 +68,7 @@ function App() {
             <Route path="medical-records" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><MedicalRecords /></R>} />
             <Route path="prescriptions" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN]}><Prescriptions /></R>} />
             <Route path="lab-reports" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN]}><LabReports /></R>} />
+            <Route path="lab-test-requests" element={<R roles={[ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.NURSE, ROLES.ADMIN]}><LabTestRequests /></R>} />
             <Route path="documents" element={<R roles={ROLE_GROUPS.PATIENT_CARE.concat(ROLES.LAB_TECHNICIAN)}><MedicalDocuments /></R>} />
             <Route path="vaccinations" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><Vaccinations /></R>} />
             <Route path="chronic-conditions" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><ChronicConditions /></R>} />
