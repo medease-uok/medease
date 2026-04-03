@@ -3,6 +3,10 @@ const router = express.Router();
 const authenticate = require('../middleware/authenticate');
 const { upload } = require('../middleware/upload');
 const { getMe, updateMe, uploadProfileImage, deleteProfileImage } = require('../controllers/profile.controller');
+const { apiLimiter } = require('../middleware/rateLimit');
+
+// Apply rate limiting before authentication to protect auth layer from DoS
+router.use(apiLimiter);
 
 router.use(authenticate);
 

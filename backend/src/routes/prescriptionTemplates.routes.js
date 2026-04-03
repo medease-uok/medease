@@ -4,6 +4,10 @@ const { getAll, getById, create, update, remove } = require('../controllers/pres
 const authenticate = require('../middleware/authenticate')
 const { requirePermission } = require('../middleware/authorize')
 const resolveSubject = require('../middleware/resolveSubject')
+const { apiLimiter } = require('../middleware/rateLimit')
+
+// Apply rate limiting before authentication to protect auth layer from DoS
+router.use(apiLimiter)
 
 router.use(authenticate)
 router.use(resolveSubject)

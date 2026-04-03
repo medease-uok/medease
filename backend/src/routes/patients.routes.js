@@ -12,7 +12,10 @@ const allergiesRoutes = require('./allergies.routes');
 const vaccinationsRoutes = require('./vaccinations.routes');
 const chronicConditionsRoutes = require('./chronicConditions.routes');
 const treatmentPlansRoutes = require('./treatmentPlans.routes');
-const { sensitiveDataLimiter, exportLimiter } = require('../middleware/rateLimit');
+const { sensitiveDataLimiter, exportLimiter, apiLimiter } = require('../middleware/rateLimit');
+
+// Apply rate limiting before authentication to protect auth layer from DoS
+router.use(apiLimiter);
 
 router.use(authenticate);
 router.use(resolveSubject);

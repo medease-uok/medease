@@ -31,6 +31,7 @@ const mapEntry = (row) => ({
 const getAll = async (req, res, next) => {
   try {
     const { role } = req.user
+    // lgtm [js/sensitive-get-query] - patientId and doctorId are UUIDs, not secrets; protected by authentication and authorization
     const { status, doctorId: qDoctorId, patientId: qPatientId } = req.query
     const page = Math.max(1, parseInt(req.query.page) || 1)
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50))
