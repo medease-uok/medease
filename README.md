@@ -33,7 +33,8 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Medical document management (S3-backed with presigned URLs)
 - Prescription refill requests with doctor approval workflow
 - Lab test request workflow with priority levels and lab technician assignment
-- Lab report file uploads (PDF, JPEG, PNG, WebP, DOC, DOCX up to 25 MB) stored in S3 with presigned download URLs
+- Lab report file uploads (PDF, JPEG, PNG, WebP, DOC, DOCX up to 25 MB) stored in S3 with presigned download URLs and direct file streaming
+- Lab report comparison and trending view with charted metrics over time, grouped by test type
 - Patient satisfaction and feedback system with per-doctor ratings and analytics
 - Inventory management for hospital supplies and equipment with low stock alerts, expiry date tracking, admin notifications, and reorder quantity suggestions for admins
 - Supplier management for tracking medication and equipment suppliers, with full-text search and soft deletion (admin only)
@@ -59,6 +60,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 | Auth | JWT + email OTP |
 | Storage | AWS S3 |
 | PDF | PDFKit |
+| Charting | Recharts |
 | Scheduler | node-cron |
 | CAPTCHA | Cloudflare Turnstile |
 | Malware Scanning | VirusTotal API (optional) |
