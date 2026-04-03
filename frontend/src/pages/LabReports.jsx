@@ -123,6 +123,7 @@ export default function LabReports({ embedded = false }) {
   const isPatient = currentUser?.role === 'patient';
   const isLabTech = currentUser?.role === 'lab_technician';
   const canCreate = isLabTech || currentUser?.role === 'admin';
+  const canCompare = ['patient', 'doctor', 'nurse', 'admin'].includes(currentUser?.role);
   const deferredSearch = useDeferredValue(search);
 
   const fetchReports = useCallback(() => {
@@ -220,13 +221,15 @@ export default function LabReports({ embedded = false }) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/lab-reports/comparison')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              <TrendingUp className="w-4 h-4" />
-              Compare Trends
-            </button>
+            {canCompare && (
+              <button
+                onClick={() => navigate('/lab-reports/comparison')}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Compare Trends
+              </button>
+            )}
             {canCreate && (
               <button
                 onClick={() => setShowCreateModal(true)}
