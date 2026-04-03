@@ -20,6 +20,18 @@ export default function DocumentViewer({ isOpen, onClose, url, fileName, fileTyp
 
   if (!isOpen) return null;
 
+  // Validate URL
+  if (!url) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="bg-white rounded-lg p-6 max-w-md">
+          <p className="text-red-600 mb-4">No URL provided for document</p>
+          <button onClick={onClose} className="px-4 py-2 bg-slate-200 rounded-lg">Close</button>
+        </div>
+      </div>
+    );
+  }
+
   const handleDownload = () => {
     const link = document.createElement('a');
     link.href = url;
@@ -186,8 +198,14 @@ export default function DocumentViewer({ isOpen, onClose, url, fileName, fileTyp
               alt={fileName}
               style={{ transform: `scale(${scale})` }}
               className="max-w-full max-h-full object-contain shadow-lg transition-transform"
-              onError={() => {
-                setError('Failed to load image');
+              crossOrigin="anonymous"
+              onError={(e) => {
+                console.error('Image load error:', e);
+                console.error('Failed URL:', url);
+                setError(`Failed to load image. URL: ${url?.substring(0, 100)}...`);
+              }}
+              onLoad={() => {
+                console.log('Image loaded successfully');
               }}
             />
           )}
