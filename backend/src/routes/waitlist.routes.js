@@ -4,6 +4,10 @@ const authenticate = require('../middleware/authenticate')
 const authorize = require('../middleware/authorize')
 const resolveSubject = require('../middleware/resolveSubject')
 const { getAll, create, cancel } = require('../controllers/waitlist.controller')
+const { apiLimiter } = require('../middleware/rateLimit')
+
+// Apply rate limiting before authentication to protect auth layer from DoS
+router.use(apiLimiter)
 
 // All routes require authentication
 router.use(authenticate, resolveSubject)

@@ -10,6 +10,10 @@ const {
   getDoctorIdValidation,
   getSlotsValidation,
 } = require('../validators/schedules.validators')
+const { apiLimiter } = require('../middleware/rateLimit')
+
+// Apply rate limiting before authentication to protect auth layer from DoS
+router.use(apiLimiter)
 
 router.use(authenticate)
 
