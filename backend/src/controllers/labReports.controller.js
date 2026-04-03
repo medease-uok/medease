@@ -22,6 +22,55 @@ const mapReport = (row) => ({
   fileName: row.file_name,
 });
 
+/**
+ * Build nurse department filter for lab reports
+ * Restricts nurses to only see lab reports for patients who have appointments
+ * with doctors from the same department as the nurse
+ *
+ * @param {string} userId - User ID of the nurse
+ * @param {string} patientId - Optional patient ID to verify access for
+ * @param {number} currentParamCount - Current count of query parameters
+ * @returns {Object} { filter: string, param: string } - SQL filter and department parameter
+ */
+const buildNurseDepartmentFilter = async (userId, patientId, currentParamCount) => {
+  const nurseInfo = await db.query(
+    `SELECT department FROM nurses WHERE user_id = $1`,
+    [userId]
+  );
+
+  if (nurseInfo.rows.length === 0) {
+    throw new AppError('Access denied.', 403);
+  }
+
+  const nurseDepartment = nurseInfo.rows[0].department;
+
+  // IDOR Prevention: If a specific patientId is requested, verify the patient is in nurse's department
+  if (patientId) {
+    const patientDeptCheck = await db.query(
+      `SELECT EXISTS (
+        SELECT 1 FROM appointments a
+        JOIN doctors d ON a.doctor_id = d.id
+        WHERE a.patient_id = $1 AND d.department = $2
+      ) AS has_access`,
+      [patientId, nurseDepartment]
+    );
+
+    if (!patientDeptCheck.rows[0].has_access) {
+      throw new AppError('Access denied. Patient not in your department.', 403);
+    }
+  }
+
+  // Build SQL filter that restricts to patients in this department
+  const filter = `AND EXISTS (
+    SELECT 1 FROM appointments a
+    JOIN doctors d ON a.doctor_id = d.id
+    WHERE a.patient_id = lr.patient_id
+    AND d.department = $${currentParamCount + 1}
+  )`;
+
+  return { filter, param: nurseDepartment };
+};
+
 const getAll = async (req, res, next) => {
   try {
     const subject = {
@@ -38,29 +87,12 @@ const getAll = async (req, res, next) => {
     const { clause, params } = await buildAccessFilter('lab_report', subject, columnMap);
 
     // For nurses, restrict to patients from their department
-    // (patients who have had appointments with doctors from the same department)
     let nurseFilter = '';
     let queryParams = [...params];
     if (req.user.role === 'nurse') {
-      const nurseInfo = await db.query(
-        `SELECT department FROM nurses WHERE user_id = $1`,
-        [req.user.id]
-      );
-
-      if (nurseInfo.rows.length === 0) {
-        throw new AppError('Nurse profile not found.', 404);
-      }
-
-      const nurseDepartment = nurseInfo.rows[0].department;
-
-      // Only show patients who have appointments with doctors from this department
-      nurseFilter = `AND EXISTS (
-        SELECT 1 FROM appointments a
-        JOIN doctors d ON a.doctor_id = d.id
-        WHERE a.patient_id = lr.patient_id
-        AND d.department = $${queryParams.length + 1}
-      )`;
-      queryParams.push(nurseDepartment);
+      const { filter, param } = await buildNurseDepartmentFilter(req.user.id, null, queryParams.length);
+      nurseFilter = filter;
+      queryParams.push(param);
     }
 
     const query = `
@@ -383,6 +415,11 @@ const getComparison = async (req, res, next) => {
       patientId: req.user.patientId,
     };
 
+    // IDOR Prevention: Verify user is authorized to access the requested patient's data
+    if (patientId && req.user.role === 'patient' && req.user.patientId !== patientId) {
+      throw new AppError('You can only view your own lab reports.', 403);
+    }
+
     const columnMap = {
       patient_id: 'lr.patient_id',
       technician_id: 'lr.technician_id',
@@ -399,28 +436,11 @@ const getComparison = async (req, res, next) => {
     }
 
     // For nurses, restrict to patients from their department
-    // (patients who have had appointments with doctors from the same department)
     let nurseFilter = '';
     if (req.user.role === 'nurse') {
-      const nurseInfo = await db.query(
-        `SELECT department FROM nurses WHERE user_id = $1`,
-        [req.user.id]
-      );
-
-      if (nurseInfo.rows.length === 0) {
-        throw new AppError('Nurse profile not found.', 404);
-      }
-
-      const nurseDepartment = nurseInfo.rows[0].department;
-
-      // Only show patients who have appointments with doctors from this department
-      nurseFilter = `AND EXISTS (
-        SELECT 1 FROM appointments a
-        JOIN doctors d ON a.doctor_id = d.id
-        WHERE a.patient_id = lr.patient_id
-        AND d.department = $${queryParams.length + 1}
-      )`;
-      queryParams.push(nurseDepartment);
+      const { filter, param } = await buildNurseDepartmentFilter(req.user.id, patientId, queryParams.length);
+      nurseFilter = filter;
+      queryParams.push(param);
     }
 
     // Get all reports for comparison
