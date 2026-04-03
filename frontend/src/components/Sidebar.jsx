@@ -16,6 +16,7 @@ import {
   Star,
   Archive,
   Truck,
+  FlaskConical,
 } from 'lucide-react';
 
 
