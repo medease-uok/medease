@@ -62,6 +62,16 @@ const allActions = [
     path: '/lab-reports',
     roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN],
   },
+  {
+    id: 'lab-test-requests',
+    label: 'Test Requests',
+    icon: FlaskConical,
+    color: 'from-red-500 to-red-600',
+    hoverColor: 'hover:from-red-600 hover:to-red-700',
+    description: 'Lab test requests from doctors',
+    path: '/lab-test-requests',
+    roles: [ROLES.LAB_TECHNICIAN, ROLES.DOCTOR, ROLES.NURSE, ROLES.ADMIN],
+  },
 ]
 
 export function QuickActions({ onActionClick, role }) {

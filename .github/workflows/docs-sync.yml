@@ -173,7 +173,13 @@ jobs:
       - name: Update README via PR
         if: steps.changes.outputs.has_code_changes == 'true' && steps.analysis.outputs.readme_update == 'true'
         uses: actions/github-script@v7
+        # Note: Using PERSONAL_ACCESS_TOKEN instead of default GITHUB_TOKEN because:
+        # 1. GITHUB_TOKEN cannot trigger other workflows (label-pr, pr-validation)
+        # 2. PERSONAL_ACCESS_TOKEN allows the auto-labeling workflow to run
+        # Downside: PRs appear as created by the token owner instead of a bot
+        # Alternative: Use GitHub App token (requires app setup) for bot attribution
         with:
+          github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           script: |
             const fs = require('fs');
             const analysis = JSON.parse(fs.readFileSync('/tmp/analysis.json', 'utf8'));
@@ -229,13 +235,24 @@ jobs:
               base: 'main'
             });
 
+            console.log(`Created PR #${pr.number}: ${pr.html_url}`);
+
             // Add docs-only label so PR validation is skipped
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr.number,
-              labels: ['docs-only']
-            });
+            // Note: Using same authentication context (PERSONAL_ACCESS_TOKEN) as PR creation
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['docs-only']
+              });
+              console.log(`✅ Successfully added 'docs-only' label to skip validation checks`);
+            } catch (labelError) {
+              // Don't fail the workflow if label addition fails - PR was created successfully
+              console.error(`⚠️  Failed to add 'docs-only' label: ${labelError.message}`);
+              console.error(`   Please manually add the 'docs-only' label to PR #${pr.number}`);
+              console.error(`   Without this label, the PR will fail validation checks`);
+            }
 
             console.log(`✅ Created PR #${pr.number}: ${pr.html_url}`);
 

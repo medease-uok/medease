@@ -310,106 +310,108 @@ export default function DashboardEnhanced() {
 
       <QuickActions onActionClick={handleQuickAction} role={role} />
 
-      {/* Appointments Overview */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Today's Appointments */}
-        <div className="lg:col-span-2">
+      {/* Appointments Overview — visible to roles with appointment access */}
+      {['admin', 'doctor', 'nurse', 'patient'].includes(role) && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Today's Appointments */}
+          <div className="lg:col-span-2">
+            <Card className="h-full hover:shadow-lg transition-shadow duration-300">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-blue-500" />
+                    Today's Appointments
+                  </CardTitle>
+                  <CardDescription>
+                    {todayAppointments.length} appointment{todayAppointments.length !== 1 ? 's' : ''} scheduled for today
+                  </CardDescription>
+                </div>
+                <button
+                  onClick={() => navigate('/appointments')}
+                  className="text-sm text-primary hover:underline flex items-center gap-1"
+                >
+                  View All <ChevronRight className="w-3 h-3" />
+                </button>
+              </CardHeader>
+              <CardContent>
+                {todayAppointments.length > 0 ? (
+                  <div className="space-y-2">
+                    {todayAppointments.map((apt) => {
+                      const nameField = role === 'patient' ? apt.doctorName : apt.patientName;
+                      return (
+                        <div
+                          key={apt.id}
+                          className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-sm font-semibold text-slate-600">
+                              {nameField.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm text-slate-900">{nameField}</p>
+                              <p className="text-xs text-slate-500 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {formatTime(apt.scheduledAt)}
+                                {apt.notes && <span className="ml-1">— {apt.notes}</span>}
+                              </p>
+                            </div>
+                          </div>
+                          <AppointmentStatusBadge status={apt.status} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-slate-400">
+                    <Calendar className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium">No appointments today</p>
+                    <p className="text-sm mt-1">Your schedule is clear.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Upcoming Appointments */}
           <Card className="h-full hover:shadow-lg transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-blue-500" />
-                  Today's Appointments
-                </CardTitle>
-                <CardDescription>
-                  {todayAppointments.length} appointment{todayAppointments.length !== 1 ? 's' : ''} scheduled for today
-                </CardDescription>
-              </div>
-              <button
-                onClick={() => navigate('/appointments')}
-                className="text-sm text-primary hover:underline flex items-center gap-1"
-              >
-                View All <ChevronRight className="w-3 h-3" />
-              </button>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="w-5 h-5 text-indigo-500" />
+                Upcoming
+              </CardTitle>
+              <CardDescription>{upcomingAppointments.length} scheduled</CardDescription>
             </CardHeader>
             <CardContent>
-              {todayAppointments.length > 0 ? (
-                <div className="space-y-2">
-                  {todayAppointments.map((apt) => {
+              {upcomingAppointments.length > 0 ? (
+                <div className="space-y-3">
+                  {upcomingAppointments.map((apt) => {
                     const nameField = role === 'patient' ? apt.doctorName : apt.patientName;
                     return (
                       <div
                         key={apt.id}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200"
+                        className="p-3 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-sm font-semibold text-slate-600">
-                            {nameField.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm text-slate-900">{nameField}</p>
-                            <p className="text-xs text-slate-500 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {formatTime(apt.scheduledAt)}
-                              {apt.notes && <span className="ml-1">— {apt.notes}</span>}
-                            </p>
-                          </div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-medium text-sm text-slate-900">{nameField}</p>
+                          <AppointmentStatusBadge status={apt.status} />
                         </div>
-                        <AppointmentStatusBadge status={apt.status} />
+                        <p className="text-xs text-slate-500">
+                          {formatDate(apt.scheduledAt)} at {formatTime(apt.scheduledAt)}
+                        </p>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <div className="text-center py-12 text-slate-400">
-                  <Calendar className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                  <p className="font-medium">No appointments today</p>
-                  <p className="text-sm mt-1">Your schedule is clear.</p>
+                <div className="text-center py-8 text-slate-400">
+                  <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No upcoming appointments</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
-
-        {/* Upcoming Appointments */}
-        <Card className="h-full hover:shadow-lg transition-shadow duration-300">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Clock className="w-5 h-5 text-indigo-500" />
-              Upcoming
-            </CardTitle>
-            <CardDescription>{upcomingAppointments.length} scheduled</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {upcomingAppointments.length > 0 ? (
-              <div className="space-y-3">
-                {upcomingAppointments.map((apt) => {
-                  const nameField = role === 'patient' ? apt.doctorName : apt.patientName;
-                  return (
-                    <div
-                      key={apt.id}
-                      className="p-3 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm text-slate-900">{nameField}</p>
-                        <AppointmentStatusBadge status={apt.status} />
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        {formatDate(apt.scheduledAt)} at {formatTime(apt.scheduledAt)}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-400">
-                <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No upcoming appointments</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
       {/* Patient Queue — visible to clinical staff */}
       {['admin', 'nurse', 'doctor'].includes(role) && (

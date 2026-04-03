@@ -14,6 +14,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 
 - Appointment scheduling with real-time doctor availability
 - Appointment rescheduling to a new time slot with conflict detection and waitlist notification
+- Bulk (mass) appointment rescheduling by date range and day offset, with role-based authorization, conflict detection, and all-or-nothing transaction semantics
 - Appointment waitlist with automatic slot notifications when cancellations occur
 - Recurring appointment series (daily, weekly, biweekly, monthly) with conflict detection and bulk cancellation
 - Appointment confirmation emails sent to patients upon booking
@@ -32,6 +33,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Medical document management (S3-backed with presigned URLs)
 - Prescription refill requests with doctor approval workflow
 - Lab test request workflow with priority levels and lab technician assignment
+- Lab report file uploads (PDF, JPEG, PNG, WebP, DOC, DOCX up to 25 MB) stored in S3 with presigned download URLs
 - Patient satisfaction and feedback system with per-doctor ratings and analytics
 - Inventory management for hospital supplies and equipment with low stock alerts, expiry date tracking, admin notifications, and reorder quantity suggestions for admins
 - PDF generation for medical records and prescriptions
@@ -41,6 +43,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Email verification, multi-step login with OTP, and password reset
 - Real-time in-app notifications
 - Profile image uploads with cropping
+- File upload security with magic-byte validation and optional VirusTotal malware scanning
 - Data privacy controls with role-based field masking
 - Audit logging and CAPTCHA protection
 
@@ -57,6 +60,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 | PDF | PDFKit |
 | Scheduler | node-cron |
 | CAPTCHA | Cloudflare Turnstile |
+| Malware Scanning | VirusTotal API (optional) |
 | Container | Docker & Docker Compose |
 | Cloud | AWS (Fargate, S3, CloudFront) |
 | IaC | Terraform |
@@ -149,3 +153,13 @@ cd backend && npm run db:seed   # Seed database manually
 ---
 
 Built by the MedEase team at the University of Kelaniya, Sri Lanka
+
+## Confluence Pages Available (page ID: title)
+- 360461: Security Architecture
+- 393218: Architecture & Tech Stack
+- 393239: Scalability & Performance
+- 425985: Access Control (RBAC + ABAC)
+- 426011: API Documentation
+- 426031: Database Schema
+- 426062: Developer Guide
+- 458753: API Versioning Strategy

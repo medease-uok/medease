@@ -35,6 +35,10 @@ async function main() {
   const smtpFrom = await ask('  SMTP_FROM (e.g. MedEase <you@gmail.com>): ');
 
   console.log();
+  console.log('VirusTotal (Malware Scanning):');
+  const vtApiKey = await ask('  VIRUSTOTAL_API_KEY (leave empty to disable): ');
+
+  console.log();
 
   let password;
   while (true) {
@@ -60,6 +64,7 @@ async function main() {
     'SMTP_USER=' + smtpUser,
     'SMTP_PASS=' + smtpPass,
     'SMTP_FROM=' + smtpFrom,
+    'VIRUSTOTAL_API_KEY=' + vtApiKey,
   ].join('\n') + '\n';
 
   const encrypted = encrypt(plaintext, password);
