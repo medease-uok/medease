@@ -267,18 +267,25 @@ exports.getInventoryReport = async (req, res, next) => {
     `;
     const categoryResult = await client.query(categoryQuery);
 
-    // 3. Recent Transactions Trends (e.g., last 30 days)
-    const trendsQuery = `
-      SELECT 
-        DATE(created_at) as date,
-        transaction_type,
-        SUM(quantity_changed) as total_quantity
-      FROM inventory_transactions
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-      GROUP BY DATE(created_at), transaction_type
-      ORDER BY date ASC
-    `;
-    const trendsResult = await client.query(trendsQuery);
+    // 3. Recent Transactions Trends (last 30 days)
+    // Gracefully handle if inventory_transactions table doesn't exist yet.
+    let trendsRows = [];
+    try {
+      const trendsQuery = `
+        SELECT 
+          DATE(created_at) as date,
+          transaction_type,
+          SUM(quantity_changed) as total_quantity
+        FROM inventory_transactions
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY DATE(created_at), transaction_type
+        ORDER BY date ASC
+      `;
+      const trendsResult = await client.query(trendsQuery);
+      trendsRows = trendsResult.rows;
+    } catch (_) {
+      // inventory_transactions table not yet created — return empty trends
+    }
 
     await client.query('COMMIT');
 
@@ -297,7 +304,7 @@ exports.getInventoryReport = async (req, res, next) => {
           count: parseInt(row.count) || 0,
           total_quantity: parseInt(row.total_quantity) || 0
         })),
-        trends: trendsResult.rows.map(row => ({
+        trends: trendsRows.map(row => ({
           date: row.date,
           transaction_type: row.transaction_type,
           total_quantity: parseInt(row.total_quantity) || 0
