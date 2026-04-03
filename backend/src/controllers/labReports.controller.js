@@ -369,6 +369,7 @@ const parseNumericValues = (result) => {
  */
 const getComparison = async (req, res, next) => {
   try {
+    // codeql[js/sensitive-get-query] - patientId is a UUID resource identifier for filtering comparison data, not a secret; RESTful API design with ABAC authorization checks
     const { patientId } = req.query;
 
     // Validate patientId if provided
