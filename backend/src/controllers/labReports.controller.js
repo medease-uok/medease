@@ -304,4 +304,134 @@ const getDownloadUrl = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, create, update, getDownloadUrl };
+/**
+ * Parse numeric values from lab report result text
+ * Extracts metrics with their values for charting
+ */
+const parseNumericValues = (result) => {
+  if (!result) return {};
+
+  const metrics = {};
+
+  // Common patterns: "MetricName: 123.4 unit" or "MetricName 123.4 unit"
+  // Match patterns like "WBC: 7.2 x10^9/L", "Hemoglobin: 13.5 g/dL", "TSH: 2.8 mIU/L"
+  const patterns = [
+    /(\w+(?:\s+\w+)*?):\s*([\d.]+)/g,  // "Name: 123.4"
+    /(\w+(?:\s+\w+)*?)\s+([\d.]+)\s*(?:mg\/dL|mmHg|mIU\/L|g\/dL|x10\^|bpm|%)/g,  // "Name 123.4 unit"
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(result)) !== null) {
+      const [, name, value] = match;
+      const normalizedName = name.trim().replace(/\s+/g, ' ');
+      const numericValue = parseFloat(value);
+
+      if (!isNaN(numericValue) && normalizedName) {
+        metrics[normalizedName] = numericValue;
+      }
+    }
+  }
+
+  return metrics;
+};
+
+/**
+ * Get lab reports for comparison - grouped by test name with parsed numeric values
+ * Supports filtering by patient (own data for patients, any patient for staff)
+ */
+const getComparison = async (req, res, next) => {
+  try {
+    const { patientId } = req.query;
+
+    // Validate patientId if provided
+    if (patientId && !UUID_REGEX.test(patientId)) {
+      throw new AppError('Invalid patientId format.', 400);
+    }
+
+    const subject = {
+      id: req.user.id,
+      role: req.user.role,
+      patientId: req.user.patientId,
+    };
+
+    const columnMap = {
+      patient_id: 'lr.patient_id',
+      technician_id: 'lr.technician_id',
+    };
+
+    const { clause, params } = await buildAccessFilter('lab_report', subject, columnMap);
+
+    // Add patient filter if provided
+    let patientFilter = '';
+    let queryParams = [...params];
+    if (patientId) {
+      queryParams.push(patientId);
+      patientFilter = `AND lr.patient_id = $${queryParams.length}`;
+    }
+
+    // Get all reports for comparison
+    const query = `
+      SELECT lr.id, lr.patient_id, lr.test_name, lr.result,
+             lr.notes, lr.report_date,
+             pu.first_name || ' ' || pu.last_name AS patient_name
+      FROM lab_reports lr
+      JOIN patients p ON lr.patient_id = p.id
+      JOIN users pu ON p.user_id = pu.id
+      WHERE ${clause} ${patientFilter}
+      ORDER BY lr.test_name, lr.report_date ASC`;
+
+    const result = await db.query(query, queryParams);
+
+    // Group by test name and parse numeric values
+    const groupedData = {};
+    const testNames = new Set();
+
+    for (const row of result.rows) {
+      const testName = row.test_name;
+      testNames.add(testName);
+
+      if (!groupedData[testName]) {
+        groupedData[testName] = [];
+      }
+
+      const metrics = parseNumericValues(row.result);
+
+      groupedData[testName].push({
+        id: row.id,
+        reportDate: row.report_date,
+        date: new Date(row.report_date).toISOString().split('T')[0], // YYYY-MM-DD
+        notes: row.notes,
+        rawResult: row.result,
+        metrics,
+      });
+    }
+
+    // Get test names with multiple results (only these can be compared)
+    const comparableTests = Array.from(testNames).filter(
+      (testName) => groupedData[testName].length > 1
+    );
+
+    await auditLog({
+      userId: req.user.id,
+      action: 'VIEW_LAB_COMPARISON',
+      resourceType: 'lab_report',
+      ip: req.ip,
+      details: { patientId: patientId || 'all' }
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        allTests: Array.from(testNames).sort(),
+        comparableTests: comparableTests.sort(),
+        reports: groupedData,
+        patientName: result.rows[0]?.patient_name,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, create, update, getDownloadUrl, getComparison };

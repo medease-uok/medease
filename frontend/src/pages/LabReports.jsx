@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
-  FlaskConical, AlertCircle, Search, Clock, User, CalendarDays, X, Stethoscope, Download, FileText, Plus,
+  FlaskConical, AlertCircle, Search, Clock, User, CalendarDays, X, Stethoscope, Download, FileText, Plus, TrendingUp,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
@@ -105,6 +106,7 @@ function ListSkeleton() {
 }
 
 export default function LabReports({ embedded = false }) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -217,15 +219,24 @@ export default function LabReports({ embedded = false }) {
                 : 'Manage and review patient lab reports.'}
             </p>
           </div>
-          {canCreate && (
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              onClick={() => navigate('/lab-reports/comparison')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              Create Lab Report
+              <TrendingUp className="w-4 h-4" />
+              Compare Trends
             </button>
-          )}
+            {canCreate && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create Lab Report
+              </button>
+            )}
+          </div>
         </div>
       )}
 
