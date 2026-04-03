@@ -37,6 +37,32 @@ const getAll = async (req, res, next) => {
 
     const { clause, params } = await buildAccessFilter('lab_report', subject, columnMap);
 
+    // For nurses, restrict to patients from their department
+    // (patients who have had appointments with doctors from the same department)
+    let nurseFilter = '';
+    let queryParams = [...params];
+    if (req.user.role === 'nurse') {
+      const nurseInfo = await db.query(
+        `SELECT department FROM nurses WHERE user_id = $1`,
+        [req.user.id]
+      );
+
+      if (nurseInfo.rows.length === 0) {
+        throw new AppError('Nurse profile not found.', 404);
+      }
+
+      const nurseDepartment = nurseInfo.rows[0].department;
+
+      // Only show patients who have appointments with doctors from this department
+      nurseFilter = `AND EXISTS (
+        SELECT 1 FROM appointments a
+        JOIN doctors d ON a.doctor_id = d.id
+        WHERE a.patient_id = lr.patient_id
+        AND d.department = $${queryParams.length + 1}
+      )`;
+      queryParams.push(nurseDepartment);
+    }
+
     const query = `
       SELECT lr.id, lr.patient_id, lr.technician_id, lr.test_name, lr.result,
              lr.notes, lr.report_date, lr.file_key, lr.file_name,
@@ -46,10 +72,10 @@ const getAll = async (req, res, next) => {
       JOIN patients p ON lr.patient_id = p.id
       JOIN users pu ON p.user_id = pu.id
       LEFT JOIN users tu ON lr.technician_id = tu.id
-      WHERE ${clause}
+      WHERE ${clause} ${nurseFilter}
       ORDER BY lr.report_date DESC`;
 
-    const result = await db.query(query, params);
+    const result = await db.query(query, queryParams);
 
     await auditLog({ userId: req.user.id, action: 'VIEW_LAB_REPORTS', resourceType: 'lab_report', ip: req.ip });
 
@@ -339,6 +365,7 @@ const parseNumericValues = (result) => {
 /**
  * Get lab reports for comparison - grouped by test name with parsed numeric values
  * Supports filtering by patient (own data for patients, any patient for staff)
+ * Nurses can only see reports for patients in their department (patients with appointments from doctors in the same department)
  */
 const getComparison = async (req, res, next) => {
   try {
@@ -370,6 +397,31 @@ const getComparison = async (req, res, next) => {
       patientFilter = `AND lr.patient_id = $${queryParams.length}`;
     }
 
+    // For nurses, restrict to patients from their department
+    // (patients who have had appointments with doctors from the same department)
+    let nurseFilter = '';
+    if (req.user.role === 'nurse') {
+      const nurseInfo = await db.query(
+        `SELECT department FROM nurses WHERE user_id = $1`,
+        [req.user.id]
+      );
+
+      if (nurseInfo.rows.length === 0) {
+        throw new AppError('Nurse profile not found.', 404);
+      }
+
+      const nurseDepartment = nurseInfo.rows[0].department;
+
+      // Only show patients who have appointments with doctors from this department
+      nurseFilter = `AND EXISTS (
+        SELECT 1 FROM appointments a
+        JOIN doctors d ON a.doctor_id = d.id
+        WHERE a.patient_id = lr.patient_id
+        AND d.department = $${queryParams.length + 1}
+      )`;
+      queryParams.push(nurseDepartment);
+    }
+
     // Get all reports for comparison
     const query = `
       SELECT lr.id, lr.patient_id, lr.test_name, lr.result,
@@ -378,7 +430,7 @@ const getComparison = async (req, res, next) => {
       FROM lab_reports lr
       JOIN patients p ON lr.patient_id = p.id
       JOIN users pu ON p.user_id = pu.id
-      WHERE ${clause} ${patientFilter}
+      WHERE ${clause} ${patientFilter} ${nurseFilter}
       ORDER BY lr.test_name, lr.report_date ASC`;
 
     const result = await db.query(query, queryParams);
