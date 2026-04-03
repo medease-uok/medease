@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAll, create, update, getDownloadUrl, getComparison } = require('../controllers/labReports.controller');
+const { getAll, create, update, getDownloadUrl, streamFile, getComparison } = require('../controllers/labReports.controller');
 const authenticate = require('../middleware/authenticate');
 const { requirePermission } = require('../middleware/authorize');
 const resolveSubject = require('../middleware/resolveSubject');
@@ -14,6 +14,7 @@ router.use(resolveSubject);
 router.get('/', sensitiveDataLimiter, requirePermission('view_lab_reports', 'view_own_lab_reports'), getAll);
 router.get('/comparison', sensitiveDataLimiter, requirePermission('view_lab_reports', 'view_own_lab_reports'), getComparison);
 router.get('/:id/download-url', sensitiveDataLimiter, requirePermission('view_lab_reports', 'view_own_lab_reports'), getDownloadUrl);
+router.get('/:id/file', sensitiveDataLimiter, requirePermission('view_lab_reports', 'view_own_lab_reports'), streamFile);
 router.post(
   '/',
   apiLimiter,

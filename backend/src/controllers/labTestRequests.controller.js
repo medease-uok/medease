@@ -26,6 +26,11 @@ const mapRequest = (row, role) => {
     base.assignedTo = row.assigned_to
     base.assignedToName = row.assigned_to_name
     base.labReportId = row.lab_report_id
+    // Include lab report details if available
+    if (row.lab_report_result) {
+      base.labReportResult = row.lab_report_result
+      base.labReportDate = row.lab_report_date
+    }
   }
   return base
 }
@@ -74,13 +79,16 @@ const getAll = async (req, res, next) => {
               r.created_at, r.updated_at,
               pu.first_name || ' ' || pu.last_name AS patient_name,
               'Dr. ' || du.first_name || ' ' || du.last_name AS doctor_name,
-              au.first_name || ' ' || au.last_name AS assigned_to_name
+              au.first_name || ' ' || au.last_name AS assigned_to_name,
+              lr.result AS lab_report_result,
+              lr.report_date AS lab_report_date
        FROM lab_test_requests r
        JOIN patients p ON r.patient_id = p.id
        JOIN users pu ON p.user_id = pu.id
        JOIN doctors d ON r.doctor_id = d.id
        JOIN users du ON d.user_id = du.id
        LEFT JOIN users au ON r.assigned_to = au.id
+       LEFT JOIN lab_reports lr ON r.lab_report_id = lr.id
        WHERE ${clause}${statusFilter}
        ORDER BY
          CASE r.priority WHEN 'urgent' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,

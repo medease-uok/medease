@@ -3,7 +3,7 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
-const { uploadLabReportToS3, getPresignedImageUrl, deleteFromS3 } = require('../middleware/upload');
+const { uploadLabReportToS3, getPresignedImageUrl, deleteFromS3, getS3Object } = require('../middleware/upload');
 const path = require('path');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -362,6 +362,60 @@ const getDownloadUrl = async (req, res, next) => {
   }
 };
 
+const streamFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError('Invalid report ID format.', 400);
+    }
+
+    const subject = {
+      id: req.user.id,
+      role: req.user.role,
+      patientId: req.user.patientId,
+    };
+
+    const columnMap = {
+      patient_id: 'lr.patient_id',
+      technician_id: 'lr.technician_id',
+    };
+
+    const { clause, params } = await buildAccessFilter('lab_report', subject, columnMap);
+
+    const result = await db.query(
+      `SELECT lr.id, lr.file_key, lr.file_name
+       FROM lab_reports lr
+       WHERE lr.id = $1 AND ${clause}`,
+      [id, ...params]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Lab report not found or access denied.', 404);
+    }
+
+    const report = result.rows[0];
+
+    if (!report.file_key) {
+      throw new AppError('No file attached to this report.', 404);
+    }
+
+    // Get the file from S3
+    const s3Response = await getS3Object(report.file_key);
+
+    // Set response headers
+    res.setHeader('Content-Type', s3Response.ContentType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${report.file_name}"`);
+    res.setHeader('Content-Length', s3Response.ContentLength);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+
+    // Stream the file
+    s3Response.Body.pipe(res);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 /**
  * Parse numeric values from lab report result text
  * Extracts metrics with their values for charting
@@ -507,4 +561,4 @@ const getComparison = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, create, update, getDownloadUrl, getComparison };
+module.exports = { getAll, create, update, getDownloadUrl, streamFile, getComparison };

@@ -77,6 +77,16 @@ async function getPresignedImageUrl(key) {
   return getSignedUrl(s3, command, { expiresIn: PRESIGNED_URL_EXPIRY });
 }
 
+async function getS3Object(key) {
+  if (!key) return null;
+  const command = new GetObjectCommand({
+    Bucket: config.s3.bucket,
+    Key: key,
+  });
+  const response = await s3.send(command);
+  return response;
+}
+
 async function deleteFromS3(key) {
   if (!key) return;
   try {
@@ -209,4 +219,4 @@ async function uploadLabReportToS3(file, patientId) {
   return key;
 }
 
-module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl, documentUpload, uploadDocumentToS3, prescriptionImageUpload, uploadPrescriptionImageToS3, labReportUpload, uploadLabReportToS3 };
+module.exports = { upload, uploadToS3, deleteFromS3, getPresignedImageUrl, getS3Object, documentUpload, uploadDocumentToS3, prescriptionImageUpload, uploadPrescriptionImageToS3, labReportUpload, uploadLabReportToS3 };

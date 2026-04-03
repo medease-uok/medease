@@ -119,6 +119,7 @@ export default function LabReports({ embedded = false }) {
   const [viewerUrl, setViewerUrl] = useState('');
   const [viewerFileName, setViewerFileName] = useState('');
   const [viewerFileType, setViewerFileType] = useState('');
+  const [loadingViewer, setLoadingViewer] = useState(false);
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
   const isLabTech = currentUser?.role === 'lab_technician';
@@ -170,8 +171,11 @@ export default function LabReports({ embedded = false }) {
   const handleViewFile = async (report) => {
     try {
       setLoadingViewer(true);
-      const response = await api.get(`/lab-reports/${report.id}/download-url`);
-      const { url, fileName } = response.data;
+
+      // Use the streaming endpoint which serves the file directly with proper CORS headers
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+      const url = `${API_URL}/api/lab-reports/${report.id}/file`;
+      const fileName = report.fileName || 'Lab Report';
 
       // Determine file type from fileName
       const fileExtension = fileName?.split('.').pop()?.toLowerCase();
@@ -187,11 +191,11 @@ export default function LabReports({ embedded = false }) {
       }
 
       setViewerUrl(url);
-      setViewerFileName(fileName || report.fileName || 'Lab Report');
+      setViewerFileName(fileName);
       setViewerFileType(fileType);
       setViewerOpen(true);
     } catch (err) {
-      alert(err.data?.message || 'Failed to load file');
+      alert(err?.message || 'Failed to load file');
     } finally {
       setLoadingViewer(false);
     }
