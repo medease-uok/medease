@@ -31,9 +31,11 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Vaccination records and chronic condition tracking
 - Treatment plans with checklist items, priority levels, and status tracking
 - Medical document management (S3-backed with presigned URLs)
+- In-browser document viewer for PDFs and images with zoom and pagination controls
 - Prescription refill requests with doctor approval workflow
 - Lab test request workflow with priority levels and lab technician assignment
 - Lab report file uploads (PDF, JPEG, PNG, WebP, DOC, DOCX up to 25 MB) stored in S3 with presigned download URLs
+- Lab report access for admins, doctors, nurses, and patients
 - Patient satisfaction and feedback system with per-doctor ratings and analytics
 - Inventory management for hospital supplies and equipment with low stock alerts, expiry date tracking, admin notifications, and reorder quantity suggestions for admins
 - Supplier management for tracking medication and equipment suppliers, with full-text search and soft deletion (admin only)
@@ -58,7 +60,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 | Cache | Redis 8 |
 | Auth | JWT + email OTP |
 | Storage | AWS S3 |
-| PDF | PDFKit |
+| PDF | PDFKit (server), react-pdf / pdfjs-dist (client) |
 | Scheduler | node-cron |
 | CAPTCHA | Cloudflare Turnstile |
 | Malware Scanning | VirusTotal API (optional) |
@@ -154,13 +156,3 @@ cd backend && npm run db:seed   # Seed database manually
 ---
 
 Built by the MedEase team at the University of Kelaniya, Sri Lanka
-
-## Confluence Pages Available (page ID: title)
-- 360461: Security Architecture
-- 393218: Architecture & Tech Stack
-- 393239: Scalability & Performance
-- 425985: Access Control (RBAC + ABAC)
-- 426011: API Documentation
-- 426031: Database Schema
-- 426062: Developer Guide
-- 458753: API Versioning Strategy
