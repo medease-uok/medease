@@ -11,14 +11,16 @@ export default function DocumentViewer({ isOpen, onClose, url, fileName, fileTyp
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  if (!isOpen) return null;
 
   const isPdf = fileType?.toLowerCase().includes('pdf') || fileName?.toLowerCase().endsWith('.pdf');
   const isImage = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'].includes(fileType) ||
     /\.(jpg|jpeg|png|webp)$/i.test(fileName);
+
+  // Only show loading for PDFs, images load instantly
+  const [loading, setLoading] = useState(isPdf);
+
+  if (!isOpen) return null;
 
   const handleDownload = () => {
     const link = document.createElement('a');
@@ -180,22 +182,20 @@ export default function DocumentViewer({ isOpen, onClose, url, fileName, fileTyp
           )}
 
           {/* Image viewer */}
-          {!error && !loading && isImage && (
+          {!error && isImage && (
             <img
               src={url}
               alt={fileName}
               style={{ transform: `scale(${scale})` }}
               className="max-w-full max-h-full object-contain shadow-lg transition-transform"
-              onLoad={() => setLoading(false)}
               onError={() => {
                 setError('Failed to load image');
-                setLoading(false);
               }}
             />
           )}
 
           {/* Fallback for other file types */}
-          {!error && !loading && !isPdf && !isImage && (
+          {!error && !isPdf && !isImage && (
             <div className="text-center max-w-md">
               <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Download className="w-8 h-8 text-slate-600" />

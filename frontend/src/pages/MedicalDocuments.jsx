@@ -344,7 +344,7 @@ function ViewerModal({ doc, onClose }) {
 
   return (
     <DocumentViewer
-      isOpen={!!doc && !!url}
+      isOpen={!!url}
       onClose={onClose}
       url={url}
       fileName={doc.fileName || doc.title}
