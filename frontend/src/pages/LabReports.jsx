@@ -2,12 +2,12 @@ import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'rea
 import {
   FlaskConical, AlertCircle, Search, Clock, User, CalendarDays, X, Stethoscope, Download, FileText, Plus, TrendingUp,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../data/AuthContext';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import CreateLabReportModal from '../components/CreateLabReportModal';
 import DocumentViewer from '../components/DocumentViewer';
+import CompareLabReportsModal from '../components/CompareLabReportsModal';
 
 const SKELETON_COUNT = 6;
 
@@ -106,7 +106,6 @@ function ListSkeleton() {
 }
 
 export default function LabReports({ embedded = false }) {
-  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -114,6 +113,7 @@ export default function LabReports({ embedded = false }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
   const [patients, setPatients] = useState([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerUrl, setViewerUrl] = useState('');
@@ -227,7 +227,7 @@ export default function LabReports({ embedded = false }) {
           <div className="flex items-center gap-3">
             {canCompare && (
               <button
-                onClick={() => navigate('/lab-reports/comparison')}
+                onClick={() => setShowCompareModal(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 <TrendingUp className="w-4 h-4" />
@@ -250,8 +250,9 @@ export default function LabReports({ embedded = false }) {
       {/* Filters and search */}
       <Card>
         <CardContent className="py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+              <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
               <label htmlFor="lab-search" className="sr-only">Search lab reports</label>
               <input
@@ -295,6 +296,31 @@ export default function LabReports({ embedded = false }) {
                   <X className="w-4 h-4" />
                 </button>
               )}
+            </div>
+
+            {/* Action buttons for embedded mode */}
+            {embedded && (canCompare || canCreate) && (
+              <div className="flex items-center gap-2">
+                {canCompare && (
+                  <button
+                    onClick={() => setShowCompareModal(true)}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    Compare
+                  </button>
+                )}
+                {canCreate && (
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create
+                  </button>
+                )}
+              </div>
+            )}
             </div>
           </div>
         </CardContent>
@@ -368,6 +394,12 @@ export default function LabReports({ embedded = false }) {
         onClose={() => setShowCreateModal(false)}
         onSuccess={fetchReports}
         patients={patients}
+      />
+
+      {/* Compare Lab Reports Modal */}
+      <CompareLabReportsModal
+        isOpen={showCompareModal}
+        onClose={() => setShowCompareModal(false)}
       />
 
       {/* Document Viewer */}

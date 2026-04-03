@@ -78,7 +78,9 @@ async function getPresignedImageUrl(key) {
 }
 
 async function getS3Object(key) {
-  if (!key) return null;
+  if (!key) {
+    throw new AppError('File key is required.', 400);
+  }
   const command = new GetObjectCommand({
     Bucket: config.s3.bucket,
     Key: key,

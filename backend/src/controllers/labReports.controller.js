@@ -8,6 +8,9 @@ const path = require('path');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Minimum number of reports required to show a test type in the comparison view
+const MIN_REPORTS_FOR_COMPARISON = 2;
+
 const mapReport = (row) => ({
   id: row.id,
   patientId: row.patient_id,
@@ -403,13 +406,36 @@ const streamFile = async (req, res, next) => {
     // Get the file from S3
     const s3Response = await getS3Object(report.file_key);
 
-    // Set response headers
-    res.setHeader('Content-Type', s3Response.ContentType || 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${report.file_name}"`);
+    if (!s3Response || !s3Response.Body) {
+      throw new AppError('File not found in storage.', 404);
+    }
+
+    // Validate and sanitize content type
+    const ALLOWED_CONTENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    const contentType = ALLOWED_CONTENT_TYPES.includes(s3Response.ContentType)
+      ? s3Response.ContentType
+      : 'application/octet-stream';
+
+    // Sanitize filename to prevent header injection
+    const safeFileName = report.file_name
+      .replace(/[^\w.\-]/g, '_')  // Remove unsafe characters
+      .substring(0, 255);  // Limit length
+
+    // Set response headers with security measures
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"`);
     res.setHeader('Content-Length', s3Response.ContentLength);
     res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');  // Prevent MIME sniffing
 
-    // Stream the file
+    // Stream the file with error handling
+    s3Response.Body.on('error', (err) => {
+      console.error('S3 stream error:', err);
+      if (!res.headersSent) {
+        return next(new AppError('Error streaming file.', 500));
+      }
+    });
+
     s3Response.Body.pipe(res);
   } catch (err) {
     return next(err);
@@ -423,13 +449,15 @@ const streamFile = async (req, res, next) => {
 const parseNumericValues = (result) => {
   if (!result) return {};
 
-  const metrics = {};
+  // Use Object.create(null) to prevent prototype pollution
+  const metrics = Object.create(null);
 
+  // Create new RegExp instances to avoid lastIndex state persistence
   // Common patterns: "MetricName: 123.4 unit" or "MetricName 123.4 unit"
   // Match patterns like "WBC: 7.2 x10^9/L", "Hemoglobin: 13.5 g/dL", "TSH: 2.8 mIU/L"
   const patterns = [
-    /(\w+(?:\s+\w+)*?):\s*([\d.]+)/g,  // "Name: 123.4"
-    /(\w+(?:\s+\w+)*?)\s+([\d.]+)\s*(?:mg\/dL|mmHg|mIU\/L|g\/dL|x10\^|bpm|%)/g,  // "Name 123.4 unit"
+    new RegExp(/(\w+(?:\s+\w+)*?):\s*([\d.]+)/g),  // "Name: 123.4"
+    new RegExp(/(\w+(?:\s+\w+)*?)\s+([\d.]+)\s*(?:mg\/dL|mmHg|mIU\/L|g\/dL|x10\^|bpm|%)/g),  // "Name 123.4 unit"
   ];
 
   for (const pattern of patterns) {
@@ -439,7 +467,11 @@ const parseNumericValues = (result) => {
       const normalizedName = name.trim().replace(/\s+/g, ' ');
       const numericValue = parseFloat(value);
 
-      if (!isNaN(numericValue) && normalizedName) {
+      // Skip dangerous property names to prevent prototype pollution
+      if (!isNaN(numericValue) && normalizedName &&
+          normalizedName !== '__proto__' &&
+          normalizedName !== 'constructor' &&
+          normalizedName !== 'prototype') {
         metrics[normalizedName] = numericValue;
       }
     }
@@ -510,13 +542,32 @@ const getComparison = async (req, res, next) => {
 
     const result = await db.query(query, queryParams);
 
+    // Handle empty results explicitly
+    if (result.rows.length === 0) {
+      await auditLog({
+        userId: req.user.id,
+        action: 'VIEW_LAB_COMPARISON',
+        resourceType: 'lab_report',
+        ip: req.ip,
+        details: { patientId: patientId || 'all', resultCount: 0 }
+      });
+
+      return res.json({
+        status: 'success',
+        data: {
+          allTests: [],
+          comparableTests: [],
+          reports: {},
+          patientName: null,
+        },
+      });
+    }
+
     // Group by test name and parse numeric values
     const groupedData = {};
-    const testNames = new Set();
 
     for (const row of result.rows) {
       const testName = row.test_name;
-      testNames.add(testName);
 
       if (!groupedData[testName]) {
         groupedData[testName] = [];
@@ -535,8 +586,9 @@ const getComparison = async (req, res, next) => {
     }
 
     // Get test names with multiple results (only these can be compared)
-    const comparableTests = Array.from(testNames).filter(
-      (testName) => groupedData[testName].length > 1
+    const allTests = Object.keys(groupedData).sort();
+    const comparableTests = allTests.filter(
+      (testName) => groupedData[testName].length >= MIN_REPORTS_FOR_COMPARISON
     );
 
     await auditLog({
@@ -544,16 +596,16 @@ const getComparison = async (req, res, next) => {
       action: 'VIEW_LAB_COMPARISON',
       resourceType: 'lab_report',
       ip: req.ip,
-      details: { patientId: patientId || 'all' }
+      details: { patientId: patientId || 'all', resultCount: result.rows.length }
     });
 
     res.json({
       status: 'success',
       data: {
-        allTests: Array.from(testNames).sort(),
-        comparableTests: comparableTests.sort(),
+        allTests,
+        comparableTests,
         reports: groupedData,
-        patientName: result.rows[0]?.patient_name,
+        patientName: result.rows[0].patient_name,
       },
     });
   } catch (err) {
