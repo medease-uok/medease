@@ -80,13 +80,13 @@ INSERT INTO abac_policies (name, description, resource_type, conditions, effect,
    'allow', 5);
 
 -- Lab report access
--- NOTE: Nurse access grants visibility to ALL lab reports without patient/ward scoping.
--- This follows the current system design where there are no ward assignments or formal
--- patient-nurse relationships. For HIPAA compliance in larger facilities, consider
--- implementing ward-based scoping: {"all": [{"subject.role": {"equals": "nurse"}},
--- {"resource.ward_id": {"equals_ref": "subject.assignedWardId"}}]}
+-- NOTE: Nurse access is department-scoped via application logic (not ABAC).
+-- Nurses can only view lab reports for patients who have had appointments with
+-- doctors from the nurse's department. This filtering is implemented in the
+-- labReports.controller.js getAll() and getComparison() functions.
+-- Admins and doctors have unrestricted access to all lab reports.
 INSERT INTO abac_policies (name, description, resource_type, conditions, effect, priority) VALUES
-  ('lab_report_privileged_access', 'Admins, doctors, and nurses can view all lab reports', 'lab_report',
+  ('lab_report_privileged_access', 'Admins, doctors, and nurses can view lab reports (nurses scoped to department)', 'lab_report',
    '{"any": [{"subject.role": {"in": ["admin", "doctor", "nurse"]}}]}',
    'allow', 10),
   ('lab_report_patient_own', 'Patients can view their own lab reports', 'lab_report',

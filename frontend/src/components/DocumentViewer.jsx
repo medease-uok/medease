@@ -150,7 +150,13 @@ export default function DocumentViewer({ isOpen, onClose, url, fileName, fileTyp
           {!error && isPdf && (
             <div className="flex flex-col items-center gap-4">
               <Document
-                file={url}
+                file={{
+                  url,
+                  httpHeaders: {
+                    Authorization: `Bearer ${localStorage.getItem('medease_token')}`,
+                  },
+                  withCredentials: false,
+                }}
                 onLoadSuccess={onDocumentLoadSuccess}
                 onLoadError={onDocumentLoadError}
                 loading=""
@@ -198,7 +204,6 @@ export default function DocumentViewer({ isOpen, onClose, url, fileName, fileTyp
               alt={fileName}
               style={{ transform: `scale(${scale})` }}
               className="max-w-full max-h-full object-contain shadow-lg transition-transform"
-              crossOrigin="anonymous"
               onError={(e) => {
                 console.error('Image load error:', e);
                 console.error('Failed URL:', url);

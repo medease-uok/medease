@@ -34,6 +34,9 @@ export default function LabTestRequests() {
   const [patients, setPatients] = useState([]);
   const [updatingStatus, setUpdatingStatus] = useState({});
 
+  // Only lab technicians and admins can work on lab test requests
+  const canWorkOnRequests = ['lab_technician', 'admin'].includes(currentUser?.role);
+
   const fetchRequests = async () => {
     try {
       setLoading(true);
@@ -220,37 +223,39 @@ export default function LabTestRequests() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                      {request.status === 'pending' ? (
-                        <button
-                          onClick={() => handleStartWorking(request.id)}
-                          disabled={updatingStatus[request.id]}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Play className="w-4 h-4" />
-                          {updatingStatus[request.id] ? 'Starting...' : 'Start Working'}
-                        </button>
-                      ) : (
-                        <>
-                          <select
-                            value={request.status}
-                            onChange={(e) => handleStatusChange(request.id, e.target.value)}
-                            disabled={updatingStatus[request.id]}
-                            className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-                          >
-                            <option value="in_progress">In Progress</option>
-                            <option value="completed">Completed</option>
-                          </select>
+                    {canWorkOnRequests && (
+                      <div className="flex flex-col gap-2">
+                        {request.status === 'pending' ? (
                           <button
-                            onClick={() => handleCreateReport(request)}
-                            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+                            onClick={() => handleStartWorking(request.id)}
+                            disabled={updatingStatus[request.id]}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <FileText className="w-4 h-4" />
-                            Upload Report
+                            <Play className="w-4 h-4" />
+                            {updatingStatus[request.id] ? 'Starting...' : 'Start Working'}
                           </button>
-                        </>
-                      )}
-                    </div>
+                        ) : (
+                          <>
+                            <select
+                              value={request.status}
+                              onChange={(e) => handleStatusChange(request.id, e.target.value)}
+                              disabled={updatingStatus[request.id]}
+                              className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                            >
+                              <option value="in_progress">In Progress</option>
+                              <option value="completed">Completed</option>
+                            </select>
+                            <button
+                              onClick={() => handleCreateReport(request)}
+                              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+                            >
+                              <FileText className="w-4 h-4" />
+                              Upload Report
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -295,6 +300,16 @@ export default function LabTestRequests() {
                         <p className="font-medium text-slate-700">{request.doctorName}</p>
                       </div>
                     </div>
+
+                    {request.labReportResult && (
+                      <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p className="text-xs font-medium text-green-900 mb-1 flex items-center gap-1">
+                          <FileText className="w-3 h-3" />
+                          Lab Results
+                        </p>
+                        <p className="text-sm text-green-800 whitespace-pre-wrap">{request.labReportResult}</p>
+                      </div>
+                    )}
 
                     <div className="mt-2 text-xs text-slate-500">
                       Completed {new Date(request.updatedAt).toLocaleString()}

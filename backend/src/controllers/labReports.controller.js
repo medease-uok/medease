@@ -3,10 +3,13 @@ const AppError = require('../utils/AppError');
 const { buildAccessFilter } = require('../utils/abac');
 const { createNotification } = require('./notifications.controller');
 const auditLog = require('../utils/auditLog');
-const { uploadLabReportToS3, getPresignedImageUrl, deleteFromS3 } = require('../middleware/upload');
+const { uploadLabReportToS3, getPresignedImageUrl, deleteFromS3, getS3Object } = require('../middleware/upload');
 const path = require('path');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Minimum number of reports required to show a test type in the comparison view
+const MIN_REPORTS_FOR_COMPARISON = 2;
 
 const mapReport = (row) => ({
   id: row.id,
@@ -21,6 +24,55 @@ const mapReport = (row) => ({
   fileKey: row.file_key,
   fileName: row.file_name,
 });
+
+/**
+ * Build nurse department filter for lab reports
+ * Restricts nurses to only see lab reports for patients who have appointments
+ * with doctors from the same department as the nurse
+ *
+ * @param {string} userId - User ID of the nurse
+ * @param {string} patientId - Optional patient ID to verify access for
+ * @param {number} currentParamCount - Current count of query parameters
+ * @returns {Object} { filter: string, param: string } - SQL filter and department parameter
+ */
+const buildNurseDepartmentFilter = async (userId, patientId, currentParamCount) => {
+  const nurseInfo = await db.query(
+    `SELECT department FROM nurses WHERE user_id = $1`,
+    [userId]
+  );
+
+  if (nurseInfo.rows.length === 0) {
+    throw new AppError('Access denied.', 403);
+  }
+
+  const nurseDepartment = nurseInfo.rows[0].department;
+
+  // IDOR Prevention: If a specific patientId is requested, verify the patient is in nurse's department
+  if (patientId) {
+    const patientDeptCheck = await db.query(
+      `SELECT EXISTS (
+        SELECT 1 FROM appointments a
+        JOIN doctors d ON a.doctor_id = d.id
+        WHERE a.patient_id = $1 AND d.department = $2
+      ) AS has_access`,
+      [patientId, nurseDepartment]
+    );
+
+    if (!patientDeptCheck.rows[0].has_access) {
+      throw new AppError('Access denied. Patient not in your department.', 403);
+    }
+  }
+
+  // Build SQL filter that restricts to patients in this department
+  const filter = `AND EXISTS (
+    SELECT 1 FROM appointments a
+    JOIN doctors d ON a.doctor_id = d.id
+    WHERE a.patient_id = lr.patient_id
+    AND d.department = $${currentParamCount + 1}
+  )`;
+
+  return { filter, param: nurseDepartment };
+};
 
 const getAll = async (req, res, next) => {
   try {
@@ -37,6 +89,15 @@ const getAll = async (req, res, next) => {
 
     const { clause, params } = await buildAccessFilter('lab_report', subject, columnMap);
 
+    // For nurses, restrict to patients from their department
+    let nurseFilter = '';
+    let queryParams = [...params];
+    if (req.user.role === 'nurse') {
+      const { filter, param } = await buildNurseDepartmentFilter(req.user.id, null, queryParams.length);
+      nurseFilter = filter;
+      queryParams.push(param);
+    }
+
     const query = `
       SELECT lr.id, lr.patient_id, lr.technician_id, lr.test_name, lr.result,
              lr.notes, lr.report_date, lr.file_key, lr.file_name,
@@ -46,10 +107,10 @@ const getAll = async (req, res, next) => {
       JOIN patients p ON lr.patient_id = p.id
       JOIN users pu ON p.user_id = pu.id
       LEFT JOIN users tu ON lr.technician_id = tu.id
-      WHERE ${clause}
+      WHERE ${clause} ${nurseFilter}
       ORDER BY lr.report_date DESC`;
 
-    const result = await db.query(query, params);
+    const result = await db.query(query, queryParams);
 
     await auditLog({ userId: req.user.id, action: 'VIEW_LAB_REPORTS', resourceType: 'lab_report', ip: req.ip });
 
@@ -304,4 +365,252 @@ const getDownloadUrl = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, create, update, getDownloadUrl };
+const streamFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError('Invalid report ID format.', 400);
+    }
+
+    const subject = {
+      id: req.user.id,
+      role: req.user.role,
+      patientId: req.user.patientId,
+    };
+
+    const columnMap = {
+      patient_id: 'lr.patient_id',
+      technician_id: 'lr.technician_id',
+    };
+
+    const { clause, params } = await buildAccessFilter('lab_report', subject, columnMap);
+
+    const result = await db.query(
+      `SELECT lr.id, lr.file_key, lr.file_name
+       FROM lab_reports lr
+       WHERE lr.id = $1 AND ${clause}`,
+      [id, ...params]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Lab report not found or access denied.', 404);
+    }
+
+    const report = result.rows[0];
+
+    if (!report.file_key) {
+      throw new AppError('No file attached to this report.', 404);
+    }
+
+    // Get the file from S3
+    const s3Response = await getS3Object(report.file_key);
+
+    if (!s3Response || !s3Response.Body) {
+      throw new AppError('File not found in storage.', 404);
+    }
+
+    // Validate and sanitize content type
+    const ALLOWED_CONTENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    const contentType = ALLOWED_CONTENT_TYPES.includes(s3Response.ContentType)
+      ? s3Response.ContentType
+      : 'application/octet-stream';
+
+    // Sanitize filename to prevent header injection
+    const safeFileName = report.file_name
+      .replace(/[^\w.\-]/g, '_')  // Remove unsafe characters
+      .substring(0, 255);  // Limit length
+
+    // Set response headers with security measures
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"`);
+    res.setHeader('Content-Length', s3Response.ContentLength);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');  // Prevent MIME sniffing
+
+    // Stream the file with error handling
+    s3Response.Body.on('error', (err) => {
+      console.error('S3 stream error:', err);
+      if (!res.headersSent) {
+        return next(new AppError('Error streaming file.', 500));
+      }
+    });
+
+    s3Response.Body.pipe(res);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * Parse numeric values from lab report result text
+ * Extracts metrics with their values for charting
+ */
+const parseNumericValues = (result) => {
+  if (!result) return {};
+
+  // Use Object.create(null) to prevent prototype pollution
+  const metrics = Object.create(null);
+
+  // Create new RegExp instances to avoid lastIndex state persistence
+  // Common patterns: "MetricName: 123.4 unit" or "MetricName 123.4 unit"
+  // Match patterns like "WBC: 7.2 x10^9/L", "Hemoglobin: 13.5 g/dL", "TSH: 2.8 mIU/L"
+  const patterns = [
+    new RegExp(/(\w+(?:\s+\w+)*?):\s*([\d.]+)/g),  // "Name: 123.4"
+    new RegExp(/(\w+(?:\s+\w+)*?)\s+([\d.]+)\s*(?:mg\/dL|mmHg|mIU\/L|g\/dL|x10\^|bpm|%)/g),  // "Name 123.4 unit"
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(result)) !== null) {
+      const [, name, value] = match;
+      const normalizedName = name.trim().replace(/\s+/g, ' ');
+      const numericValue = parseFloat(value);
+
+      // Skip dangerous property names to prevent prototype pollution
+      if (!isNaN(numericValue) && normalizedName &&
+          normalizedName !== '__proto__' &&
+          normalizedName !== 'constructor' &&
+          normalizedName !== 'prototype') {
+        metrics[normalizedName] = numericValue;
+      }
+    }
+  }
+
+  return metrics;
+};
+
+/**
+ * Get lab reports for comparison - grouped by test name with parsed numeric values
+ * Supports filtering by patient (own data for patients, any patient for staff)
+ * Nurses can only see reports for patients in their department (patients with appointments from doctors in the same department)
+ */
+const getComparison = async (req, res, next) => {
+  try {
+    // codeql[js/sensitive-get-query] - patientId is a UUID resource identifier for filtering comparison data, not a secret; RESTful API design with ABAC authorization checks
+    const { patientId } = req.query;
+
+    // Validate patientId if provided
+    if (patientId && !UUID_REGEX.test(patientId)) {
+      throw new AppError('Invalid patientId format.', 400);
+    }
+
+    const subject = {
+      id: req.user.id,
+      role: req.user.role,
+      patientId: req.user.patientId,
+    };
+
+    // IDOR Prevention: Verify user is authorized to access the requested patient's data
+    if (patientId && req.user.role === 'patient' && req.user.patientId !== patientId) {
+      throw new AppError('You can only view your own lab reports.', 403);
+    }
+
+    const columnMap = {
+      patient_id: 'lr.patient_id',
+      technician_id: 'lr.technician_id',
+    };
+
+    const { clause, params } = await buildAccessFilter('lab_report', subject, columnMap);
+
+    // Add patient filter if provided
+    let patientFilter = '';
+    let queryParams = [...params];
+    if (patientId) {
+      queryParams.push(patientId);
+      patientFilter = `AND lr.patient_id = $${queryParams.length}`;
+    }
+
+    // For nurses, restrict to patients from their department
+    let nurseFilter = '';
+    if (req.user.role === 'nurse') {
+      const { filter, param } = await buildNurseDepartmentFilter(req.user.id, patientId, queryParams.length);
+      nurseFilter = filter;
+      queryParams.push(param);
+    }
+
+    // Get all reports for comparison
+    const query = `
+      SELECT lr.id, lr.patient_id, lr.test_name, lr.result,
+             lr.notes, lr.report_date,
+             pu.first_name || ' ' || pu.last_name AS patient_name
+      FROM lab_reports lr
+      JOIN patients p ON lr.patient_id = p.id
+      JOIN users pu ON p.user_id = pu.id
+      WHERE ${clause} ${patientFilter} ${nurseFilter}
+      ORDER BY lr.test_name, lr.report_date ASC`;
+
+    const result = await db.query(query, queryParams);
+
+    // Handle empty results explicitly
+    if (result.rows.length === 0) {
+      await auditLog({
+        userId: req.user.id,
+        action: 'VIEW_LAB_COMPARISON',
+        resourceType: 'lab_report',
+        ip: req.ip,
+        details: { patientId: patientId || 'all', resultCount: 0 }
+      });
+
+      return res.json({
+        status: 'success',
+        data: {
+          allTests: [],
+          comparableTests: [],
+          reports: {},
+          patientName: null,
+        },
+      });
+    }
+
+    // Group by test name and parse numeric values
+    const groupedData = {};
+
+    for (const row of result.rows) {
+      const testName = row.test_name;
+
+      if (!groupedData[testName]) {
+        groupedData[testName] = [];
+      }
+
+      const metrics = parseNumericValues(row.result);
+
+      groupedData[testName].push({
+        id: row.id,
+        reportDate: row.report_date,
+        date: new Date(row.report_date).toISOString().split('T')[0], // YYYY-MM-DD
+        notes: row.notes,
+        rawResult: row.result,
+        metrics,
+      });
+    }
+
+    // Get test names with multiple results (only these can be compared)
+    const allTests = Object.keys(groupedData).sort();
+    const comparableTests = allTests.filter(
+      (testName) => groupedData[testName].length >= MIN_REPORTS_FOR_COMPARISON
+    );
+
+    await auditLog({
+      userId: req.user.id,
+      action: 'VIEW_LAB_COMPARISON',
+      resourceType: 'lab_report',
+      ip: req.ip,
+      details: { patientId: patientId || 'all', resultCount: result.rows.length }
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        allTests,
+        comparableTests,
+        reports: groupedData,
+        patientName: result.rows[0].patient_name,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = { getAll, create, update, getDownloadUrl, streamFile, getComparison };
