@@ -117,7 +117,6 @@ export default function LabReports({ embedded = false }) {
   const [viewerUrl, setViewerUrl] = useState('');
   const [viewerFileName, setViewerFileName] = useState('');
   const [viewerFileType, setViewerFileType] = useState('');
-  const [loadingViewer, setLoadingViewer] = useState(false);
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
   const isLabTech = currentUser?.role === 'lab_technician';
