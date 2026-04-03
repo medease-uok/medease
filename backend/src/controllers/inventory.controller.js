@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const { query: dbQuery, getClient } = require('../config/database');
 const { notifyAdmins } = require('../utils/notifications.helper');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -56,7 +56,7 @@ exports.getAllInventory = async (req, res, next) => {
       ORDER BY item_name ASC LIMIT $${values.length - 1} OFFSET $${values.length}
     `;
 
-    const result = await pool.query(query, values);
+    const result = await dbQuery(query, values);
     
     const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
     
@@ -93,7 +93,7 @@ exports.getInventoryById = async (req, res, next) => {
       FROM inventory
       WHERE id = $1 AND deleted_at IS NULL
     `;
-    const result = await pool.query(query, [id]);
+    const result = await dbQuery(query, [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ status: 'error', message: 'Inventory item not found' });
@@ -120,7 +120,7 @@ exports.addInventory = async (req, res, next) => {
     `;
     
     const values = [item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location];
-    const result = await pool.query(query, values);
+    const result = await dbQuery(query, values);
     
     const newItem = result.rows[0];
 
@@ -152,7 +152,7 @@ exports.updateInventory = async (req, res, next) => {
   let connectionReleased = false;
 
   try {
-    client = await pool.connect();
+    client = await getClient();
     const { item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location } = validation.data;
     
     await client.query('BEGIN');
@@ -227,7 +227,7 @@ exports.deleteInventory = async (req, res, next) => {
       RETURNING id
     `;
     
-    const result = await pool.query(query, [id]);
+    const result = await dbQuery(query, [id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ status: 'error', message: 'Inventory item not found or already deleted' });
@@ -240,8 +240,9 @@ exports.deleteInventory = async (req, res, next) => {
 };
 
 exports.getInventoryReport = async (req, res, next) => {
-  const client = await pool.connect();
+  let client;
   try {
+    client = await getClient();
     await client.query('BEGIN');
 
     // 1. Overview counts
