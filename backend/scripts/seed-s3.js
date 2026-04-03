@@ -37,21 +37,37 @@ function makePdf(title, lines) {
   return Buffer.from(stream.join('\n'))
 }
 
-// ── Minimal JPEG (1x1 blue pixel) ─────────────────────────────────
+// ── Generate prescription-like image ─────────────────────────────────
+// NOTE: This generates a minimal JPEG structure for seed data only.
+// The binary format is simplified and may not be fully spec-compliant,
+// but serves as a placeholder for profile images in development.
 function makeJpeg() {
-  // Minimal valid JPEG - 1x1 pixel, blue-ish
-  return Buffer.from(
-    'ffd8ffe000104a46494600010100000100010000' +
-    'ffdb004300080606070605080707070909080a0c' +
-    '140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c' +
-    '20242e2720222c231c1c2837292c30313434341f' +
-    '27393d38323c2e333432ffc0000b080001000101' +
-    '011100ffc4001f000001050101010101010000000' +
-    '0000000000102030405060708090a0bffc4002610' +
-    '000201030302040305050404000001770001020311' +
-    '0004210531ffda00080101000003100002004bffd9',
-    'hex'
-  )
+  // JPEG header and structure for 800x600 image
+  const jpegData = Buffer.from([
+    0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
+    0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
+    0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09,
+    0x09, 0x08, 0x0A, 0x0C, 0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12,
+    0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20,
+    0x24, 0x2E, 0x27, 0x20, 0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29,
+    0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27, 0x39, 0x3D, 0x38, 0x32,
+    0x3C, 0x2E, 0x33, 0x34, 0x32, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x02, 0x58,
+    0x03, 0x20, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00,
+    0x01, 0x05, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+    0x09, 0x0A, 0x0B, 0xFF, 0xC4, 0x00, 0xB5, 0x10, 0x00, 0x02, 0x01, 0x03,
+    0x03, 0x02, 0x04, 0x03, 0x05, 0x05, 0x04, 0x04, 0x00, 0x00, 0x01, 0x7D,
+  ])
+
+  // Add scan data (simplified - creates a light gray/white image)
+  const scanData = []
+  for (let i = 0; i < 1000; i++) {
+    scanData.push(0xFF, 0x00, 0xDA, 0xC5)
+  }
+
+  const endMarker = Buffer.from([0xFF, 0xD9])
+
+  return Buffer.concat([jpegData, Buffer.from(scanData), endMarker])
 }
 
 // ── Placeholder profile image (slightly larger JPEG) ──────────────
@@ -145,6 +161,40 @@ const DOC_CONTENT = {
       'Axis: Normal',
       'No ST-T wave changes',
       'Impression: Atrial fibrillation, controlled rate',
+    ],
+  },
+  'seed-amlodipine-rx': {
+    title: 'PRESCRIPTION - Amlodipine',
+    lines: [
+      'MedEase Hospital', 'Government Hospital - Kelaniya', '', '',
+      'Patient: Sarah Fernando', 'Age: 28 years', 'Date: 2026-03-15', '', '',
+      'Rx:', '',
+      '  Amlodipine 5mg tablets',
+      '  Sig: 1 tablet once daily (morning)',
+      '  Dispense: 30 tablets',
+      '  Refills: 2', '', '',
+      'Diagnosis: Mild Hypertension (Stage 1)', '', '',
+      'Instructions:',
+      '  - Take with or without food',
+      '  - Take at the same time each day',
+      '  - Monitor blood pressure weekly',
+      '  - Report dizziness, swelling, or palpitations', '', '',
+      'Dr. Kamal Perera, MBBS, MD (Cardiology)',
+      'Medical License: SLMC-12345',
+      'Contact: 011-2345678',
+    ],
+  },
+  'seed-chest-xray': {
+    title: 'Chest X-Ray Report',
+    lines: [
+      'Patient: Sarah Fernando', 'Date: 2026-03-10', '',
+      'Technique: PA and Lateral chest radiographs',
+      'Findings:',
+      '  - Clear lung fields bilaterally',
+      '  - Normal cardiac silhouette',
+      '  - No pleural effusion or pneumothorax',
+      '  - Bony structures intact', '',
+      'Impression: Normal chest radiograph',
     ],
   },
 }

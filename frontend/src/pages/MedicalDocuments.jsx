@@ -8,6 +8,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import VoiceNoteButton from '../components/VoiceNoteButton';
+import DocumentViewer from '../components/DocumentViewer';
 
 const SKELETON_COUNT = 6;
 const MAX_TITLE_LENGTH = 255;
@@ -329,111 +330,26 @@ function UploadModal({ open, onClose, onSubmit, patients, isPatient }) {
 function ViewerModal({ doc, onClose }) {
   const [url, setUrl] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!doc) return;
     setLoading(true);
-    setError(null);
     api.get(`/medical-documents/${doc.id}`)
       .then((res) => setUrl(res.data.url))
-      .catch(() => setError('Failed to load document.'))
+      .catch(() => setUrl(null))
       .finally(() => setLoading(false));
   }, [doc]);
 
-  if (!doc) return null;
-
-  const isImage = doc.mimeType?.startsWith('image/');
-  const isPdf = doc.mimeType === 'application/pdf';
+  if (!doc || loading) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">{doc.title}</h2>
-            <p className="text-sm text-slate-500">{doc.fileName} &middot; {formatFileSize(doc.fileSize)}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {url && (
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
-              >
-                <Download className="w-4 h-4" /> Download
-              </a>
-            )}
-            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto p-5 min-h-0">
-          {loading && (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 border-3 border-slate-200 border-t-primary rounded-full animate-spin" />
-            </div>
-          )}
-
-          {error && (
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center">
-                <AlertCircle className="w-12 h-12 text-red-300 mx-auto mb-3" />
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {!loading && !error && url && (
-            <>
-              {isImage && (
-                <div className="flex justify-center">
-                  <img
-                    src={url}
-                    alt={doc.title}
-                    className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
-                  />
-                </div>
-              )}
-              {isPdf && (
-                <iframe
-                  src={url}
-                  title={doc.title}
-                  className="w-full h-[70vh] rounded-lg border border-slate-200"
-                />
-              )}
-              {!isImage && !isPdf && (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <File className="w-16 h-16 text-slate-300 mb-4" />
-                  <p className="text-slate-600 font-medium mb-2">Preview not available for this file type</p>
-                  <p className="text-sm text-slate-400 mb-4">{doc.mimeType}</p>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
-                  >
-                    <Download className="w-4 h-4" /> Download File
-                  </a>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {doc.description && (
-          <div className="px-5 pb-4 border-t border-slate-100 pt-3">
-            <p className="text-sm text-slate-600">{doc.description}</p>
-          </div>
-        )}
-      </div>
-    </div>
+    <DocumentViewer
+      isOpen={!!url}
+      onClose={onClose}
+      url={url}
+      fileName={doc.fileName || doc.title}
+      fileType={doc.mimeType}
+    />
   );
 }
 

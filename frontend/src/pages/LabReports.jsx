@@ -6,6 +6,7 @@ import { useAuth } from '../data/AuthContext';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import CreateLabReportModal from '../components/CreateLabReportModal';
+import DocumentViewer from '../components/DocumentViewer';
 
 const SKELETON_COUNT = 6;
 
@@ -24,22 +25,9 @@ const matchesSearch = (r, query) => {
     .some((field) => r[field]?.toLowerCase().includes(q));
 };
 
-function ReportCard({ report, showPatient }) {
-  const [downloading, setDownloading] = useState(false);
-
-  const handleDownload = async () => {
-    try {
-      setDownloading(true);
-      const response = await api.get(`/lab-reports/${report.id}/download-url`);
-      const { url } = response.data;
-
-      // Open in new tab
-      window.open(url, '_blank');
-    } catch (err) {
-      alert(err.data?.message || 'Failed to download file');
-    } finally {
-      setDownloading(false);
-    }
+function ReportCard({ report, showPatient, onViewFile }) {
+  const handleViewFile = () => {
+    onViewFile(report);
   };
 
   return (
@@ -82,13 +70,11 @@ function ReportCard({ report, showPatient }) {
       {report.fileKey && (
         <div className="mt-3 pt-3 border-t border-slate-100">
           <button
-            onClick={handleDownload}
-            disabled={downloading}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-primary hover:text-primary-dark bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleViewFile}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-primary hover:text-primary-dark bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"
           >
             <FileText className="w-4 h-4" />
-            <span>{downloading ? 'Loading...' : (report.fileName || 'View Report File')}</span>
-            <Download className="w-3.5 h-3.5 ml-1" />
+            <span>{report.fileName || 'View Report File'}</span>
           </button>
         </div>
       )}
@@ -127,6 +113,10 @@ export default function LabReports({ embedded = false }) {
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [patients, setPatients] = useState([]);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerFileName, setViewerFileName] = useState('');
+  const [viewerFileType, setViewerFileType] = useState('');
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
   const isLabTech = currentUser?.role === 'lab_technician';
@@ -173,6 +163,43 @@ export default function LabReports({ embedded = false }) {
     }),
     [reports, deferredSearch, dateFrom, dateTo],
   );
+
+  const handleViewFile = async (report) => {
+    try {
+      setLoadingViewer(true);
+      const response = await api.get(`/lab-reports/${report.id}/download-url`);
+      const { url, fileName } = response.data;
+
+      // Determine file type from fileName
+      const fileExtension = fileName?.split('.').pop()?.toLowerCase();
+      let fileType = '';
+      if (fileExtension === 'pdf') {
+        fileType = 'application/pdf';
+      } else if (['jpg', 'jpeg'].includes(fileExtension)) {
+        fileType = 'image/jpeg';
+      } else if (fileExtension === 'png') {
+        fileType = 'image/png';
+      } else if (fileExtension === 'webp') {
+        fileType = 'image/webp';
+      }
+
+      setViewerUrl(url);
+      setViewerFileName(fileName || report.fileName || 'Lab Report');
+      setViewerFileType(fileType);
+      setViewerOpen(true);
+    } catch (err) {
+      alert(err.data?.message || 'Failed to load file');
+    } finally {
+      setLoadingViewer(false);
+    }
+  };
+
+  const handleCloseViewer = () => {
+    setViewerOpen(false);
+    setViewerUrl('');
+    setViewerFileName('');
+    setViewerFileType('');
+  };
 
   const hasFilters = search || dateFrom || dateTo;
 
@@ -285,7 +312,7 @@ export default function LabReports({ embedded = false }) {
       {!loading && !error && filtered.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((r) => (
-            <ReportCard key={r.id} report={r} showPatient={!isPatient} />
+            <ReportCard key={r.id} report={r} showPatient={!isPatient} onViewFile={handleViewFile} />
           ))}
         </div>
       )}
@@ -323,6 +350,15 @@ export default function LabReports({ embedded = false }) {
         onClose={() => setShowCreateModal(false)}
         onSuccess={fetchReports}
         patients={patients}
+      />
+
+      {/* Document Viewer */}
+      <DocumentViewer
+        isOpen={viewerOpen}
+        onClose={handleCloseViewer}
+        url={viewerUrl}
+        fileName={viewerFileName}
+        fileType={viewerFileType}
       />
     </div>
   );
