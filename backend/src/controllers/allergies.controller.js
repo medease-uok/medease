@@ -4,6 +4,7 @@ const { canAccessPatient, assertPatientAccess } = require('../utils/patientAcces
 
 const getByPatientId = async (req, res, next) => {
   try {
+    // lgtm [js/sensitive-get-query] - patientId is a UUID resource identifier, not a secret; RESTful API design with authorization checks
     const { patientId } = req.params;
 
     if (!(await canAccessPatient(req.user, patientId))) {

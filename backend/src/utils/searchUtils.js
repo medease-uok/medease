@@ -14,6 +14,8 @@ function escapeLikeWildcards(str) {
  * @returns {string} SQL fragment to append (empty string if no search)
  */
 function buildPatientSearchClause(search, params) {
+  // Prevent type confusion attacks - query params can be arrays or objects
+  if (typeof search !== 'string') return ''
   if (!search || !search.trim()) return ''
   if (search.length > 100) return ''
 

@@ -321,6 +321,10 @@ const getAssignedPatients = async (req, res, next) => {
     const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
     const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
 
+    // Prevent type confusion - reject non-string search params
+    if (search && typeof search !== 'string') {
+      throw new AppError('Invalid search parameter type.', 400);
+    }
     if (search && search.length > 100) {
       throw new AppError('Search term must be under 100 characters.', 400);
     }

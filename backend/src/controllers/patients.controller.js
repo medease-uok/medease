@@ -37,6 +37,10 @@ const getAll = async (req, res, next) => {
   try {
     const { clause, params } = buildPatientAccessFilter(req.user);
 
+    // Prevent type confusion - reject non-string search params
+    if (req.query.search && typeof req.query.search !== 'string') {
+      throw new AppError('Invalid search parameter type.', 400);
+    }
     if (req.query.search && req.query.search.length > 100) {
       throw new AppError('Search term must be under 100 characters.', 400);
     }

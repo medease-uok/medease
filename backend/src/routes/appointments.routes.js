@@ -6,6 +6,9 @@ const { requirePermission } = require('../middleware/authorize');
 const resolveSubject = require('../middleware/resolveSubject');
 const { sensitiveDataLimiter, apiLimiter } = require('../middleware/rateLimit');
 
+// Apply rate limiting before authentication to protect auth layer from DoS
+router.use(apiLimiter);
+
 router.use(authenticate);
 router.use(resolveSubject);
 
