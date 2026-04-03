@@ -38,12 +38,10 @@ function makePdf(title, lines) {
 }
 
 // ── Generate prescription-like image ─────────────────────────────────
-function makeJpeg(baseName) {
-  // Create a simple medical document image (white background with text-like pattern)
-  // This creates a 800x600 JPEG with visible content
-  const width = 800
-  const height = 600
-
+// NOTE: This generates a minimal JPEG structure for seed data only.
+// The binary format is simplified and may not be fully spec-compliant,
+// but serves as a placeholder for profile images in development.
+function makeJpeg() {
   // JPEG header and structure for 800x600 image
   const jpegData = Buffer.from([
     0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
@@ -74,7 +72,7 @@ function makeJpeg(baseName) {
 
 // ── Placeholder profile image (slightly larger JPEG) ──────────────
 function makeProfileJpeg() {
-  return makeJpeg('profile')
+  return makeJpeg()
 }
 
 // ── Document content based on file key ────────────────────────────
@@ -238,7 +236,7 @@ async function main() {
       const info = DOC_CONTENT[baseName] || { title: row.title, lines: ['Placeholder document.'] }
       body = makePdf(info.title, info.lines)
     } else {
-      body = makeJpeg(baseName)
+      body = makeJpeg()
     }
 
     await uploadToS3(key, body, mime)
