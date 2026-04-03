@@ -58,7 +58,7 @@ const PLAN_GROUP = `
 
 const getByPatientId = async (req, res, next) => {
   try {
-    // lgtm [js/sensitive-get-query] - patientId is a UUID resource identifier, not a secret; RESTful API design with authorization checks
+    // codeql[js/sensitive-get-query] - patientId is a UUID resource identifier, not a secret; RESTful API design with authorization checks
     const { patientId } = req.params
 
     await assertPatientAccess(req.user, patientId)
@@ -91,7 +91,7 @@ const getByPatientId = async (req, res, next) => {
 
 const getById = async (req, res, next) => {
   try {
-    // lgtm [js/sensitive-get-query] - patientId and id are UUID resource identifiers, not secrets; RESTful API design with authorization checks
+    // codeql[js/sensitive-get-query] - patientId and id are UUID resource identifiers, not secrets; RESTful API design with authorization checks
     const { patientId, id } = req.params
 
     await assertPatientAccess(req.user, patientId)
