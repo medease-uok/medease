@@ -9,6 +9,7 @@ const db = require('./config/database');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const { startReminderScheduler } = require('./jobs/appointmentReminders');
+const { startAutomatedOrderingScheduler } = require('./jobs/automatedOrdering');
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Environment: ${config.nodeEnv}`);
   startReminderScheduler();
+  startAutomatedOrderingScheduler();
 });
 
 module.exports = app;

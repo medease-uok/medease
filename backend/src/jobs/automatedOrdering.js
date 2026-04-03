@@ -1,3 +1,4 @@
+const cron = require('node-cron');
 const pool = require('../config/database');
 const { createNotification } = require('../utils/notifications.util');
 const logger = require('../utils/logger.util'); // Assumes a logger exists, adjust if console is preferred
@@ -110,6 +111,30 @@ const processAutomatedOrdering = async () => {
   }
 };
 
+/**
+ * Starts the cron job for automated ordering.
+ * Runs every day at midnight by default.
+ */
+const startAutomatedOrderingScheduler = () => {
+  const schedule = process.env.AUTOMATED_ORDERING_CRON || '0 0 * * *'; // Run daily at 12 AM
+  
+  if (!cron.validate(schedule)) {
+    logger.error(`[Automated Ordering] Invalid cron schedule: "${schedule}"`);
+    return;
+  }
+
+  logger.info(`[Automated Ordering] Scheduler started. Will run at: ${schedule}`);
+  
+  cron.schedule(schedule, async () => {
+    try {
+      await processAutomatedOrdering();
+    } catch (err) {
+      logger.error('[Automated Ordering] Unhandled error in scheduling automated ordering:', err);
+    }
+  });
+};
+
 module.exports = {
-  processAutomatedOrdering
+  processAutomatedOrdering,
+  startAutomatedOrderingScheduler
 };
