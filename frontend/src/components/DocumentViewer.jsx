@@ -198,6 +198,7 @@ export default function DocumentViewer({ isOpen, onClose, url, fileName, fileTyp
               alt={fileName}
               style={{ transform: `scale(${scale})` }}
               className="max-w-full max-h-full object-contain shadow-lg transition-transform"
+              crossOrigin="anonymous"
               onError={(e) => {
                 console.error('Image load error:', e);
                 console.error('Failed URL:', url);
