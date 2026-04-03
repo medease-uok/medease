@@ -11,6 +11,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import CreatePrescriptionModal from '../components/CreatePrescriptionModal';
 import VoiceNoteButton from '../components/VoiceNoteButton';
+import DocumentViewer from '../components/DocumentViewer';
 
 const STATUS_STYLES = {
   active: { variant: 'success', label: 'Active' },
@@ -441,38 +442,7 @@ function ListSkeleton() {
   );
 }
 
-function ImageViewerModal({ rx, onClose }) {
-  if (!rx || !rx.imageUrl) return null;
-  const isPdf = rx.imageUrl.includes('.pdf');
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Handwritten Prescription</h2>
-            {rx.doctorName && <p className="text-sm text-slate-500">{rx.doctorName}</p>}
-          </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6">
-          {isPdf ? (
-            <iframe src={rx.imageUrl} className="w-full h-[70vh] rounded-lg border border-slate-200" title="Prescription" />
-          ) : (
-            <img src={rx.imageUrl} alt="Handwritten prescription" className="w-full rounded-lg shadow-sm" />
-          )}
-          {rx.notes && (
-            <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-              <p className="text-sm font-medium text-slate-700">Notes</p>
-              <p className="text-sm text-slate-600 mt-1">{rx.notes}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+// ImageViewerModal replaced by DocumentViewer component
 
 function PatientSelectModal({ onSelect, onClose }) {
   const [query, setQuery] = useState('');
@@ -1048,9 +1018,12 @@ export default function Prescriptions({ embedded = false }) {
         />
       )}
       {imageViewer && (
-        <ImageViewerModal
-          rx={imageViewer}
+        <DocumentViewer
+          isOpen={!!imageViewer}
           onClose={() => setImageViewer(null)}
+          url={imageViewer.imageUrl}
+          fileName={`Prescription - ${imageViewer.medication || 'Handwritten'}`}
+          fileType={imageViewer.imageUrl?.includes('.pdf') ? 'application/pdf' : 'image/jpeg'}
         />
       )}
     </div>
