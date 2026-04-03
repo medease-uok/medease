@@ -81,8 +81,8 @@ INSERT INTO abac_policies (name, description, resource_type, conditions, effect,
 
 -- Lab report access
 INSERT INTO abac_policies (name, description, resource_type, conditions, effect, priority) VALUES
-  ('lab_report_admin_access', 'Admins and doctors can view all lab reports', 'lab_report',
-   '{"any": [{"subject.role": {"in": ["admin", "doctor"]}}]}',
+  ('lab_report_admin_access', 'Admins, doctors, and nurses can view all lab reports', 'lab_report',
+   '{"any": [{"subject.role": {"in": ["admin", "doctor", "nurse"]}}]}',
    'allow', 10),
   ('lab_report_patient_own', 'Patients can view their own lab reports', 'lab_report',
    '{"all": [{"subject.role": {"equals": "patient"}}, {"resource.patient_id": {"equals_ref": "subject.patientId"}}]}',
