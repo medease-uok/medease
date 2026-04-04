@@ -16,7 +16,7 @@ router.get('/', authorize('admin', 'doctor', 'nurse', 'lab_technician', 'pharmac
 // /report MUST come before /:id, otherwise 'report' will be captured as an :id parameter
 // exportLimiter used here because report generation is an expensive operation (more restrictive than apiLimiter)
 router.get('/report', exportLimiter, authorize('admin'), getInventoryReport);
-router.get('/audit/logs', authorize('admin'), getTransactionLogs);
+router.get('/audit/logs', exportLimiter, authorize('admin'), getTransactionLogs);
 router.get('/:id', authorize('admin', 'doctor', 'nurse', 'lab_technician', 'pharmacist'), getInventoryById);
 router.post('/', authorize('admin'), addInventory);
 router.put('/:id', authorize('admin'), updateInventory);

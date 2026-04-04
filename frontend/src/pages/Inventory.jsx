@@ -3,7 +3,7 @@ import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
 import { inventoryService } from '../services/inventory.service';
 import { getExpiryStatus, calculateReorderSuggestion } from '../utils/inventoryUtils';
-import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download, X } from 'lucide-react';
 import { ReorderSuggestionBadge } from '../components/ReorderSuggestionBadge';
 
 export default function Inventory() {
@@ -21,21 +21,6 @@ export default function Inventory() {
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
-
-  const fetchAuditLogs = async () => {
-    setLoadingAudit(true);
-    try {
-      const response = await inventoryService.getAuditLogs();
-      setAuditLogs(response.data?.logs || []);
-      setShowAuditModal(true);
-    } catch (error) {
-      console.error('Error fetching audit logs:', error);
-      alert('Failed to load transaction logs.');
-    } finally {
-      setLoadingAudit(false);
-    }
-  };
-
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
     item_name: '', category: 'Surgical', quantity: 0, unit: 'boxes', reorder_level: 10, expiry_date: '', supplier: '', location: ''
@@ -43,9 +28,38 @@ export default function Inventory() {
 
   const categories = ['All', 'Surgical', 'Stationery', 'Medical Equipment', 'Consumables'];
 
+  const fetchAuditLogs = async () => {
+    if (auditLogs.length > 0) {
+      setShowAuditModal(true);
+      return;
+    }
+    setLoadingAudit(true);
+    setReportError(null);
+    try {
+      const response = await inventoryService.getAuditLogs();
+      setAuditLogs(response.data?.logs || []);
+      setShowAuditModal(true);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      setReportError('Failed to load transaction logs. Only 5 requests per minute are allowed.');
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
   useEffect(() => {
     fetchInventory();
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showAuditModal) {
+        setShowAuditModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAuditModal]);
 
   const fetchInventory = async () => {
     try {
@@ -430,11 +444,13 @@ export default function Inventory() {
         </div>
       )}
       {showAuditModal && isAdmin && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-slide-up flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAuditModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-slide-up flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <h2 className="text-xl font-bold text-slate-900">Inventory Transaction Logs</h2>
-              <button onClick={() => setShowAuditModal(false)} className="text-slate-400 hover:text-slate-600 p-2">?</button>
+              <button onClick={() => setShowAuditModal(false)} className="text-slate-400 hover:text-slate-600 p-2">
+                 <X className="w-5 h-5" />
+              </button>
             </div>
             
             <div className="p-6 overflow-y-auto">
@@ -456,15 +472,17 @@ export default function Inventory() {
                       <tr key={log.id} className="border-b border-slate-100 text-sm text-slate-700">
                         <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
                         <td className="p-3">
-                          <div className="font-medium text-slate-900">{log.item_name}</div>
-                          <div className="text-xs text-slate-500">{log.category}</div>
-                        </td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded inline-block text-xs font-medium ${log.transaction_type === 'IN' ? 'bg-green-100 text-green-800' : log.transaction_type === 'OUT' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                            {log.transaction_type}
-                          </span>
-                        </td>
-                        <td className="p-3 font-semibold">{log.quantity_changed}</td>
+                            <div className="font-medium text-slate-900">{log.item_name ?? 'Deleted Item'}</div>
+                            <div className="text-xs text-slate-500">{log.category}</div>
+                          </td>
+                          <td className="p-3">
+                            <span className={`px-2 py-1 rounded inline-block text-xs font-medium ${log.transaction_type === 'IN' ? 'bg-green-100 text-green-800' : log.transaction_type === 'OUT' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                              {log.transaction_type}
+                            </span>
+                          </td>
+                          <td className="p-3 font-semibold">
+                            {log.transaction_type === 'OUT' ? `-${log.quantity_changed}` : `+${log.quantity_changed}`}
+                          </td>
                         <td className="p-3">{log.reference || '-'}</td>
                       </tr>
                     ))}
