@@ -21,6 +21,7 @@ export default function Inventory() {
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [auditError, setAuditError] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
     item_name: '', category: 'Surgical', quantity: 0, unit: 'boxes', reorder_level: 10, expiry_date: '', supplier: '', location: ''
@@ -28,20 +29,21 @@ export default function Inventory() {
 
   const categories = ['All', 'Surgical', 'Stationery', 'Medical Equipment', 'Consumables'];
 
-  const fetchAuditLogs = async () => {
-    if (auditLogs.length > 0) {
+  const fetchAuditLogs = async (forceRefresh = false) => {
+    if (auditLogs.length > 0 && !forceRefresh) {
       setShowAuditModal(true);
       return;
     }
     setLoadingAudit(true);
-    setReportError(null);
+    setAuditError(null);
     try {
       const response = await inventoryService.getAuditLogs();
       setAuditLogs(response.data?.logs || []);
       setShowAuditModal(true);
     } catch (error) {
       console.error('Error fetching audit logs:', error);
-      setReportError('Failed to load transaction logs. Only 5 requests per minute are allowed.');
+      setAuditError('Failed to load transaction logs. Please try again later.');
+      setShowAuditModal(true);
     } finally {
       setLoadingAudit(false);
     }
@@ -110,6 +112,7 @@ export default function Inventory() {
       } else {
         await inventoryService.add(formData);
       }
+      setAuditLogs([]);
       fetchInventory();
       handleCloseModal();
     } catch (error) {
@@ -122,6 +125,7 @@ export default function Inventory() {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     try {
       await inventoryService.delete(id);
+      setAuditLogs([]);
       fetchInventory();
     } catch (error) {
       console.error('Error deleting item:', error);
@@ -198,7 +202,15 @@ export default function Inventory() {
         {isAdmin && (
           <div className="flex gap-3">
             <button
-              onClick={fetchAuditLogs} disabled={loadingAudit} className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"> <PackageSearch className="w-5 h-5" /> {loadingAudit ? 'Loading...' : 'Audit Logs'} </button> <button onClick={handleDownloadReport}
+              onClick={fetchAuditLogs}
+              disabled={loadingAudit}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <PackageSearch className="w-5 h-5" />
+              {loadingAudit ? 'Loading...' : 'Audit Logs'}
+            </button>
+            <button
+              onClick={handleDownloadReport}
               disabled={downloadingReport}
               className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
             >
@@ -444,17 +456,43 @@ export default function Inventory() {
         </div>
       )}
       {showAuditModal && isAdmin && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAuditModal(false)}>
+        <div
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowAuditModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="audit-modal-title"
+        >
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-slide-up flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-slate-900">Inventory Transaction Logs</h2>
-              <button onClick={() => setShowAuditModal(false)} className="text-slate-400 hover:text-slate-600 p-2">
-                 <X className="w-5 h-5" />
-              </button>
+              <div>
+                <h2 id="audit-modal-title" className="text-xl font-bold text-slate-900">Inventory Transaction Logs</h2>
+                {auditLogs.length > 0 && (
+                  <p className="text-sm text-slate-500 mt-0.5">Showing {auditLogs.length} most recent records</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fetchAuditLogs(true)}
+                  disabled={loadingAudit}
+                  className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors"
+                >
+                  {loadingAudit ? 'Refreshing...' : 'Refresh'}
+                </button>
+                <button
+                  onClick={() => setShowAuditModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-2"
+                  aria-label="Close audit logs"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            
+
             <div className="p-6 overflow-y-auto">
-              {auditLogs.length === 0 ? (
+              {auditError ? (
+                <p className="text-center text-red-600">{auditError}</p>
+              ) : auditLogs.length === 0 ? (
                 <p className="text-center text-slate-500">No transaction logs found.</p>
               ) : (
                 <table className="w-full text-left border-collapse">
@@ -472,17 +510,17 @@ export default function Inventory() {
                       <tr key={log.id} className="border-b border-slate-100 text-sm text-slate-700">
                         <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
                         <td className="p-3">
-                            <div className="font-medium text-slate-900">{log.item_name ?? 'Deleted Item'}</div>
-                            <div className="text-xs text-slate-500">{log.category}</div>
-                          </td>
-                          <td className="p-3">
-                            <span className={`px-2 py-1 rounded inline-block text-xs font-medium ${log.transaction_type === 'IN' ? 'bg-green-100 text-green-800' : log.transaction_type === 'OUT' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                              {log.transaction_type}
-                            </span>
-                          </td>
-                          <td className="p-3 font-semibold">
-                            {log.transaction_type === 'OUT' ? `-${log.quantity_changed}` : `+${log.quantity_changed}`}
-                          </td>
+                          <div className="font-medium text-slate-900">{log.item_name ?? 'Deleted Item'}</div>
+                          <div className="text-xs text-slate-500">{log.category}</div>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded inline-block text-xs font-medium ${log.transaction_type === 'IN' ? 'bg-green-100 text-green-800' : log.transaction_type === 'OUT' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            {log.transaction_type}
+                          </span>
+                        </td>
+                        <td className="p-3 font-semibold">
+                          {log.transaction_type === 'OUT' ? `-${log.quantity_changed}` : `+${log.quantity_changed}`}
+                        </td>
                         <td className="p-3">{log.reference || '-'}</td>
                       </tr>
                     ))}
