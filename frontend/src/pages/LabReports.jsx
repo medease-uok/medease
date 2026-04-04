@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import {
-  FlaskConical, AlertCircle, Search, Clock, User, CalendarDays, X, Stethoscope, Download, FileText, Plus,
+  FlaskConical, AlertCircle, Search, Clock, User, CalendarDays, X, Stethoscope, Download, FileText, Plus, TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../data/AuthContext';
 import api from '../services/api';
 import { Card, CardContent } from '../components/ui/card';
 import CreateLabReportModal from '../components/CreateLabReportModal';
 import DocumentViewer from '../components/DocumentViewer';
+import CompareLabReportsModal from '../components/CompareLabReportsModal';
 
 const SKELETON_COUNT = 6;
 
@@ -112,15 +113,18 @@ export default function LabReports({ embedded = false }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
   const [patients, setPatients] = useState([]);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerUrl, setViewerUrl] = useState('');
   const [viewerFileName, setViewerFileName] = useState('');
   const [viewerFileType, setViewerFileType] = useState('');
+  const [loadingViewer, setLoadingViewer] = useState(false);
   const { currentUser } = useAuth();
   const isPatient = currentUser?.role === 'patient';
   const isLabTech = currentUser?.role === 'lab_technician';
   const canCreate = isLabTech || currentUser?.role === 'admin';
+  const canCompare = ['patient', 'doctor', 'nurse', 'admin'].includes(currentUser?.role);
   const deferredSearch = useDeferredValue(search);
 
   const fetchReports = useCallback(() => {
@@ -167,8 +171,11 @@ export default function LabReports({ embedded = false }) {
   const handleViewFile = async (report) => {
     try {
       setLoadingViewer(true);
-      const response = await api.get(`/lab-reports/${report.id}/download-url`);
-      const { url, fileName } = response.data;
+
+      // Use the streaming endpoint which serves the file directly with proper CORS headers
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+      const url = `${API_URL}/api/lab-reports/${report.id}/file`;
+      const fileName = report.fileName || 'Lab Report';
 
       // Determine file type from fileName
       const fileExtension = fileName?.split('.').pop()?.toLowerCase();
@@ -184,11 +191,11 @@ export default function LabReports({ embedded = false }) {
       }
 
       setViewerUrl(url);
-      setViewerFileName(fileName || report.fileName || 'Lab Report');
+      setViewerFileName(fileName);
       setViewerFileType(fileType);
       setViewerOpen(true);
     } catch (err) {
-      alert(err.data?.message || 'Failed to load file');
+      alert(err?.message || 'Failed to load file');
     } finally {
       setLoadingViewer(false);
     }
@@ -217,23 +224,35 @@ export default function LabReports({ embedded = false }) {
                 : 'Manage and review patient lab reports.'}
             </p>
           </div>
-          {canCreate && (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Create Lab Report
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {canCompare && (
+              <button
+                onClick={() => setShowCompareModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Compare Trends
+              </button>
+            )}
+            {canCreate && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create Lab Report
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {/* Filters and search */}
       <Card>
         <CardContent className="py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+              <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
               <label htmlFor="lab-search" className="sr-only">Search lab reports</label>
               <input
@@ -277,6 +296,31 @@ export default function LabReports({ embedded = false }) {
                   <X className="w-4 h-4" />
                 </button>
               )}
+            </div>
+
+            {/* Action buttons for embedded mode */}
+            {embedded && (canCompare || canCreate) && (
+              <div className="flex items-center gap-2">
+                {canCompare && (
+                  <button
+                    onClick={() => setShowCompareModal(true)}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    Compare
+                  </button>
+                )}
+                {canCreate && (
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create
+                  </button>
+                )}
+              </div>
+            )}
             </div>
           </div>
         </CardContent>
@@ -350,6 +394,12 @@ export default function LabReports({ embedded = false }) {
         onClose={() => setShowCreateModal(false)}
         onSuccess={fetchReports}
         patients={patients}
+      />
+
+      {/* Compare Lab Reports Modal */}
+      <CompareLabReportsModal
+        isOpen={showCompareModal}
+        onClose={() => setShowCompareModal(false)}
       />
 
       {/* Document Viewer */}
