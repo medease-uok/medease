@@ -18,6 +18,24 @@ export default function Inventory() {
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   const [showModal, setShowModal] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+
+  const fetchAuditLogs = async () => {
+    setLoadingAudit(true);
+    try {
+      const response = await inventoryService.getAuditLogs();
+      setAuditLogs(response.data?.logs || []);
+      setShowAuditModal(true);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      alert('Failed to load transaction logs.');
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
     item_name: '', category: 'Surgical', quantity: 0, unit: 'boxes', reorder_level: 10, expiry_date: '', supplier: '', location: ''
@@ -166,7 +184,7 @@ export default function Inventory() {
         {isAdmin && (
           <div className="flex gap-3">
             <button
-              onClick={handleDownloadReport}
+              onClick={fetchAuditLogs} disabled={loadingAudit} className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg font-medium transition-colors flex items-center gap-2"> <PackageSearch className="w-5 h-5" /> {loadingAudit ? 'Loading...' : 'Audit Logs'} </button> <button onClick={handleDownloadReport}
               disabled={downloadingReport}
               className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
             >
@@ -401,6 +419,52 @@ export default function Inventory() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {showAuditModal && isAdmin && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-slide-up flex flex-col max-h-[85vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-900">Inventory Transaction Logs</h2>
+              <button onClick={() => setShowAuditModal(false)} className="text-slate-400 hover:text-slate-600 p-2">?</button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              {auditLogs.length === 0 ? (
+                <p className="text-center text-slate-500">No transaction logs found.</p>
+              ) : (
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-600">
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Item & Category</th>
+                      <th className="p-3">Type</th>
+                      <th className="p-3">Qty Changed</th>
+                      <th className="p-3">Reason / Ref</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map(log => (
+                      <tr key={log.id} className="border-b border-slate-100 text-sm text-slate-700">
+                        <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
+                        <td className="p-3">
+                          <div className="font-medium text-slate-900">{log.item_name}</div>
+                          <div className="text-xs text-slate-500">{log.category}</div>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded inline-block text-xs font-medium ${log.transaction_type === 'IN' ? 'bg-green-100 text-green-800' : log.transaction_type === 'OUT' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            {log.transaction_type}
+                          </span>
+                        </td>
+                        <td className="p-3 font-semibold">{log.quantity_changed}</td>
+                        <td className="p-3">{log.reference || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       )}
