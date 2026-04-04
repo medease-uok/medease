@@ -256,8 +256,10 @@ export default function Inventory() {
                 <tr className="bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-600">
                   <th className="p-4">Item Name</th>
                   <th className="p-4">Category</th>
-                  <th className="p-4">Stock</th>
-                  <th className="p-4 hidden md:table-cell">Expiry / Location</th>
+                    <th className="p-4 hidden sm:table-cell">Supplier</th>
+                    <th className="p-4 hidden sm:table-cell">Location</th>
+                    <th className="p-4">Stock</th>
+                    <th className="p-4 hidden md:table-cell">Expiry</th>
                   {isAdmin && <th className="p-4 text-right">Actions</th>}
                 </tr>
               </thead>
@@ -275,12 +277,17 @@ export default function Inventory() {
                     }`}>
                       <td className="p-4">
                         <div className="font-medium text-slate-900">{item.item_name}</div>
-                        <div className="text-sm text-slate-500 hidden sm:block">Supplier: {item.supplier || 'N/A'}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-                          {item.category}
-                        </span>
+                        </td>
+                        <td className="p-4">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                            {item.category}
+                          </span>
+                        </td>
+                        <td className="p-4 hidden sm:table-cell text-sm text-slate-600">
+                          {item.supplier || 'N/A'}
+                        </td>
+                        <td className="p-4 hidden sm:table-cell text-sm text-slate-600">
+                          {item.location || '-'}
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col items-start justify-center">
@@ -321,7 +328,7 @@ export default function Inventory() {
                               )}
                             </div>
                           )}
-                          {item.location && <div className="text-slate-500 mt-0.5">Loc: {item.location}</div>}
+
                         </div>
                       </td>
                       {isAdmin && (
