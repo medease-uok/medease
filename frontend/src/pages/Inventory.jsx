@@ -184,7 +184,7 @@ export default function Inventory() {
         {isAdmin && (
           <div className="flex gap-3">
             <button
-              onClick={fetchAuditLogs} disabled={loadingAudit} className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg font-medium transition-colors flex items-center gap-2"> <PackageSearch className="w-5 h-5" /> {loadingAudit ? 'Loading...' : 'Audit Logs'} </button> <button onClick={handleDownloadReport}
+              onClick={fetchAuditLogs} disabled={loadingAudit} className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"> <PackageSearch className="w-5 h-5" /> {loadingAudit ? 'Loading...' : 'Audit Logs'} </button> <button onClick={handleDownloadReport}
               disabled={downloadingReport}
               className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
             >
