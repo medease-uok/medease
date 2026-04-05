@@ -6,6 +6,6 @@ export const getPurchaseOrders = async (params) => {
 };
 
 export const updatePurchaseOrderStatus = async (id, status) => {
-  const response = await api.put(\`/purchase-orders/\${id}/status\`, { status });
+  const response = await api.put(`/purchase-orders/${id}/status`, { status });
   return response.data;
 };
