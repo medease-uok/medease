@@ -10,9 +10,9 @@ const purchaseOrdersLimiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs for these routes
 });
 
+router.use(purchaseOrdersLimiter);
 router.use(protect);
 router.use(authorize('admin', 'pharmacist', 'lab_technician')); // Role check
-router.use(purchaseOrdersLimiter);
 
 router
   .route('/')
