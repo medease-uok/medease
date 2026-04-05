@@ -3,7 +3,8 @@ import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
 import { inventoryService } from '../services/inventory.service';
 import { getExpiryStatus, calculateReorderSuggestion } from '../utils/inventoryUtils';
-import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download, X, ShoppingCart } from 'lucide-react';
+import { getPurchaseOrders, updatePurchaseOrderStatus } from '../services/purchaseOrders.service';
 import { ReorderSuggestionBadge } from '../components/ReorderSuggestionBadge';
 
 export default function Inventory() {
@@ -19,6 +20,9 @@ export default function Inventory() {
 
   const [showModal, setShowModal] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
+  const [showPurchaseOrdersModal, setShowPurchaseOrdersModal] = useState(false);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [loadingPurchaseOrders, setLoadingPurchaseOrders] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -60,6 +64,36 @@ export default function Inventory() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showAuditModal]);
+
+  const fetchPurchaseOrders = async () => {
+    try {
+      setLoadingPurchaseOrders(true);
+      const res = await getPurchaseOrders();
+      setPurchaseOrders(res.data || []);
+      setShowPurchaseOrdersModal(true);
+    } catch (error) {
+      console.error('Failed to fetch purchase orders:', error);
+      alert('Failed to load purchase orders.');
+    } finally {
+      setLoadingPurchaseOrders(false);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (id, newStatus) => {
+    try {
+      await updatePurchaseOrderStatus(id, newStatus);
+      // update state
+      setPurchaseOrders(prevOptions => 
+        prevOptions.map(po => po.id === id ? { ...po, status: newStatus } : po)
+      );
+      if (newStatus === 'RECEIVED') {
+        fetchInventory(); // refresh inventory because quantity changed
+      }
+    } catch (error) {
+      console.error('Failed to update purchase order status:', error);
+      alert('Failed to update status');
+    }
+  };
 
   const fetchInventory = async () => {
     try {
@@ -197,6 +231,14 @@ export default function Inventory() {
         </div>
         {isAdmin && (
           <div className="flex gap-3">
+            <button
+              onClick={fetchPurchaseOrders}
+              disabled={loadingPurchaseOrders}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {loadingPurchaseOrders ? 'Loading...' : 'Purchase Orders'}
+            </button>
             <button
               onClick={fetchAuditLogs} disabled={loadingAudit} className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"> <PackageSearch className="w-5 h-5" /> {loadingAudit ? 'Loading...' : 'Audit Logs'} </button> <button onClick={handleDownloadReport}
               disabled={downloadingReport}
@@ -488,6 +530,101 @@ export default function Inventory() {
                     ))}
                   </tbody>
                 </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Purchase Orders Modal */}
+      {showPurchaseOrdersModal && isAdmin && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-fade-in my-auto">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl sticky top-0 z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                  <ShoppingCart className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Purchase Orders</h2>
+                  <p className="text-sm text-slate-500">Manage automated supplier orders</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPurchaseOrdersModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingPurchaseOrders ? (
+                <div className="flex justify-center p-8">
+                  <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+                </div>
+              ) : purchaseOrders.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-4">
+                    <ShoppingCart className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-slate-900 mb-1">No Orders Found</h3>
+                  <p className="text-slate-500">Purchase orders will be automatically generated when stock is low.</p>
+                </div>
+              ) : (
+                <div className="bg-white border text-left border-slate-200 rounded-xl overflow-hidden content-start justify-items-start">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">Item</th>
+                        <th className="px-6 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">Supplier</th>
+                        <th className="px-6 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">Qty</th>
+                        <th className="px-6 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">Status</th>
+                        <th className="px-6 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {purchaseOrders.map((po) => (
+                        <tr key={po.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-slate-900">{po.item_name}</div>
+                            <div className="text-xs text-slate-500">{po.category}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm text-slate-600">{po.supplier_name || 'Unknown'}</span>
+                          </td>
+                          <td className="px-6 py-4 font-medium">
+                            {po.quantity} <span className="text-slate-500 text-xs font-normal">{po.unit}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={\`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium \${
+                              po.status === 'RECEIVED' ? 'bg-emerald-100 text-emerald-700' :
+                              po.status === 'ORDERED' ? 'bg-blue-100 text-blue-700' :
+                              po.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                              'bg-amber-100 text-amber-700'
+                            }\`}>
+                              {po.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <select
+                              value={po.status}
+                              onChange={(e) => handleUpdateOrderStatus(po.id, e.target.value)}
+                              disabled={po.status === 'RECEIVED' || po.status === 'CANCELLED'}
+                              className="text-sm border border-slate-200 rounded bg-white px-2 py-1 outline-none text-slate-700 disabled:opacity-50"
+                            >
+                              <option value="PENDING">Pending</option>
+                              <option value="APPROVED">Approve</option>
+                              <option value="ORDERED">Mark Ordered</option>
+                              <option value="RECEIVED">Mark Received</option>
+                              <option value="CANCELLED">Cancel</option>
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
