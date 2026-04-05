@@ -597,12 +597,12 @@ export default function Inventory() {
                             {po.quantity} <span className="text-slate-500 text-xs font-normal">{po.unit}</span>
                           </td>
                           <td className="px-6 py-4">
-                            <span className={\`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium \${
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                               po.status === 'RECEIVED' ? 'bg-emerald-100 text-emerald-700' :
                               po.status === 'ORDERED' ? 'bg-blue-100 text-blue-700' :
                               po.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
                               'bg-amber-100 text-amber-700'
-                            }\`}>
+                            }`}>
                               {po.status}
                             </span>
                           </td>
