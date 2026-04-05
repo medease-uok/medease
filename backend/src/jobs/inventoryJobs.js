@@ -37,7 +37,7 @@ const checkLowStockAndOrder = async () => {
       `;
       
       await db.query(insertQuery, [item.id, item.supplier, orderQuantity]);
-      console.log(\`[Inventory] Auto-generated purchase order for \${item.item_name} (Qty: \${orderQuantity})\`);
+      console.log(`[Inventory] Auto-generated purchase order for ${item.item_name} (Qty: ${orderQuantity})`);
     }
     
   } catch (error) {
