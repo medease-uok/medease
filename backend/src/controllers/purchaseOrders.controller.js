@@ -5,11 +5,11 @@ const getAllPurchaseOrders = async (req, res) => {
   try {
     const { status } = req.query;
     
-    let query = \`
+    let query = `
       SELECT po.*, i.item_name, i.category, i.unit, i.quantity as current_stock 
       FROM purchase_orders po
       LEFT JOIN inventory i ON po.inventory_id = i.id
-    \`;
+    `;
     const params = [];
     
     if (status) {
@@ -58,21 +58,21 @@ const updatePurchaseOrderStatus = async (req, res) => {
       const po = poResult.rows[0];
       
       // Update the PO status
-      const updatePoQuery = \`
+      const updatePoQuery = `
         UPDATE purchase_orders 
         SET status = $1, updated_at = NOW() 
         WHERE id = $2 
         RETURNING *
-      \`;
+      `;
       const updatedPoResult = await client.query(updatePoQuery, [status, id]);
       
       // If status is RECEIVED, update inventory stock
       if (status === 'RECEIVED' && po.status !== 'RECEIVED') {
-        const updateInventoryQuery = \`
+        const updateInventoryQuery = `
           UPDATE inventory 
           SET quantity = quantity + $1, last_restocked_at = NOW(), updated_at = NOW()
           WHERE id = $2
-        \`;
+        `;
         await client.query(updateInventoryQuery, [po.quantity, po.inventory_id]);
       }
       
