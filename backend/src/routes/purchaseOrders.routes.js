@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { getAllPurchaseOrders, updatePurchaseOrderStatus } = require('../controllers/purchaseOrders.controller');
-const { protect, authorize } = require('../middleware/auth');
+const protect = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
 
 router.use(protect);
 router.use(authorize('admin', 'pharmacist', 'lab_technician')); // Role check
