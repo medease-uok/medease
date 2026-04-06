@@ -33,10 +33,6 @@ export default function Inventory() {
   const categories = ['All', 'Surgical', 'Stationery', 'Medical Equipment', 'Consumables'];
 
   const fetchAuditLogs = async () => {
-    if (auditLogs.length > 0) {
-      setShowAuditModal(true);
-      return;
-    }
     setLoadingAudit(true);
     setReportError(null);
     try {

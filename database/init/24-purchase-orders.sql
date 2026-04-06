@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    inventory_id UUID REFERENCES inventory(id),
+    inventory_id UUID REFERENCES inventory(id) ON DELETE SET NULL,
     supplier_name VARCHAR(255),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     status VARCHAR(50) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'ORDERED', 'RECEIVED', 'CANCELLED')),
@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
     expected_delivery_date DATE,
     notes TEXT,
     
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    received_by UUID REFERENCES users(id) ON DELETE SET NULL,
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -35,4 +39,6 @@ CREATE TRIGGER tgr_purchase_orders_updated_at
 -- Add permission policy for app users
 GRANT SELECT, INSERT, UPDATE, DELETE ON purchase_orders TO medease_app;
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all for authenticated app users" ON purchase_orders FOR ALL TO medease_app USING (true);
+CREATE POLICY "Allow all for authenticated app users" ON purchase_orders 
+    FOR ALL TO medease_app 
+    USING (current_setting('request.jwt.claim.role', true) IN ('admin', 'pharmacist', 'lab_technician'));

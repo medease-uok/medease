@@ -1,6 +1,9 @@
 const db = require('../config/database');
 const cron = require('node-cron');
 
+const ORDER_MULTIPLIER = process.env.PO_REORDER_MULTIPLIER || 2;
+const MIN_ORDER_QTY = process.env.PO_MIN_ORDER_QTY || 10;
+
 const checkLowStockAndOrder = async () => {
   try {
     console.log('[Inventory] Running job: Checking low stock items to generate purchase orders');
@@ -26,9 +29,12 @@ const checkLowStockAndOrder = async () => {
       return;
     }
     
+    let generatedCount = 0;
+
     for (const item of items) {
-      // Create a purchase order to restock up to double the reorder level, minimum 10.
-      const orderQuantity = Math.max(item.reorder_level * 2 - item.quantity, 10);
+      // Calculate order quantity based on configurable multiplier
+      let targetStock = item.reorder_level > 0 ? item.reorder_level * ORDER_MULTIPLIER : MIN_ORDER_QTY * 2;
+      const orderQuantity = Math.max(targetStock - item.quantity, MIN_ORDER_QTY);
       
       const insertQuery = `
         INSERT INTO purchase_orders (inventory_id, supplier_name, quantity, status)
@@ -38,10 +44,13 @@ const checkLowStockAndOrder = async () => {
       
       await db.query(insertQuery, [item.id, item.supplier, orderQuantity]);
       console.log(`[Inventory] Auto-generated purchase order for ${item.item_name} (Qty: ${orderQuantity})`);
+      generatedCount++;
     }
     
+    console.log(`[Inventory] Job complete. Generated ${generatedCount} purchase orders at ${new Date().toISOString()}`);
+    
   } catch (error) {
-    console.error('[Inventory] Error generating automated purchase orders:', error.message);
+    console.error('[Inventory] Error generating automated purchase orders:', error.stack || error.message);
   }
 };
 
@@ -51,7 +60,7 @@ const startInventoryScheduler = () => {
     try {
       await checkLowStockAndOrder();
     } catch (err) {
-      console.error('[Inventory] Unhandled error in inventory job:', err.message);
+      console.error('[Inventory] Unhandled error in inventory job:', err.stack || err.message);
     }
   });
   console.log('[Inventory] Automated purchase order scheduler started (runs daily at 2:00 AM)');

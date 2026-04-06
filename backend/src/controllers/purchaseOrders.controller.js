@@ -1,7 +1,9 @@
 const db = require('../config/database');
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 // Get all purchase orders with inventory details
-const getAllPurchaseOrders = async (req, res) => {
+const getAllPurchaseOrders = async (req, res, next) => {
   try {
     const { status } = req.query;
     
@@ -22,24 +24,32 @@ const getAllPurchaseOrders = async (req, res) => {
     const result = await db.query(query, params);
     
     res.json({
-      success: true,
-      count: result.rowCount,
+      status: 'success',
+      count: result.rows.length,
       data: result.rows
     });
   } catch (error) {
-    console.error('[Purchase Orders] Error fetching orders:', error.message);
-    res.status(500).json({ success: false, message: 'Server Error' });
+    next(error);
   }
 };
 
 // Update purchase order status
-const updatePurchaseOrderStatus = async (req, res) => {
+const updatePurchaseOrderStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
     
+    if (!UUID_REGEX.test(id)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid ID format' });
+    }
+
     if (!['PENDING', 'APPROVED', 'ORDERED', 'RECEIVED', 'CANCELLED'].includes(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status' });
+      return res.status(400).json({ status: 'error', message: 'Invalid status' });
+    }
+    
+    // Authorization check for 'RECEIVED' status
+    if (status === 'RECEIVED' && req.user && !['admin', 'pharmacist'].includes(req.user.role)) {
+      return res.status(403).json({ status: 'error', message: 'Only admin or pharmacist can mark a PO as RECEIVED' });
     }
     
     // Begin transaction
@@ -50,23 +60,49 @@ const updatePurchaseOrderStatus = async (req, res) => {
       const getPoQuery = 'SELECT * FROM purchase_orders WHERE id = $1 FOR UPDATE';
       const poResult = await client.query(getPoQuery, [id]);
       
-      if (poResult.rowCount === 0) {
+      if (poResult.rows.length === 0) {
         await client.query('ROLLBACK');
-        return res.status(404).json({ success: false, message: 'Purchase order not found' });
+        return res.status(404).json({ status: 'error', message: 'Purchase order not found' });
       }
       
       const po = poResult.rows[0];
       
-      // Update the PO status
+      // State transition validation
+      const validTransitions = {
+        PENDING: ['APPROVED', 'CANCELLED'],
+        APPROVED: ['ORDERED', 'CANCELLED'],
+        ORDERED: ['RECEIVED', 'CANCELLED'],
+        RECEIVED: [], // terminal state
+        CANCELLED: [] // terminal state
+      };
+      
+      if (po.status !== status && !validTransitions[po.status]?.includes(status)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ status: 'error', message: `Invalid transition: ${po.status} → ${status}` });
+      }
+
+      // Determine which column to update based on the status action
+      let queryUpdates = ['status = $1', 'updated_at = NOW()'];
+      const queryParams = [status, id];
+      let paramIndex = 3;
+      
+      if (status === 'RECEIVED' && req.user?.id) {
+        queryUpdates.push(`received_by = $${paramIndex++}`);
+        queryParams.push(req.user.id);
+      } else if (status === 'APPROVED' && req.user?.id) {
+        queryUpdates.push(`approved_by = $${paramIndex++}`);
+        queryParams.push(req.user.id);
+      }
+
       const updatePoQuery = `
         UPDATE purchase_orders 
-        SET status = $1, updated_at = NOW() 
+        SET ${queryUpdates.join(', ')}
         WHERE id = $2 
         RETURNING *
       `;
-      const updatedPoResult = await client.query(updatePoQuery, [status, id]);
+      const updatedPoResult = await client.query(updatePoQuery, queryParams);
       
-      // If status is RECEIVED, update inventory stock
+      // If status is newly RECEIVED, update inventory stock and create transaction log
       if (status === 'RECEIVED' && po.status !== 'RECEIVED') {
         const updateInventoryQuery = `
           UPDATE inventory 
@@ -74,12 +110,19 @@ const updatePurchaseOrderStatus = async (req, res) => {
           WHERE id = $2
         `;
         await client.query(updateInventoryQuery, [po.quantity, po.inventory_id]);
+        
+        // Insert into inventory_transactions
+        await client.query(
+          `INSERT INTO inventory_transactions (inventory_id, transaction_type, quantity_changed, reference)
+           VALUES ($1, 'IN', $2, $3)`,
+          [po.inventory_id, po.quantity, `PO-${id}`]
+        );
       }
       
       await client.query('COMMIT');
       
       res.json({
-        success: true,
+        status: 'success',
         data: updatedPoResult.rows[0]
       });
     } catch (err) {
@@ -90,8 +133,7 @@ const updatePurchaseOrderStatus = async (req, res) => {
     }
     
   } catch (error) {
-    console.error('[Purchase Orders] Error updating status:', error.message);
-    res.status(500).json({ success: false, message: 'Server Error' });
+    next(error);
   }
 };
 

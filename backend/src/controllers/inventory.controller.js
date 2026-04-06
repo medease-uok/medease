@@ -326,6 +326,10 @@ exports.getInventoryReport = async (req, res, next) => {
 
 exports.getTransactionLogs = async (req, res, next) => {
   try {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 200);
+    const page = parseInt(req.query.page) || 1;
+    const offset = (page - 1) * limit;
+
     const { rows } = await dbQuery(`
       SELECT
         t.id,
@@ -334,17 +338,27 @@ exports.getTransactionLogs = async (req, res, next) => {
         t.reference,
         t.created_at,
         i.item_name,
-        i.category
+        i.category,
+        COUNT(*) OVER() AS total_count
       FROM inventory_transactions t
       LEFT JOIN inventory i ON t.inventory_id = i.id
       ORDER BY t.created_at DESC
-      LIMIT 500
-    `);
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+    
+    const totalCount = rows.length > 0 ? parseInt(rows[0].total_count) : 0;
+    const data = rows.map(({ total_count, ...rest }) => rest);
 
     res.status(200).json({
       status: 'success',
       data: {
-        logs: rows
+        logs: data,
+        meta: {
+          total: totalCount,
+          page,
+          limit,
+          totalPages: Math.ceil(totalCount / limit)
+        }
       }
     });
   } catch (error) {
