@@ -25,6 +25,7 @@ export default function Inventory() {
   const [loadingPurchaseOrders, setLoadingPurchaseOrders] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [auditError, setAuditError] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
     item_name: '', category: 'Surgical', quantity: 0, unit: 'boxes', reorder_level: 10, expiry_date: '', supplier: '', location: ''
@@ -32,16 +33,21 @@ export default function Inventory() {
 
   const categories = ['All', 'Surgical', 'Stationery', 'Medical Equipment', 'Consumables'];
 
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = async (forceRefresh = false) => {
+    if (auditLogs.length > 0 && !forceRefresh) {
+      setShowAuditModal(true);
+      return;
+    }
     setLoadingAudit(true);
-    setReportError(null);
+    setAuditError(null);
     try {
       const response = await inventoryService.getAuditLogs();
       setAuditLogs(response.data?.logs || []);
       setShowAuditModal(true);
     } catch (error) {
       console.error('Error fetching audit logs:', error);
-      setReportError('Failed to load transaction logs. Only 5 requests per minute are allowed.');
+      setAuditError('Failed to load transaction logs. Only 5 requests per minute are allowed.');
+      setShowAuditModal(true);
     } finally {
       setLoadingAudit(false);
     }
@@ -236,7 +242,15 @@ export default function Inventory() {
               {loadingPurchaseOrders ? 'Loading...' : 'Purchase Orders'}
             </button>
             <button
-              onClick={fetchAuditLogs} disabled={loadingAudit} className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"> <PackageSearch className="w-5 h-5" /> {loadingAudit ? 'Loading...' : 'Audit Logs'} </button> <button onClick={handleDownloadReport}
+              onClick={fetchAuditLogs}
+              disabled={loadingAudit}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <PackageSearch className="w-5 h-5" />
+              {loadingAudit ? 'Loading...' : 'Audit Logs'}
+            </button>
+            <button
+              onClick={handleDownloadReport}
               disabled={downloadingReport}
               className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
             >
