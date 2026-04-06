@@ -3,7 +3,7 @@ import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
 import { inventoryService } from '../services/inventory.service';
 import { getExpiryStatus, calculateReorderSuggestion } from '../utils/inventoryUtils';
-import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, PackageSearch, AlertCircle, Download, X } from 'lucide-react';
 import { ReorderSuggestionBadge } from '../components/ReorderSuggestionBadge';
 
 export default function Inventory() {
@@ -18,6 +18,10 @@ export default function Inventory() {
   const [selectedCategory, setSelectedCategory] = useState('All');
 
   const [showModal, setShowModal] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [auditError, setAuditError] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
     item_name: '', category: 'Surgical', quantity: 0, unit: 'boxes', reorder_level: 10, expiry_date: '', supplier: '', location: ''
@@ -25,9 +29,39 @@ export default function Inventory() {
 
   const categories = ['All', 'Surgical', 'Stationery', 'Medical Equipment', 'Consumables'];
 
+  const fetchAuditLogs = async (forceRefresh = false) => {
+    if (auditLogs.length > 0 && !forceRefresh) {
+      setShowAuditModal(true);
+      return;
+    }
+    setLoadingAudit(true);
+    setAuditError(null);
+    try {
+      const response = await inventoryService.getAuditLogs();
+      setAuditLogs(response.data?.logs || []);
+      setShowAuditModal(true);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      setAuditError('Failed to load transaction logs. Please try again later.');
+      setShowAuditModal(true);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
   useEffect(() => {
     fetchInventory();
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showAuditModal) {
+        setShowAuditModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAuditModal]);
 
   const fetchInventory = async () => {
     try {
@@ -78,6 +112,7 @@ export default function Inventory() {
       } else {
         await inventoryService.add(formData);
       }
+      setAuditLogs([]);
       fetchInventory();
       handleCloseModal();
     } catch (error) {
@@ -90,6 +125,7 @@ export default function Inventory() {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     try {
       await inventoryService.delete(id);
+      setAuditLogs([]);
       fetchInventory();
     } catch (error) {
       console.error('Error deleting item:', error);
@@ -166,6 +202,14 @@ export default function Inventory() {
         {isAdmin && (
           <div className="flex gap-3">
             <button
+              onClick={fetchAuditLogs}
+              disabled={loadingAudit}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <PackageSearch className="w-5 h-5" />
+              {loadingAudit ? 'Loading...' : 'Audit Logs'}
+            </button>
+            <button
               onClick={handleDownloadReport}
               disabled={downloadingReport}
               className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
@@ -238,8 +282,10 @@ export default function Inventory() {
                 <tr className="bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-600">
                   <th className="p-4">Item Name</th>
                   <th className="p-4">Category</th>
-                  <th className="p-4">Stock</th>
-                  <th className="p-4 hidden md:table-cell">Expiry / Location</th>
+                    <th className="p-4 hidden sm:table-cell">Supplier</th>
+                    <th className="p-4 hidden sm:table-cell">Location</th>
+                    <th className="p-4">Stock</th>
+                    <th className="p-4 hidden md:table-cell">Expiry</th>
                   {isAdmin && <th className="p-4 text-right">Actions</th>}
                 </tr>
               </thead>
@@ -257,12 +303,17 @@ export default function Inventory() {
                     }`}>
                       <td className="p-4">
                         <div className="font-medium text-slate-900">{item.item_name}</div>
-                        <div className="text-sm text-slate-500 hidden sm:block">Supplier: {item.supplier || 'N/A'}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-                          {item.category}
-                        </span>
+                        </td>
+                        <td className="p-4">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                            {item.category}
+                          </span>
+                        </td>
+                        <td className="p-4 hidden sm:table-cell text-sm text-slate-600">
+                          {item.supplier || 'N/A'}
+                        </td>
+                        <td className="p-4 hidden sm:table-cell text-sm text-slate-600">
+                          {item.location || '-'}
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col items-start justify-center">
@@ -303,7 +354,7 @@ export default function Inventory() {
                               )}
                             </div>
                           )}
-                          {item.location && <div className="text-slate-500 mt-0.5">Loc: {item.location}</div>}
+
                         </div>
                       </td>
                       {isAdmin && (
@@ -401,6 +452,82 @@ export default function Inventory() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {showAuditModal && isAdmin && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowAuditModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="audit-modal-title"
+        >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-slide-up flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h2 id="audit-modal-title" className="text-xl font-bold text-slate-900">Inventory Transaction Logs</h2>
+                {auditLogs.length > 0 && (
+                  <p className="text-sm text-slate-500 mt-0.5">Showing {auditLogs.length} most recent records</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fetchAuditLogs(true)}
+                  disabled={loadingAudit}
+                  className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors"
+                >
+                  {loadingAudit ? 'Refreshing...' : 'Refresh'}
+                </button>
+                <button
+                  onClick={() => setShowAuditModal(false)}
+                  className="text-slate-400 hover:text-slate-600 p-2"
+                  aria-label="Close audit logs"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto">
+              {auditError ? (
+                <p className="text-center text-red-600">{auditError}</p>
+              ) : auditLogs.length === 0 ? (
+                <p className="text-center text-slate-500">No transaction logs found.</p>
+              ) : (
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-600">
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Item & Category</th>
+                      <th className="p-3">Type</th>
+                      <th className="p-3">Qty Changed</th>
+                      <th className="p-3">Reason / Ref</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map(log => (
+                      <tr key={log.id} className="border-b border-slate-100 text-sm text-slate-700">
+                        <td className="p-3">{new Date(log.created_at).toLocaleString()}</td>
+                        <td className="p-3">
+                          <div className="font-medium text-slate-900">{log.item_name ?? 'Deleted Item'}</div>
+                          <div className="text-xs text-slate-500">{log.category}</div>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded inline-block text-xs font-medium ${log.transaction_type === 'IN' ? 'bg-green-100 text-green-800' : log.transaction_type === 'OUT' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            {log.transaction_type}
+                          </span>
+                        </td>
+                        <td className="p-3 font-semibold">
+                          {log.transaction_type === 'OUT' ? `-${log.quantity_changed}` : `+${log.quantity_changed}`}
+                        </td>
+                        <td className="p-3">{log.reference || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       )}

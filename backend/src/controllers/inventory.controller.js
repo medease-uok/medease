@@ -323,3 +323,31 @@ exports.getInventoryReport = async (req, res, next) => {
     if (client) client.release();
   }
 };
+
+exports.getTransactionLogs = async (req, res, next) => {
+  try {
+    const { rows } = await dbQuery(`
+      SELECT
+        t.id,
+        t.transaction_type,
+        t.quantity_changed,
+        t.reference,
+        t.created_at,
+        i.item_name,
+        i.category
+      FROM inventory_transactions t
+      LEFT JOIN inventory i ON t.inventory_id = i.id
+      ORDER BY t.created_at DESC
+      LIMIT 500
+    `);
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        logs: rows
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
