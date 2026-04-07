@@ -7,4 +7,5 @@ export const inventoryService = {
   update: (id, data) => api.put(`/inventory/${id}`, data),
   delete: (id) => api.delete(`/inventory/${id}`),
   getReport: () => api.get('/inventory/report'),
+  getAuditLogs: () => api.get('/inventory/audit/logs'),
 };
