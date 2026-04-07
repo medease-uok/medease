@@ -4,7 +4,7 @@ import { reportService } from '../services/report.service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { FileText, Package, TrendingDown, CalendarDays, Truck } from 'lucide-react';
+import { FileText, Package, TrendingDown, CalendarDays, Truck, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const reportTabs = [
@@ -21,6 +21,7 @@ export default function Reports() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,14 +57,46 @@ export default function Reports() {
     fetchData();
   }, [activeTab]);
 
+  const handleExport = async (format) => {
+    setExporting(format);
+    try {
+      await reportService.exportReport(activeTab, format);
+    } catch (err) {
+      console.error(`Error exporting ${format}`, err);
+      setError(`Failed to export report as ${format.toUpperCase()}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-          <FileText className="w-8 h-8 text-indigo-600" />
-          System Reports
-        </h1>
-        <p className="text-slate-500 mt-1">View system-wide analytics and data summaries.</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <FileText className="w-8 h-8 text-indigo-600" />
+            System Reports
+          </h1>
+          <p className="text-slate-500 mt-1">View system-wide analytics and data summaries.</p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => handleExport('csv')}
+            disabled={exporting !== null || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors"
+          >
+            {exporting === 'csv' ? <div className="w-4 h-4 border-2 border-slate-700 border-t-transparent rounded-full animate-spin"></div> : <Download className="w-4 h-4" />}
+            Export CSV
+          </button>
+          <button
+            onClick={() => handleExport('pdf')}
+            disabled={exporting !== null || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            {exporting === 'pdf' ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Download className="w-4 h-4" />}
+            Export PDF
+          </button>
+        </div>
       </div>
 
       <Card>
