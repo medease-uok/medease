@@ -35,8 +35,10 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Lab test request workflow with priority levels and lab technician assignment
 - Lab report file uploads (PDF, JPEG, PNG, WebP, DOC, DOCX up to 25 MB) stored in S3 with presigned download URLs
 - Patient satisfaction and feedback system with per-doctor ratings and analytics
-- Inventory management for hospital supplies and equipment with low stock alerts, expiry date tracking, admin notifications, reorder quantity suggestions, and transaction audit logs for admins
+- Inventory management for hospital supplies and equipment with low stock alerts, expiry date tracking, admin notifications, and reorder quantity suggestions for admins
+- Automated purchase order generation for low-stock inventory items (runs daily), with a structured approval workflow (PENDING → APPROVED → ORDERED → RECEIVED / CANCELLED) and automatic stock updates on receipt
 - Supplier management for tracking medication and equipment suppliers, with full-text search and soft deletion (admin only)
+- System reports with CSV and PDF export for inventory status, monthly inventory usage, appointment summaries, and supplier orders (admin only)
 - PDF generation for medical records and prescriptions
 - Voice input (speech-to-text) for clinical notes, diagnoses, prescriptions, and other text fields
 - Role-Based Access Control (RBAC) with permissions across 6 roles
