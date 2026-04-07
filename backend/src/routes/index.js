@@ -27,6 +27,7 @@ const inventoryRoutes = require('./inventory.routes');
 const waitlistRoutes = require('./waitlist.routes');
 const supplierRoutes = require('./supplier.routes');
 const purchaseOrdersRoutes = require('./purchaseOrders.routes');
+const reportRoutes = require('./report.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -63,5 +64,6 @@ router.use('/inventory', inventoryRoutes);
 router.use('/waitlist', waitlistRoutes);
 router.use('/suppliers', supplierRoutes);
 router.use('/purchase-orders', purchaseOrdersRoutes);
+router.use('/reports', reportRoutes);
 
 module.exports = router;
