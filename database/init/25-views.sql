@@ -1,0 +1,72 @@
+-- Create Database Reporting Views
+
+-- 1. vw_inventory_status
+CREATE OR REPLACE VIEW vw_inventory_status AS
+SELECT 
+    id,
+    item_name,
+    category,
+    quantity,
+    reorder_level,
+    unit,
+    CASE 
+        WHEN quantity = 0 THEN 'Out of Stock'
+        WHEN quantity <= reorder_level THEN 'Reorder Recommended'
+        ELSE 'Healthy'
+    END AS stock_status,
+    expiry_date,
+    CASE 
+        WHEN expiry_date < CURRENT_DATE THEN 'Expired'
+        WHEN expiry_date < CURRENT_DATE + INTERVAL '30 days' THEN 'Expiring Soon'
+        ELSE 'Valid'
+    END AS expiry_status
+FROM inventory
+WHERE deleted_at IS NULL;
+
+-- 2. vw_monthly_inventory_usage
+CREATE OR REPLACE VIEW vw_monthly_inventory_usage AS
+SELECT 
+    i.id AS inventory_id,
+    i.item_name,
+    i.category,
+    DATE_TRUNC('month', it.created_at) AS usage_month,
+    SUM(it.quantity_changed) AS total_quantity_used
+FROM inventory_transactions it
+JOIN inventory i ON it.inventory_id = i.id
+WHERE it.transaction_type = 'OUT'
+GROUP BY i.id, i.item_name, i.category, DATE_TRUNC('month', it.created_at);
+
+-- 3. vw_appointment_summary
+CREATE OR REPLACE VIEW vw_appointment_summary AS
+SELECT 
+    a.id AS appointment_id,
+    a.scheduled_at,
+    a.status,
+    p.id AS patient_id,
+    pu.first_name || ' ' || pu.last_name AS patient_name,
+    d.id AS doctor_id,
+    du.first_name || ' ' || du.last_name AS doctor_name,
+    d.specialization,
+    DATE_TRUNC('day', a.scheduled_at) AS appointment_day
+FROM appointments a
+JOIN patients p ON a.patient_id = p.id
+JOIN users pu ON p.user_id = pu.id
+JOIN doctors d ON a.doctor_id = d.id
+JOIN users du ON d.user_id = du.id;
+
+-- 4. vw_supplier_order_summary
+CREATE OR REPLACE VIEW vw_supplier_order_summary AS
+SELECT 
+    supplier_name,
+    COUNT(id) AS total_orders,
+    SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending_orders,
+    SUM(CASE WHEN status = 'RECEIVED' THEN 1 ELSE 0 END) AS received_orders,
+    MAX(order_date) AS last_order_date
+FROM purchase_orders
+GROUP BY supplier_name;
+
+-- Standardize permissions for views for the application role
+GRANT SELECT ON vw_inventory_status TO medease_app;
+GRANT SELECT ON vw_monthly_inventory_usage TO medease_app;
+GRANT SELECT ON vw_appointment_summary TO medease_app;
+GRANT SELECT ON vw_supplier_order_summary TO medease_app;
