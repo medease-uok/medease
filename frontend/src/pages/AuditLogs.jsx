@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { auditService } from '../services/audit.service';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -19,11 +19,11 @@ export default function AuditLogs() {
     fetchLogs(filters.page);
   }, [filters.page]);
 
-  const fetchLogs = async (currentPage = filters.page) => {
+  const fetchLogs = useCallback(async (currentPage = 1, overrideFilters = filters) => {
     setLoading(true);
     setError('');
     try {
-      const activeFilters = { ...filters, page: currentPage };
+      const activeFilters = { ...overrideFilters, page: currentPage };
       Object.keys(activeFilters).forEach(k => {
         if (activeFilters[k] === '') delete activeFilters[k];
       });
@@ -37,7 +37,7 @@ export default function AuditLogs() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -46,13 +46,17 @@ export default function AuditLogs() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    fetchLogs(1);
+    if (filters.page !== 1) {
+      setFilters(prev => ({ ...prev, page: 1 }));
+    } else {
+      fetchLogs(1, filters);
+    }
   };
 
   const clearFilters = () => {
-    setFilters({ page: 1, limit: 20, search: '', action: '', resource_type: '', success: '', from: '', to: ''});
-    // fetchLogs will be triggered by page reset if it was > 1, otherwise explicitly call
-    setTimeout(() => fetchLogs(1), 0);
+    const defaultFilters = { page: 1, limit: 20, search: '', action: '', resource_type: '', success: '', from: '', to: '' };
+    setFilters(defaultFilters);
+    fetchLogs(1, defaultFilters);
   };
 
   // Pagination Math
@@ -105,7 +109,7 @@ export default function AuditLogs() {
               <input type="date" name="to" value={filters.to} onChange={handleFilterChange} className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none" />
             </div>
             
-            <button type="submit" className="px-4 py-2 bg-primary text-white text-white rounded-lg hover:opacity-90 transition">
+            <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 transition">
               Apply Filters
             </button>
             <button type="button" onClick={clearFilters} className="px-4 py-2 bg-white border text-slate-600 rounded-lg hover:bg-slate-50 transition">
