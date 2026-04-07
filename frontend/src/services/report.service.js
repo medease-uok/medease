@@ -19,5 +19,29 @@ export const reportService = {
   getSupplierOrders: async (params = {}) => {
     const response = await api.get('/reports/supplier-orders', { params });
     return response.data;
+  },
+
+  exportReport: async (reportType, format, params = {}) => {
+    const response = await api.get(`/reports/${reportType}`, { 
+      params: { ...params, format },
+      responseType: 'blob' 
+    });
+    
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = `report_${reportType}.${format}`;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) filename = match[1];
+    }
+    
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   }
 };
