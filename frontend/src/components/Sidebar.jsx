@@ -17,6 +17,7 @@ import {
   Archive,
   Truck,
   FlaskConical,
+  PieChart,
 } from 'lucide-react';
 
 
@@ -42,6 +43,7 @@ const navConfig = [
   { path: '/lab-test-requests', label: 'Lab Test Requests', icon: FlaskConical, roles: [ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.NURSE, ROLES.ADMIN] },
   { path: '/inventory', label: 'Inventory', icon: Archive, roles: [...ROLE_GROUPS.CLINICAL, ROLES.PHARMACIST, ROLES.LAB_TECHNICIAN] },
   { path: '/suppliers', label: 'Suppliers', icon: Truck, roles: [ROLES.ADMIN] },
+  { path: '/reports', label: 'Reports', icon: PieChart, roles: [ROLES.ADMIN] },
 ];
 
 const roleColors = {
