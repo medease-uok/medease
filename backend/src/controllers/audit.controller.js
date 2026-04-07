@@ -3,7 +3,7 @@ const { query } = require('../config/database');
 exports.getAuditLogs = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, parseInt(req.query.limit) || 20);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
 
     const {
@@ -34,22 +34,31 @@ exports.getAuditLogs = async (req, res, next) => {
     }
 
     if (from) {
-      params.push(from);
+      const fromDate = new Date(from);
+      if (isNaN(fromDate.getTime())) {
+        return res.status(400).json({ status: 'error', message: 'Invalid "from" date.' });
+      }
+      params.push(fromDate.toISOString());
       conditions.push(`a.created_at >= $${params.length}::timestamp`);
     }
 
     if (to) {
-      params.push(to);
+      const toDate = new Date(to);
+      if (isNaN(toDate.getTime())) {
+        return res.status(400).json({ status: 'error', message: 'Invalid "to" date.' });
+      }
+      params.push(toDate.toISOString());
       conditions.push(`a.created_at <= $${params.length}::timestamp + interval '1 day'`);
     }
 
     if (search) {
       params.push(`%${search}%`);
+      const idx = params.length;
       conditions.push(`(
-        u.first_name ILIKE $${params.length} OR 
-        u.last_name ILIKE $${params.length} OR 
-        u.email ILIKE $${params.length} OR
-        a.details::text ILIKE $${params.length}
+        u.first_name ILIKE $${idx} OR 
+        u.last_name ILIKE $${idx} OR 
+        u.email ILIKE $${idx} OR
+        a.details::text ILIKE $${idx}
       )`);
     }
 
@@ -90,13 +99,19 @@ exports.getAuditLogs = async (req, res, next) => {
       query(countQuery, params),
     ]);
 
+    const total = parseInt(countResult.rows[0].count, 10);
+    const totalPages = Math.ceil(total / limit) || 1;
+
     res.json({
       status: 'success',
       data: result.rows,
       pagination: {
         page,
         limit,
-        total: parseInt(countResult.rows[0].count, 10),
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
       },
     });
   } catch (error) {
