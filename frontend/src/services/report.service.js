@@ -1,23 +1,23 @@
 import api from './api';
 
 export const reportService = {
-  getInventoryStatus: async () => {
-    const response = await api.get('/reports/inventory-status');
+  getInventoryStatus: async (params = {}) => {
+    const response = await api.get('/reports/inventory-status', { params });
     return response.data;
   },
 
-  getMonthlyUsage: async () => {
-    const response = await api.get('/reports/monthly-usage');
+  getMonthlyUsage: async (params = {}) => {
+    const response = await api.get('/reports/monthly-usage', { params });
     return response.data;
   },
 
-  getAppointmentSummary: async () => {
-    const response = await api.get('/reports/appointment-summary');
+  getAppointmentSummary: async (params = {}) => {
+    const response = await api.get('/reports/appointment-summary', { params });
     return response.data;
   },
 
-  getSupplierOrders: async () => {
-    const response = await api.get('/reports/supplier-orders');
+  getSupplierOrders: async (params = {}) => {
+    const response = await api.get('/reports/supplier-orders', { params });
     return response.data;
   }
 };

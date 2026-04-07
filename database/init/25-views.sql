@@ -33,7 +33,7 @@ SELECT
     SUM(it.quantity_changed) AS total_quantity_used
 FROM inventory_transactions it
 JOIN inventory i ON it.inventory_id = i.id
-WHERE it.transaction_type = 'OUT'
+WHERE it.transaction_type = 'OUT' AND i.deleted_at IS NULL
 GROUP BY i.id, i.item_name, i.category, DATE_TRUNC('month', it.created_at);
 
 -- 3. vw_appointment_summary
@@ -46,7 +46,7 @@ SELECT
     pu.first_name || ' ' || pu.last_name AS patient_name,
     d.id AS doctor_id,
     du.first_name || ' ' || du.last_name AS doctor_name,
-    d.specialization,
+    d.specialization AS specialty,
     DATE_TRUNC('day', a.scheduled_at) AS appointment_day
 FROM appointments a
 JOIN patients p ON a.patient_id = p.id
@@ -57,13 +57,15 @@ JOIN users du ON d.user_id = du.id;
 -- 4. vw_supplier_order_summary
 CREATE OR REPLACE VIEW vw_supplier_order_summary AS
 SELECT 
-    supplier_name,
-    COUNT(id) AS total_orders,
-    SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending_orders,
-    SUM(CASE WHEN status = 'RECEIVED' THEN 1 ELSE 0 END) AS received_orders,
-    MAX(order_date) AS last_order_date
-FROM purchase_orders
-GROUP BY supplier_name;
+    s.id AS supplier_id,
+    s.name AS supplier_name,
+    COUNT(p.id) AS total_orders,
+    SUM(CASE WHEN p.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_orders,
+    SUM(CASE WHEN p.status = 'RECEIVED' THEN 1 ELSE 0 END) AS received_orders,
+    MAX(p.order_date) AS last_order_date
+FROM purchase_orders p
+JOIN suppliers s ON p.supplier_name = s.name
+GROUP BY s.id, s.name;
 
 -- Standardize permissions for views for the application role
 GRANT SELECT ON vw_inventory_status TO medease_app;

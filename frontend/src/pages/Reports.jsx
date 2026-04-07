@@ -17,19 +17,12 @@ const reportTabs = [
 export default function Reports() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = currentUser?.role === 'admin';
-
   const [activeTab, setActiveTab] = useState('inventory-status');
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!isAdmin) {
-      navigate('/dashboard');
-      return;
-    }
-    
     const fetchData = async () => {
       setLoading(true);
       setError('');
@@ -61,9 +54,7 @@ export default function Reports() {
     };
 
     fetchData();
-  }, [activeTab, isAdmin, navigate]);
-
-  if (!isAdmin) return null;
+  }, [activeTab]);
 
   return (
     <div className="space-y-6">
@@ -147,13 +138,15 @@ export default function Reports() {
                 <TableBody>
                   {data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center h-32 text-slate-500">
+                      <TableCell colSpan={activeTab === 'monthly-usage' ? 4 : 5} className="text-center h-32 text-slate-500">
                         No data available for this report.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data.map((row, i) => (
-                      <TableRow key={i}>
+                    data.map((row) => {
+                      const rowKey = row.id || row.inventory_id || row.appointment_id || row.supplier_id || row.item_name || Math.random();
+                      return (
+                      <TableRow key={rowKey}>
                         {activeTab === 'inventory-status' && (
                           <>
                             <TableCell className="font-medium">{row.item_name}</TableCell>
@@ -184,7 +177,7 @@ export default function Reports() {
                             <TableCell>{new Date(row.appointment_day).toLocaleDateString()}</TableCell>
                             <TableCell className="font-medium">{row.patient_name}</TableCell>
                             <TableCell>Dr. {row.doctor_name}</TableCell>
-                            <TableCell>{row.specialization}</TableCell>
+                            <TableCell>{row.specialty}</TableCell>
                             <TableCell>
                               <Badge variant={row.status === 'completed' ? 'success' : row.status === 'cancelled' ? 'destructive' : 'default'}>
                                 {row.status}
@@ -202,7 +195,8 @@ export default function Reports() {
                           </>
                         )}
                       </TableRow>
-                    ))
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
