@@ -62,7 +62,7 @@ export default function AuditLogs() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-          <ClipboardList className="w-8 h-8 text-indigo-600" />
+          <ClipboardList className="w-8 h-8 text-primary" />
           Audit Logs
         </h1>
         <p className="text-slate-500 mt-1">Review system activity and security events.</p>
@@ -79,7 +79,7 @@ export default function AuditLogs() {
                   type="text" 
                   name="search"
                   placeholder="Search email, names, or json data..."
-                  className="w-full pl-9 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full pl-9 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none"
                   value={filters.search}
                   onChange={handleFilterChange}
                 />
@@ -88,7 +88,7 @@ export default function AuditLogs() {
             
             <div className="w-40">
               <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>
-              <select name="success" value={filters.success} onChange={handleFilterChange} className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+              <select name="success" value={filters.success} onChange={handleFilterChange} className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white">
                 <option value="">All</option>
                 <option value="true">Success</option>
                 <option value="false">Failed</option>
@@ -97,15 +97,15 @@ export default function AuditLogs() {
 
             <div className="w-40">
               <label className="text-xs font-semibold text-slate-500 uppercase">From Date</label>
-              <input type="date" name="from" value={filters.from} onChange={handleFilterChange} className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+              <input type="date" name="from" value={filters.from} onChange={handleFilterChange} className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none" />
             </div>
 
             <div className="w-40">
               <label className="text-xs font-semibold text-slate-500 uppercase">To Date</label>
-              <input type="date" name="to" value={filters.to} onChange={handleFilterChange} className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+              <input type="date" name="to" value={filters.to} onChange={handleFilterChange} className="w-full mt-1 p-2 border rounded-lg focus:ring-2 focus:ring-primary outline-none" />
             </div>
             
-            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
+            <button type="submit" className="px-4 py-2 bg-primary text-white text-white rounded-lg hover:opacity-90 transition">
               Apply Filters
             </button>
             <button type="button" onClick={clearFilters} className="px-4 py-2 bg-white border text-slate-600 rounded-lg hover:bg-slate-50 transition">
@@ -131,7 +131,7 @@ export default function AuditLogs() {
               </TableHeader>
               <TableBody>
                 {loading && logs.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="h-32 text-center text-slate-500 flex justify-center items-center"><div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-32 text-center text-slate-500 flex justify-center items-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div></TableCell></TableRow>
                 ) : logs.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="h-32 text-center text-slate-500">No audit logs found matching criteria.</TableCell></TableRow>
                 ) : (
@@ -153,7 +153,7 @@ export default function AuditLogs() {
                       </TableCell>
                       <TableCell className="font-medium uppercase text-xs tracking-wider">{log.action}</TableCell>
                       <TableCell>
-                        <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md text-xs font-medium">
+                        <span className="bg-primary/10 text-primary px-2 py-1 rounded-md text-xs font-medium">
                            {log.resource_type}
                         </span>
                         {log.resource_id && <p className="text-[10px] text-slate-400 mt-1 font-mono truncate max-w-[120px]" title={log.resource_id}>{log.resource_id}</p>}
