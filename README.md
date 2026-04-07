@@ -39,6 +39,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Patient satisfaction and feedback system with per-doctor ratings and analytics
 - Inventory management for hospital supplies and equipment with low stock alerts, expiry date tracking, admin notifications, and reorder quantity suggestions for admins
 - Supplier management for tracking medication and equipment suppliers, with full-text search and soft deletion (admin only)
+- System reports with CSV and PDF export for inventory status, monthly inventory usage, appointment summaries, and supplier orders (admin only)
 - PDF generation for medical records and prescriptions
 - Voice input (speech-to-text) for clinical notes, diagnoses, prescriptions, and other text fields
 - Role-Based Access Control (RBAC) with permissions across 6 roles

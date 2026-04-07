@@ -9,6 +9,7 @@ const db = require('./config/database');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const { startReminderScheduler } = require('./jobs/appointmentReminders');
+const { startInventoryScheduler } = require('./jobs/inventoryJobs');
 
 const app = express();
 
@@ -78,6 +79,7 @@ app.listen(PORT, () => {
   }
 
   startReminderScheduler();
+  startInventoryScheduler();
 });
 
 module.exports = app;
