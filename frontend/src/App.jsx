@@ -28,6 +28,7 @@ import SupplierManagement from './pages/SupplierManagement';
 import Reports from './pages/Reports';
 import ScheduleCalendar from './pages/ScheduleCalendar';
 import DoctorDashboard from './pages/DoctorDashboard';
+import NurseDashboard from './pages/NurseDashboard';
 import MyRecords from './pages/MyRecords';
 import StaffRecords from './pages/StaffRecords';
 import PatientSatisfaction from './pages/PatientSatisfaction';
@@ -41,6 +42,7 @@ function DashboardRedirect() {
   if (!currentUser) return <Navigate to="/login" replace />;
   if (currentUser.role === ROLES.PATIENT) return <Navigate to="/my-health" replace />;
   if (currentUser.role === ROLES.DOCTOR) return <Navigate to="/doctor-dashboard" replace />;
+  if (currentUser.role === ROLES.NURSE) return <Navigate to="/nurse-dashboard" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -57,6 +59,7 @@ function App() {
             <Route index element={<DashboardRedirect />} />
             <Route path="dashboard" element={<R roles={ROLE_GROUPS.STAFF}><DashboardEnhanced /></R>} />
             <Route path="doctor-dashboard" element={<R roles={[ROLES.DOCTOR]}><DoctorDashboard /></R>} />
+            <Route path="nurse-dashboard" element={<R roles={[ROLES.NURSE]}><NurseDashboard /></R>} />
             <Route path="my-health" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><PatientDashboard /></R>} />
             <Route path="my-records" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><MyRecords /></R>} />
             <Route path="health-profile" element={<Navigate to="/my-records?tab=conditions" replace />} />

@@ -24,7 +24,8 @@ import {
 const navConfig = [
   // Dashboard always first
   { path: '/doctor-dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.DOCTOR] },
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.NURSE, ROLES.LAB_TECHNICIAN, ROLES.PHARMACIST, ROLES.ADMIN] },
+  { path: '/nurse-dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.NURSE] },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.LAB_TECHNICIAN, ROLES.PHARMACIST, ROLES.ADMIN] },
   // Patient navigation (alphabetical)
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: ROLE_GROUPS.PATIENT_ONLY },
