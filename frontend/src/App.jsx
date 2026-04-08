@@ -29,10 +29,12 @@ import SupplierManagement from './pages/SupplierManagement';
 import Reports from './pages/Reports';
 import ScheduleCalendar from './pages/ScheduleCalendar';
 import DoctorDashboard from './pages/DoctorDashboard';
+import NurseDashboard from './pages/NurseDashboard';
 import MyRecords from './pages/MyRecords';
 import StaffRecords from './pages/StaffRecords';
 import PatientSatisfaction from './pages/PatientSatisfaction';
 import ForgotPassword from './pages/ForgotPassword';
+import StatisticsDashboard from './pages/StatisticsDashboard';
 import './App.css';
 
 const R = ({ roles, children }) => <RoleGuard roles={roles}>{children}</RoleGuard>;
@@ -42,6 +44,7 @@ function DashboardRedirect() {
   if (!currentUser) return <Navigate to="/login" replace />;
   if (currentUser.role === ROLES.PATIENT) return <Navigate to="/my-health" replace />;
   if (currentUser.role === ROLES.DOCTOR) return <Navigate to="/doctor-dashboard" replace />;
+  if (currentUser.role === ROLES.NURSE) return <Navigate to="/nurse-dashboard" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -58,6 +61,7 @@ function App() {
             <Route index element={<DashboardRedirect />} />
             <Route path="dashboard" element={<R roles={ROLE_GROUPS.STAFF}><DashboardEnhanced /></R>} />
             <Route path="doctor-dashboard" element={<R roles={[ROLES.DOCTOR]}><DoctorDashboard /></R>} />
+            <Route path="nurse-dashboard" element={<R roles={[ROLES.NURSE]}><NurseDashboard /></R>} />
             <Route path="my-health" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><PatientDashboard /></R>} />
             <Route path="my-records" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><MyRecords /></R>} />
             <Route path="health-profile" element={<Navigate to="/my-records?tab=conditions" replace />} />
@@ -83,6 +87,7 @@ function App() {
             <Route path="reports" element={<R roles={[ROLES.ADMIN]}><Reports /></R>} />
             <Route path="audit-logs" element={<R roles={[ROLES.ADMIN]}><AuditLogs /></R>} />
             <Route path="permissions" element={<R roles={[ROLES.ADMIN]}><PermissionManagement /></R>} />
+            <Route path="statistics" element={<R roles={[ROLES.ADMIN]}><StatisticsDashboard /></R>} />
             <Route path="admin" element={<DashboardRedirect />} />
           </Route>
           <Route path="*" element={<DashboardRedirect />} />
