@@ -74,7 +74,7 @@ export default function Reports() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <FileText className="w-8 h-8 text-indigo-600" />
+            <FileText className="w-8 h-8 text-primary" />
             System Reports
           </h1>
           <p className="text-slate-500 mt-1">View system-wide analytics and data summaries.</p>
@@ -91,7 +91,7 @@ export default function Reports() {
           <button
             onClick={() => handleExport('pdf')}
             disabled={exporting !== null || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-colors"
           >
             {exporting === 'pdf' ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Download className="w-4 h-4" />}
             Export PDF
@@ -110,7 +110,7 @@ export default function Reports() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                    isActive ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -124,7 +124,7 @@ export default function Reports() {
           {error && <p className="text-red-500 mb-4">{error}</p>}
           {loading ? (
             <div className="flex justify-center items-center h-48">
-               <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border border-slate-200">
