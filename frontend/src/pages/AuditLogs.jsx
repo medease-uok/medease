@@ -3,7 +3,7 @@ import { auditService } from '../services/audit.service';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { ClipboardList, Search, RefreshCw, AlertCircle } from 'lucide-react';
+import { ClipboardList, Search, RefreshCw, AlertCircle, Download } from 'lucide-react';
 
 export default function AuditLogs() {
   const [logs, setLogs] = useState([]);
@@ -61,6 +61,17 @@ export default function AuditLogs() {
     setFetchTrigger(prev => prev + 1); // Force fresh fetch
   };
 
+  const handleDownload = (format) => {
+    const activeFilters = { ...filters, format };
+    Object.keys(activeFilters).forEach(k => {
+      if (activeFilters[k] === '') delete activeFilters[k];
+    });
+    
+    const params = new URLSearchParams(activeFilters).toString();
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+    window.open(`${API_URL}/api/audit-logs?${params}`, '_blank');
+  };
+
   const clearFilters = () => {
     setFilters({ page: 1, limit: 20, search: '', action: '', resource_type: '', success: '', from: '', to: '' });
     setFetchTrigger(prev => prev + 1);
@@ -78,14 +89,30 @@ export default function AuditLogs() {
           </h1>
           <p className="text-slate-500 mt-1">Review system activity and security events.</p>
         </div>
-        <button 
-          onClick={() => setFetchTrigger(p => p + 1)}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 text-sm bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => handleDownload('csv')}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            CSV
+          </button>
+          <button 
+            onClick={() => handleDownload('pdf')}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            PDF
+          </button>
+          <button 
+            onClick={() => setFetchTrigger(p => p + 1)}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <Card>
