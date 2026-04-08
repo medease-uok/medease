@@ -1,4 +1,5 @@
 const { query: dbQuery, getClient } = require('../config/database');
+const { generateCSV, generatePDF } = require('../utils/exportUtils');
 const { notifyAdmins } = require('../utils/notifications.helper');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -47,6 +48,34 @@ exports.getAllInventory = async (req, res, next) => {
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Handle Exports
+    if (req.query.format === 'csv' || req.query.format === 'pdf') {
+      const exportSql = `
+        SELECT item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location
+        FROM inventory
+        ${whereClause}
+        ORDER BY item_name ASC
+        LIMIT 1000
+      `;
+      const result = await dbQuery(exportSql, values);
+      const filename = `inventory_${new Date().toISOString().split('T')[0]}`;
+      const fields = [
+        { key: 'item_name', label: 'Item Name' },
+        { key: 'category', label: 'Category' },
+        { key: 'quantity', label: 'Stock' },
+        { key: 'unit', label: 'Unit' },
+        { key: 'supplier', label: 'Supplier' },
+        { key: 'expiry_date', label: 'Expiry Date' },
+        { key: 'location', label: 'Location' }
+      ];
+
+      if (req.query.format === 'csv') {
+        return generateCSV(res, filename, result.rows, fields);
+      } else {
+        return generatePDF(res, 'Inventory Status Report', filename, result.rows, fields);
+      }
+    }
 
     values.push(limit, offset);
     const query = `
