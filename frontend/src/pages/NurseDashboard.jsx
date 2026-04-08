@@ -45,7 +45,7 @@ function CareNotesModal({ patient, onClose }) {
     try {
       await api.post(`/nurses/me/care-notes/${patient.id}`, { note: newNote });
       setNewNote('');
-      fetchNotes();
+      await fetchNotes();
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to add note.');
     } finally {
@@ -59,7 +59,7 @@ function CareNotesModal({ patient, onClose }) {
     try {
       await api.patch(`/nurses/me/care-notes/${noteId}`, { note: editText });
       setEditingId(null);
-      fetchNotes();
+      await fetchNotes();
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to update note.');
     }
@@ -70,7 +70,7 @@ function CareNotesModal({ patient, onClose }) {
     setError(null);
     try {
       await api.delete(`/nurses/me/care-notes/${noteId}`);
-      fetchNotes();
+      await fetchNotes();
     } catch (err) {
       setError('Failed to delete note.');
     }
@@ -148,10 +148,10 @@ function CareNotesModal({ patient, onClose }) {
                       <div>
                         <p className="text-xs text-slate-400">
                           {note.nurse_name} · {new Date(note.created_at).toLocaleString()}
-                          {note.updated_at !== note.created_at && ' (edited)'}
+                          {new Date(note.updated_at).getTime() !== new Date(note.created_at).getTime() && ' (edited)'}
                         </p>
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                         <button
                           onClick={() => { setEditingId(note.id); setEditText(note.note); }}
                           className="p-1.5 rounded-lg hover:bg-emerald-100 text-slate-400 hover:text-emerald-600 transition-colors"

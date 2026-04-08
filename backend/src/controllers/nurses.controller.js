@@ -1,4 +1,9 @@
 const db = require('../config/database');
+const AppError = require('../utils/AppError');
+const { assertPatientAccess } = require('../utils/patientAccess');
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_NOTE_LENGTH = 2000;
 
 const getStatistics = async (req, res, next) => {
   try {
@@ -74,15 +79,19 @@ const getStatistics = async (req, res, next) => {
   }
 };
 
-module.exports = { getStatistics };
-
 // ─── Care Notes ───────────────────────────────────────────────────────────────
-const AppError = require('../utils/AppError');
 
 const getCareNotes = async (req, res, next) => {
   try {
-    const { patientId } = req.body;
-    if (!patientId) throw new AppError('Patient ID is required.', 400);
+    const { patientId } = req.params;
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    // Security: Verify nurse has access to this patient
+    await assertPatientAccess(req.user, patientId);
+
     const result = await db.query(
       `SELECT ncn.id, ncn.note, ncn.created_at, ncn.updated_at,
               u.first_name || ' ' || u.last_name AS nurse_name
@@ -94,7 +103,9 @@ const getCareNotes = async (req, res, next) => {
       [patientId]
     );
     res.json({ status: 'success', data: result.rows });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 };
 
 const addCareNote = async (req, res, next) => {
@@ -102,7 +113,21 @@ const addCareNote = async (req, res, next) => {
     const nurseId = req.nurseId;
     const { patientId } = req.params;
     const { note } = req.body;
-    if (!note || !note.trim()) throw new AppError('Note text is required.', 400);
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    if (!note || !note.trim()) {
+      throw new AppError('Note text is required.', 400);
+    }
+
+    if (note.trim().length > MAX_NOTE_LENGTH) {
+      throw new AppError(`Note is too long (max ${MAX_NOTE_LENGTH} characters).`, 400);
+    }
+
+    // Security: Verify nurse has access to this patient
+    await assertPatientAccess(req.user, patientId);
 
     const result = await db.query(
       `INSERT INTO nurse_care_notes (nurse_id, patient_id, note)
@@ -111,7 +136,9 @@ const addCareNote = async (req, res, next) => {
       [nurseId, patientId, note.trim()]
     );
     res.status(201).json({ status: 'success', data: result.rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 };
 
 const updateCareNote = async (req, res, next) => {
@@ -119,7 +146,18 @@ const updateCareNote = async (req, res, next) => {
     const nurseId = req.nurseId;
     const { noteId } = req.params;
     const { note } = req.body;
-    if (!note || !note.trim()) throw new AppError('Note text is required.', 400);
+
+    if (!UUID_RE.test(noteId)) {
+      throw new AppError('Invalid note ID format.', 400);
+    }
+
+    if (!note || !note.trim()) {
+      throw new AppError('Note text is required.', 400);
+    }
+
+    if (note.trim().length > MAX_NOTE_LENGTH) {
+      throw new AppError(`Note is too long (max ${MAX_NOTE_LENGTH} characters).`, 400);
+    }
 
     const result = await db.query(
       `UPDATE nurse_care_notes
@@ -128,24 +166,46 @@ const updateCareNote = async (req, res, next) => {
        RETURNING id, note, created_at, updated_at`,
       [note.trim(), noteId, nurseId]
     );
-    if (result.rows.length === 0) throw new AppError('Note not found or not yours.', 404);
+
+    if (result.rows.length === 0) {
+      throw new AppError('Note not found.', 404);
+    }
+
     res.json({ status: 'success', data: result.rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 };
 
 const deleteCareNote = async (req, res, next) => {
   try {
     const nurseId = req.nurseId;
     const { noteId } = req.params;
+
+    if (!UUID_RE.test(noteId)) {
+      throw new AppError('Invalid note ID format.', 400);
+    }
+
     const result = await db.query(
       `DELETE FROM nurse_care_notes WHERE id = $1 AND nurse_id = $2 RETURNING id`,
       [noteId, nurseId]
     );
-    if (result.rows.length === 0) throw new AppError('Note not found or not yours.', 404);
+
+    if (result.rows.length === 0) {
+      throw new AppError('Note not found.', 404);
+    }
+
     res.json({ status: 'success', message: 'Note deleted.' });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 };
 
-// Re-export everything (getStatistics is declared above, care notes below)
-module.exports = { getStatistics, getCareNotes, addCareNote, updateCareNote, deleteCareNote };
+module.exports = {
+  getStatistics,
+  getCareNotes,
+  addCareNote,
+  updateCareNote,
+  deleteCareNote
+};
 

@@ -4,10 +4,12 @@ CREATE TABLE IF NOT EXISTS nurse_care_notes (
     nurse_id UUID NOT NULL REFERENCES nurses(id) ON DELETE CASCADE,
     patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     note TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_nurse_care_notes_nurse_id ON nurse_care_notes(nurse_id);
-CREATE INDEX IF NOT EXISTS idx_nurse_care_notes_patient_id ON nurse_care_notes(patient_id);
+-- Composite index for patient history retrieval
+CREATE INDEX IF NOT EXISTS idx_nurse_care_notes_patient_created ON nurse_care_notes(patient_id, created_at DESC);
+
