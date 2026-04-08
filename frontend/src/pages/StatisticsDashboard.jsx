@@ -171,6 +171,7 @@ export default function StatisticsDashboard() {
                   <Legend />
                   <Line type="monotone" dataKey="total" name="Total" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4, fill: '#3B82F6' }} activeDot={{ r: 6 }} />
                   <Line type="monotone" dataKey="completed" name="Completed" stroke="#10B981" strokeWidth={2} dot={{ r: 3, fill: '#10B981' }} />
+                  <Line type="monotone" dataKey="scheduled" name="Scheduled" stroke="#F59E0B" strokeWidth={2} dot={{ r: 3, fill: '#F59E0B' }} />
                   <Line type="monotone" dataKey="cancelled" name="Cancelled" stroke="#EF4444" strokeWidth={2} strokeDasharray="5 5" />
                 </LineChart>
               </ResponsiveContainer>
