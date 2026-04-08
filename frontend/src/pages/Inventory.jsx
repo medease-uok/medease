@@ -180,10 +180,8 @@ export default function Inventory() {
         if (activeFilters[k] === '') delete activeFilters[k];
       });
       
-      const response = await inventoryService.exportInventoryData(activeFilters);
-      
-      const blob = response.data;
-      const url = window.URL.createObjectURL(new Blob([blob]));
+      const blob = await inventoryService.exportInventoryData(activeFilters);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `inventory_${new Date().toISOString().split('T')[0]}.${format}`);

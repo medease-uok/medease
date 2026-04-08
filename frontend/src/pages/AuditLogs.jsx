@@ -65,11 +65,8 @@ export default function AuditLogs() {
         if (activeFilters[k] === '') delete activeFilters[k];
       });
       
-      const response = await auditService.exportLogs(activeFilters);
-      
-      // Axios response data is the blob when responseType is 'blob'
-      const blob = response.data;
-      const url = window.URL.createObjectURL(new Blob([blob]));
+      const blob = await auditService.exportLogs(activeFilters);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `audit_logs_${new Date().toISOString().split('T')[0]}.${format}`);

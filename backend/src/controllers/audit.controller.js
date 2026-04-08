@@ -7,7 +7,8 @@ exports.getAuditLogs = async (req, res, next) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
 
-    const { filters, params } = buildAuditFilters(req.query);
+    const { filters, params, error: filterError } = buildAuditFilters(req.query);
+    if (filterError) return res.status(400).json({ status: 'error', message: filterError });
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
 
     const sqlQuery = `
@@ -51,7 +52,8 @@ exports.getAuditLogs = async (req, res, next) => {
 
 exports.exportAuditLogs = async (req, res, next) => {
   try {
-    const { filters, params } = buildAuditFilters(req.query);
+    const { filters, params, error: filterError } = buildAuditFilters(req.query);
+    if (filterError) return res.status(400).json({ status: 'error', message: filterError });
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
     const format = req.query.format === 'pdf' ? 'pdf' : 'csv';
 
@@ -111,17 +113,19 @@ function buildAuditFilters(queryData) {
   }
   if (from) {
     const fromDate = new Date(from);
-    if (!isNaN(fromDate.getTime())) {
-      params.push(fromDate.toISOString());
-      filters.push(`a.created_at >= $${params.length}::timestamp`);
+    if (isNaN(fromDate.getTime())) {
+      return { filters: null, params: null, error: 'Invalid "from" date.' };
     }
+    params.push(fromDate.toISOString());
+    filters.push(`a.created_at >= $${params.length}::timestamp`);
   }
   if (to) {
     const toDate = new Date(to);
-    if (!isNaN(toDate.getTime())) {
-      params.push(toDate.toISOString());
-      filters.push(`a.created_at <= $${params.length}::timestamp + interval '1 day'`);
+    if (isNaN(toDate.getTime())) {
+      return { filters: null, params: null, error: 'Invalid "to" date.' };
     }
+    params.push(toDate.toISOString());
+    filters.push(`a.created_at <= $${params.length}::timestamp + interval '1 day'`);
   }
   if (search) {
     params.push(`%${search}%`);
@@ -129,5 +133,5 @@ function buildAuditFilters(queryData) {
     filters.push(`(u.first_name ILIKE $${idx} OR u.last_name ILIKE $${idx} OR u.email ILIKE $${idx} OR a.details::text ILIKE $${idx})`);
   }
 
-  return { filters, params };
+  return { filters, params, error: null };
 }
