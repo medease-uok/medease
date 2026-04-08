@@ -81,7 +81,6 @@ const AppError = require('../utils/AppError');
 
 const getCareNotes = async (req, res, next) => {
   try {
-    const nurseId = req.nurseId;
     const { patientId } = req.params;
     const result = await db.query(
       `SELECT ncn.id, ncn.note, ncn.created_at, ncn.updated_at,
