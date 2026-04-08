@@ -60,7 +60,7 @@ const allActions = [
     hoverColor: 'hover:from-pink-600 hover:to-pink-700',
     description: 'View lab reports',
     path: '/lab-reports',
-    roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.ADMIN],
+    roles: [ROLES.PATIENT, ROLES.DOCTOR, ROLES.NURSE, ROLES.LAB_TECHNICIAN, ROLES.ADMIN],
   },
   {
     id: 'lab-test-requests',
