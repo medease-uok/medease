@@ -31,6 +31,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Vaccination records and chronic condition tracking
 - Treatment plans with checklist items, priority levels, and status tracking
 - Medical document management (S3-backed with presigned URLs)
+- In-browser document viewer for PDFs and images with zoom and pagination controls
 - Prescription refill requests with doctor approval workflow
 - Lab test request workflow with priority levels and lab technician assignment
 - Lab report file uploads (PDF, JPEG, PNG, WebP, DOC, DOCX up to 25 MB) stored in S3 with presigned download URLs and direct file streaming
