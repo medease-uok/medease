@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import AppointmentStatusBadge from '../components/AppointmentStatusBadge';
 import { formatTime } from '../utils/dateFormatters';
 import NurseTaskWidget from '../components/NurseTaskWidget';
-import { X, Search, Check, AlertCircle, NotebookPen, Pencil, Trash2, Plus } from 'lucide-react';
+import { X, Check, AlertCircle, NotebookPen, Pencil, Trash2, Plus } from 'lucide-react';
 
 // ── Care Notes Modal ────────────────────────────────────────────────────────
 function CareNotesModal({ patient, onClose }) {
