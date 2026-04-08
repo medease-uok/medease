@@ -9,37 +9,14 @@ import { useAuth } from '../data/AuthContext';
 import UserProfileCard from '../components/UserProfileCard';
 import EditStaffProfileModal from '../components/EditStaffProfileModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-
-const formatTime = (iso) => {
-  const d = new Date(iso);
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-};
-
-const formatDate = (iso) => {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
-
-function AppointmentStatusBadge({ status }) {
-  const variants = {
-    scheduled: 'default',
-    completed: 'success',
-    cancelled: 'destructive',
-    pending: 'warning',
-    in_progress: 'warning',
-  };
-  return (
-    <Badge variant={variants[status] || 'default'}>
-      {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-    </Badge>
-  );
-}
+import AppointmentStatusBadge from '../components/AppointmentStatusBadge';
+import { formatTime } from '../utils/dateFormatters';
 
 export default function NurseDashboard() {
   const { currentUser, updateUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [dashData, setDashData] = useState(null);
   const [assignedPatients, setAssignedPatients] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -53,45 +30,43 @@ export default function NurseDashboard() {
           api.get('/dashboard/stats'),
           api.get('/profile/me'),
           api.get('/patients'),
-          api.get('/doctor-tasks').catch(() => ({ data: { data: [] } })) // Fallback for tasks
+          api.get('/nurse-tasks').catch((err) => {
+            if (err.status === 404 || err.status === 403) {
+              return { data: [] };
+            }
+            throw err;
+          })
         ]);
-
-        // Transform stats
-        const iconMap = {
-          'Appointments Today': Calendar,
-          'Total Patients': Users,
-          'Medical Records': FileText,
-          'Completed': CheckCircle2,
-        };
-
-        const transformedStats = statsRes.data.stats.map(stat => ({
-          ...stat,
-          icon: iconMap[stat.label] || Activity,
-          change: stat.change || 0,
-          trend: stat.trend || 'up'
-        }));
 
         setDashData(statsRes.data);
         setProfileData(profileRes.data);
-        setAssignedPatients(patientsRes.data.data || []);
-        setTasks(tasksRes.data.data || []);
+        setAssignedPatients(patientsRes.data || []);
+        setTasks(tasksRes.data || []);
 
         if (profileRes.data.profileImageUrl) {
           updateUser({ profileImageUrl: profileRes.data.profileImageUrl });
         }
       } catch (err) {
         console.error('Error loading nurse dashboard:', err);
+        setError('Failed to load dashboard data. Please refresh.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [updateUser]);
 
-  const handleQuickAction = (_id, path) => {
-    if (path) navigate(path);
-  };
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center bg-red-50 text-red-600 p-6 rounded-lg border border-red-200">
+          <p className="font-medium text-lg mb-2">Error</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -104,7 +79,7 @@ export default function NurseDashboard() {
     );
   }
 
-  const { stats, todayAppointments = [] } = dashData || {};
+  const { todayAppointments = [] } = dashData || {};
 
   return (
     <div className="space-y-8 pb-10">
@@ -171,7 +146,7 @@ export default function NurseDashboard() {
                     >
                       <div className="flex items-center gap-4 mb-3 sm:mb-0">
                         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-sm font-bold text-slate-700 border-2 border-white shadow-sm group-hover:from-blue-50 group-hover:to-blue-100 group-hover:text-blue-700 transition-colors">
-                          {apt.patientName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                          {(apt.patientName || '?').split(' ').filter(Boolean).map((n) => n[0]).join('').slice(0, 2) || '?'}
                         </div>
                         <div>
                           <p className="font-bold text-slate-900 group-hover:text-primary transition-colors">{apt.patientName}</p>
@@ -245,7 +220,7 @@ export default function NurseDashboard() {
                       className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all cursor-pointer group"
                     >
                       <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 group-hover:bg-emerald-100 group-hover:text-emerald-700 transition-colors">
-                        {patient.firstName[0]}{patient.lastName[0]}
+                        {patient.firstName?.[0] ?? '?'}{patient.lastName?.[0] ?? '?'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-slate-900 truncate">{patient.firstName} {patient.lastName}</p>
