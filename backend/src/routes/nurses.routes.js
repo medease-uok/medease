@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { getStatistics } = require('../controllers/nurses.controller')
+const { getStatistics, getAssignedPatients, assignPatient } = require('../controllers/nurses.controller')
 const authenticate = require('../middleware/authenticate')
 const authorize = require('../middleware/authorize')
 const resolveSubject = require('../middleware/resolveSubject')

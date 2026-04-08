@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Calendar, Stethoscope,
@@ -12,6 +12,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import AppointmentStatusBadge from '../components/AppointmentStatusBadge';
 import { formatTime } from '../utils/dateFormatters';
 import NurseTaskWidget from '../components/NurseTaskWidget';
+import { X, Search, Check, AlertCircle } from 'lucide-react';
+
+
 
 export default function NurseDashboard() {
   const { currentUser, updateUser } = useAuth();
@@ -23,18 +26,27 @@ export default function NurseDashboard() {
   const [profileData, setProfileData] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
 
+  const fetchAssignedPatients = useCallback(async () => {
+    try {
+      // /patients already filters by nurse's department via patientAccess.js
+      const res = await api.get('/patients');
+      setAssignedPatients(res.data || []);
+    } catch (err) {
+      console.error('Error loading assigned patients:', err);
+    }
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, profileRes, patientsRes] = await Promise.all([
+        const [statsRes, profileRes] = await Promise.all([
           api.get('/dashboard/stats'),
-          api.get('/profile/me'),
-          api.get('/patients')
+          api.get('/profile/me')
         ]);
 
         setDashData(statsRes.data);
         setProfileData(profileRes.data);
-        setAssignedPatients(patientsRes.data || []);
+        fetchAssignedPatients();
 
         if (profileRes.data.profileImageUrl) {
           updateUser({ profileImageUrl: profileRes.data.profileImageUrl });
@@ -48,7 +60,7 @@ export default function NurseDashboard() {
     };
 
     fetchData();
-  }, [updateUser]);
+  }, [updateUser, fetchAssignedPatients]);
 
   if (error) {
     return (
@@ -193,7 +205,7 @@ export default function NurseDashboard() {
                   Assigned Patients
                 </CardTitle>
                 <CardDescription>
-                  Patients from your department currently under care
+                  {assignedPatients.length} patients in your department
                 </CardDescription>
               </div>
               <button
@@ -205,24 +217,34 @@ export default function NurseDashboard() {
             </CardHeader>
             <CardContent>
               {assignedPatients.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {assignedPatients.slice(0, 6).map((patient) => (
-                    <div
-                      key={patient.id}
-                      onClick={() => navigate(`/patients/${patient.id}`)}
-                      className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all cursor-pointer group"
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {assignedPatients.slice(0, 12).map((patient) => (
+                      <div
+                        key={patient.id}
+                        onClick={() => navigate(`/patients/${patient.id}`)}
+                        className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all cursor-pointer group"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 group-hover:bg-emerald-100 group-hover:text-emerald-700 transition-colors">
+                          {patient.firstName?.[0] ?? '?'}{patient.lastName?.[0] ?? '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-900 truncate">{patient.firstName} {patient.lastName}</p>
+                          <p className="text-xs text-slate-500 truncate">{patient.gender}, {patient.bloodType || 'N/A'}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                      </div>
+                    ))}
+                  </div>
+                  {assignedPatients.length > 12 && (
+                    <button
+                      onClick={() => navigate('/patients')}
+                      className="w-full mt-4 py-2.5 text-sm font-semibold text-slate-500 hover:text-primary hover:bg-slate-50 rounded-lg border-2 border-dashed border-slate-100 transition-all"
                     >
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 group-hover:bg-emerald-100 group-hover:text-emerald-700 transition-colors">
-                        {patient.firstName?.[0] ?? '?'}{patient.lastName?.[0] ?? '?'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate">{patient.firstName} {patient.lastName}</p>
-                        <p className="text-xs text-slate-500 truncate">{patient.gender}, {patient.bloodType || 'N/A'}</p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors" />
-                    </div>
-                  ))}
-                </div>
+                      View all {assignedPatients.length} patients
+                    </button>
+                  )}
+                </>
               ) : (
                 <div className="text-center py-10 bg-slate-50/30 rounded-xl border border-dashed border-slate-200">
                   <Users className="w-10 h-10 mx-auto mb-2 text-slate-300" />
