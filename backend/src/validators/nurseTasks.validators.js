@@ -38,7 +38,7 @@ const taskIdValidation = [
 
 const reorderValidation = [
   body('orderedIds')
-    .isArray().withMessage('orderedIds must be an array of task IDs')
+    .isArray({ min: 1, max: 500 }).withMessage('orderedIds must contain between 1 and 500 IDs')
     .notEmpty().withMessage('orderedIds array cannot be empty'),
   body('orderedIds.*')
     .isUUID().withMessage('Each ID in orderedIds must be a valid UUID'),

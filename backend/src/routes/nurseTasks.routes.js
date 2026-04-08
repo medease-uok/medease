@@ -16,6 +16,7 @@ const rateLimit = require('express-rate-limit');
 const nurseTasksLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each nurse to 100 requests per windowMs for these routes
+  keyGenerator: (req) => req.user?.id ?? req.ip, // per-user, falls back to IP
 });
 
 // Protect the entire router with rate limiting as the first priority

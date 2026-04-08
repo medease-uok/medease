@@ -37,6 +37,10 @@ const create = async (req, res, next) => {
     const nurseId = req.nurseId;
     const { title, dueDate } = req.body;
 
+    if (!title?.trim()) {
+      throw new AppError('Task title is required.', 400);
+    }
+
     const result = await db.query(
       `INSERT INTO nurse_tasks (nurse_id, title, due_date)
        VALUES ($1, $2, $3)
@@ -63,44 +67,39 @@ const update = async (req, res, next) => {
       throw new AppError('No updatable fields provided.', 400);
     }
 
-    // Verify ownership
-    const existing = await db.query(
-      'SELECT id FROM nurse_tasks WHERE id = $1 AND nurse_id = $2',
-      [id, nurseId]
-    );
-    if (existing.rows.length === 0) throw new AppError('Task not found or access denied.', 404);
-
     const sets = ['updated_at = NOW()'];
     const params = [];
-    let idx = 1;
 
     if (title !== undefined) {
-      sets.push(`title = $${idx}`);
       params.push(title.trim());
-      idx++;
+      sets.push(`title = $${params.length}`);
     }
     if (isCompleted !== undefined) {
-      sets.push(`is_completed = $${idx}`);
       params.push(isCompleted);
-      idx++;
+      sets.push(`is_completed = $${params.length}`);
     }
     if (priority !== undefined) {
-      sets.push(`priority = $${idx}`);
       params.push(priority);
-      idx++;
+      sets.push(`priority = $${params.length}`);
     }
     if (dueDate !== undefined) {
-      sets.push(`due_date = $${idx}`);
       params.push(dueDate || null);
-      idx++;
+      sets.push(`due_date = $${params.length}`);
     }
 
     params.push(id);
+    params.push(nurseId);
+    
     const result = await db.query(
-      `UPDATE nurse_tasks SET ${sets.join(', ')} WHERE id = $${idx}
+      `UPDATE nurse_tasks SET ${sets.join(', ')} 
+       WHERE id = $${params.length - 1} AND nurse_id = $${params.length}
        RETURNING id, title, is_completed, priority, due_date, created_at, updated_at`,
       params
     );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Task not found or access denied.', 404);
+    }
 
     res.json({
       status: 'success',
@@ -120,30 +119,38 @@ const remove = async (req, res, next) => {
       'DELETE FROM nurse_tasks WHERE id = $1 AND nurse_id = $2 RETURNING id',
       [id, nurseId]
     );
-    if (result.rows.length === 0) throw new AppError('Task not found or access denied.', 404);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Task not found or access denied.', 404);
+    }
 
-    res.json({ status: 'success', data: { id } });
+    res.json({ status: 'success', data: { id: result.rows[0].id } });
   } catch (err) {
     next(err);
   }
 };
 
 const reorder = async (req, res, next) => {
+  const client = await db.getClient();
   try {
     const nurseId = req.nurseId;
     const { orderedIds } = req.body;
 
-    // Verify all tasks belong to this nurse before reordering
-    const ownership = await db.query(
+    await client.query('BEGIN');
+
+    // Verify all tasks belong to this nurse inside the transaction
+    // This solves the TOCTOU race condition
+    const ownership = await client.query(
       'SELECT id FROM nurse_tasks WHERE nurse_id = $1 AND id = ANY($2::uuid[])',
       [nurseId, orderedIds]
     );
+    
     if (ownership.rows.length !== orderedIds.length) {
       throw new AppError('One or more tasks not found or access denied.', 404);
     }
 
-    // Bulk update using unnest for performance
-    await db.query(
+    // Bulk update using unnest
+    await client.query(
       `UPDATE nurse_tasks AS nt
        SET priority = v.priority, updated_at = NOW()
        FROM (SELECT unnest($1::uuid[]) AS id, generate_subscripts($1::uuid[], 1) - 1 AS priority) v
@@ -151,7 +158,9 @@ const reorder = async (req, res, next) => {
       [orderedIds, nurseId]
     );
 
-    // Return updated task list
+    await client.query('COMMIT');
+
+    // Return updated task list (consistent ordering)
     const result = await db.query(
       `SELECT id, title, is_completed, priority, due_date, created_at, updated_at
        FROM nurse_tasks
@@ -165,7 +174,10 @@ const reorder = async (req, res, next) => {
       data: result.rows.map(formatTask),
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     next(err);
+  } finally {
+    client.release();
   }
 };
 

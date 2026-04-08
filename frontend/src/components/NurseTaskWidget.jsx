@@ -14,6 +14,7 @@ export default function NurseTaskWidget() {
   const [editTitle, setEditTitle] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
   const [saving, setSaving] = useState(false);
+  const [errorStatus, setErrorStatus] = useState(null);
 
   const fetchTasks = useCallback(() => {
     api.get('/nurse-tasks')
@@ -31,6 +32,7 @@ export default function NurseTaskWidget() {
     e.preventDefault();
     if (!newTitle.trim()) return;
     setAdding(true);
+    setErrorStatus(null);
     try {
       const res = await api.post('/nurse-tasks', {
         title: newTitle.trim(),
@@ -41,20 +43,29 @@ export default function NurseTaskWidget() {
       setNewDueDate('');
     } catch (err) {
       console.error('Failed to add task:', err);
+      setErrorStatus('Failed to add task. Please try again.');
     } finally {
       setAdding(false);
     }
   };
 
   const handleToggle = async (task) => {
+    // Optimistic Update
+    const originalStatus = task.isCompleted;
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, isCompleted: !originalStatus } : t)));
     setTogglingIds((prev) => new Set(prev).add(task.id));
+    setErrorStatus(null);
+
     try {
       const res = await api.patch(`/nurse-tasks/${task.id}`, {
-        isCompleted: !task.isCompleted,
+        isCompleted: !originalStatus,
       });
       setTasks((prev) => prev.map((t) => (t.id === task.id ? res.data : t)));
     } catch (err) {
       console.error('Failed to toggle task:', err);
+      setErrorStatus('Failed to update task status.');
+      // Rollback
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, isCompleted: originalStatus } : t)));
     } finally {
       setTogglingIds((prev) => {
         const next = new Set(prev);
@@ -79,6 +90,7 @@ export default function NurseTaskWidget() {
   const handleSaveEdit = async (id) => {
     if (!editTitle.trim()) return;
     setSaving(true);
+    setErrorStatus(null);
     try {
       const res = await api.patch(`/nurse-tasks/${id}`, {
         title: editTitle.trim(),
@@ -88,17 +100,20 @@ export default function NurseTaskWidget() {
       handleCancelEdit();
     } catch (err) {
       console.error('Failed to update task:', err);
+      setErrorStatus('Failed to save changes.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id) => {
+    setErrorStatus(null);
     try {
       await api.delete(`/nurse-tasks/${id}`);
       setTasks((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
       console.error('Failed to delete task:', err);
+      setErrorStatus('Failed to delete task.');
     }
   };
 
@@ -108,6 +123,8 @@ export default function NurseTaskWidget() {
   const formatDue = (dateStr) => {
     if (!dateStr) return null;
     const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const due = new Date(d);
@@ -143,6 +160,12 @@ export default function NurseTaskWidget() {
         </div>
       </CardHeader>
       <CardContent>
+        {errorStatus && (
+          <div className="mb-4 p-2 bg-red-50 border border-red-100 rounded text-xs text-red-600 flex items-center justify-between">
+            <span>{errorStatus}</span>
+            <button onClick={() => setErrorStatus(null)} className="text-red-400 hover:text-red-600">✕</button>
+          </div>
+        )}
         {/* Add Task Form */}
         <form onSubmit={handleAdd} className="mb-4">
           <div className="flex gap-2">
@@ -337,7 +360,7 @@ export default function NurseTaskWidget() {
                           </div>
                         </div>
                       ) : (
-                        <p 
+                        <p
                           className="text-sm text-slate-400 line-through cursor-pointer"
                           onClick={() => handleStartEdit(task)}
                         >
