@@ -172,15 +172,29 @@ export default function Inventory() {
     return matchesSearch && matchesCat;
   });
 
-  const handleDownload = (format) => {
-    const activeFilters = { search: searchTerm, category: selectedCategory === 'All' ? '' : selectedCategory, format };
-    Object.keys(activeFilters).forEach(k => {
-      if (activeFilters[k] === '') delete activeFilters[k];
-    });
-    
-    const params = new URLSearchParams(activeFilters).toString();
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-    window.open(`${API_URL}/api/inventory?${params}`, '_blank');
+  const handleDownload = async (format) => {
+    try {
+      setReportError(null);
+      const activeFilters = { search: searchTerm, category: selectedCategory === 'All' ? '' : selectedCategory, format };
+      Object.keys(activeFilters).forEach(k => {
+        if (activeFilters[k] === '') delete activeFilters[k];
+      });
+      
+      const response = await inventoryService.exportInventoryData(activeFilters);
+      
+      const blob = response.data;
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `inventory_${new Date().toISOString().split('T')[0]}.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+      setReportError('Export failed. Please check your permissions.');
+    }
   };
 
   const handleDownloadReport = async () => {

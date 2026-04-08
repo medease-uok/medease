@@ -19,7 +19,6 @@ export default function AuditLogs() {
   // Consolidated fetcher that doesn't rely on closures
   useEffect(() => {
     const performFetch = async () => {
-      console.log('[AuditLogs] Fetching data for page:', filters.page);
       setLoading(true);
       setError('');
       
@@ -31,7 +30,6 @@ export default function AuditLogs() {
         });
 
         const res = await auditService.getLogs(activeFilters);
-        console.log('[AuditLogs] API Response:', res);
 
         if (res && res.status === 'success') {
           setLogs(Array.isArray(res.data) ? res.data : []);
@@ -40,7 +38,6 @@ export default function AuditLogs() {
           setError(res?.message || 'Failed to fetch audit logs.');
         }
       } catch (err) {
-        console.error('[AuditLogs] Fetch Error:', err);
         setError('Network error or server unavailable. Please try again.');
       } finally {
         setLoading(false);
@@ -48,7 +45,7 @@ export default function AuditLogs() {
     };
 
     performFetch();
-  }, [filters.page, fetchTrigger]); // We link to page changes and manual triggers
+  }, [filters.page, filters.search, filters.success, filters.from, filters.to, filters.action, filters.resource_type, fetchTrigger]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -61,15 +58,29 @@ export default function AuditLogs() {
     setFetchTrigger(prev => prev + 1); // Force fresh fetch
   };
 
-  const handleDownload = (format) => {
-    const activeFilters = { ...filters, format };
-    Object.keys(activeFilters).forEach(k => {
-      if (activeFilters[k] === '') delete activeFilters[k];
-    });
-    
-    const params = new URLSearchParams(activeFilters).toString();
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-    window.open(`${API_URL}/api/audit-logs?${params}`, '_blank');
+  const handleDownload = async (format) => {
+    try {
+      const activeFilters = { ...filters, format };
+      Object.keys(activeFilters).forEach(k => {
+        if (activeFilters[k] === '') delete activeFilters[k];
+      });
+      
+      const response = await auditService.exportLogs(activeFilters);
+      
+      // Axios response data is the blob when responseType is 'blob'
+      const blob = response.data;
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `audit_logs_${new Date().toISOString().split('T')[0]}.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+      setError('Export failed. Please check your permissions.');
+    }
   };
 
   const clearFilters = () => {
