@@ -172,6 +172,17 @@ export default function Inventory() {
     return matchesSearch && matchesCat;
   });
 
+  const handleDownload = (format) => {
+    const activeFilters = { search: searchTerm, category: selectedCategory === 'All' ? '' : selectedCategory, format };
+    Object.keys(activeFilters).forEach(k => {
+      if (activeFilters[k] === '') delete activeFilters[k];
+    });
+    
+    const params = new URLSearchParams(activeFilters).toString();
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+    window.open(`${API_URL}/api/inventory?${params}`, '_blank');
+  };
+
   const handleDownloadReport = async () => {
     try {
       setReportError(null);
@@ -252,12 +263,26 @@ export default function Inventory() {
               {loadingAudit ? 'Loading...' : 'Audit Logs'}
             </button>
             <button
+              onClick={() => handleDownload('csv')}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              CSV
+            </button>
+            <button
+              onClick={() => handleDownload('pdf')}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              PDF
+            </button>
+            <button
               onClick={handleDownloadReport}
               disabled={downloadingReport}
               className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
             >
               <Download className="w-5 h-5" />
-              {downloadingReport ? 'Generating...' : 'Download Report'}
+              {downloadingReport ? 'Generating...' : 'Full Summary'}
             </button>
             <button
               onClick={() => handleOpenModal()}
