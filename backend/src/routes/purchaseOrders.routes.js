@@ -7,7 +7,7 @@ const { apiLimiter } = require('../middleware/rateLimit');
 
 router.use(protect);
 router.use(apiLimiter);
-  .route('/:id/status')
+router.route('/:id/status')
   .patch(authorize('admin', 'pharmacist', 'lab_technician'), updatePurchaseOrderStatus);
 
 module.exports = router;
