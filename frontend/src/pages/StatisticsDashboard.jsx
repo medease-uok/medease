@@ -11,14 +11,6 @@ import { statisticsService } from '../services/statistics.service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { AnimatedStatsCard } from '../components/AnimatedStatsCard';
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
-const INVENTORY_COLORS = {
-  totalItems: '#3B82F6',
-  outOfStock: '#EF4444',
-  lowStock: '#F59E0B',
-  expired: '#8B5CF6',
-  expiringSoon: '#EC4899'
-};
 
 const formatDateDay = (dateStr) => {
   const date = new Date(dateStr);
@@ -32,6 +24,7 @@ export default function StatisticsDashboard() {
   const [activityTrends, setActivityTrends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -49,6 +42,7 @@ export default function StatisticsDashboard() {
       setActivityTrends(activity.data);
     } catch (err) {
       console.error('Failed to fetch statistics:', err);
+      setError('Failed to load statistics. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -70,8 +64,25 @@ export default function StatisticsDashboard() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
+          <p className="text-lg font-medium text-slate-900">{error}</p>
+          <button
+            onClick={fetchData}
+            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const inventoryPieData = inventoryStats ? [
-    { name: 'Healthy Stock', value: inventoryStats.totalItems - inventoryStats.outOfStock - inventoryStats.lowStock, color: '#10B981' },
+    { name: 'Healthy Stock', value: Math.max(0, inventoryStats.totalItems - inventoryStats.outOfStock - inventoryStats.lowStock), color: '#10B981' },
     { name: 'Low Stock', value: inventoryStats.lowStock, color: '#F59E0B' },
     { name: 'Out of Stock', value: inventoryStats.outOfStock, color: '#EF4444' }
   ].filter(item => item.value > 0) : [];

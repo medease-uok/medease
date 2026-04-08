@@ -19,11 +19,11 @@ const getSystemSummary = async (req, res, next) => {
     res.json({
       status: 'success',
       data: {
-        totalPatients: parseInt(stats.total_patients),
-        totalDoctors: parseInt(stats.total_doctors),
-        totalAppointments: parseInt(stats.total_appointments),
-        totalPrescriptions: parseInt(stats.total_prescriptions),
-        activeUsers: parseInt(stats.active_users)
+        totalPatients: parseInt(stats.total_patients) || 0,
+        totalDoctors: parseInt(stats.total_doctors) || 0,
+        totalAppointments: parseInt(stats.total_appointments) || 0,
+        totalPrescriptions: parseInt(stats.total_prescriptions) || 0,
+        activeUsers: parseInt(stats.active_users) || 0
       }
     });
   } catch (err) {
@@ -39,10 +39,10 @@ const getInventoryStats = async (req, res, next) => {
     const result = await db.query(`
       SELECT 
         COUNT(*) AS total_items,
-        SUM(CASE WHEN quantity = 0 THEN 1 ELSE 0 END) AS out_of_stock,
-        SUM(CASE WHEN quantity > 0 AND quantity <= reorder_level THEN 1 ELSE 0 END) AS low_stock,
-        SUM(CASE WHEN expiry_date < CURRENT_DATE THEN 1 ELSE 0 END) AS expired,
-        SUM(CASE WHEN expiry_date >= CURRENT_DATE AND expiry_date < CURRENT_DATE + INTERVAL '30 days' THEN 1 ELSE 0 END) AS expiring_soon
+        COALESCE(SUM(CASE WHEN quantity = 0 THEN 1 ELSE 0 END), 0) AS out_of_stock,
+        COALESCE(SUM(CASE WHEN quantity > 0 AND quantity <= reorder_level THEN 1 ELSE 0 END), 0) AS low_stock,
+        COALESCE(SUM(CASE WHEN expiry_date < CURRENT_DATE THEN 1 ELSE 0 END), 0) AS expired,
+        COALESCE(SUM(CASE WHEN expiry_date >= CURRENT_DATE AND expiry_date < CURRENT_DATE + INTERVAL '30 days' THEN 1 ELSE 0 END), 0) AS expiring_soon
       FROM inventory
       WHERE deleted_at IS NULL
     `);
@@ -52,11 +52,11 @@ const getInventoryStats = async (req, res, next) => {
     res.json({
       status: 'success',
       data: {
-        totalItems: parseInt(stats.total_items),
-        outOfStock: parseInt(stats.out_of_stock),
-        lowStock: parseInt(stats.low_stock),
-        expired: parseInt(stats.expired),
-        expiringSoon: parseInt(stats.expiring_soon)
+        totalItems: parseInt(stats.total_items) || 0,
+        outOfStock: parseInt(stats.out_of_stock) || 0,
+        lowStock: parseInt(stats.low_stock) || 0,
+        expired: parseInt(stats.expired) || 0,
+        expiringSoon: parseInt(stats.expiring_soon) || 0
       }
     });
   } catch (err) {
@@ -84,7 +84,7 @@ const getAppointmentTrends = async (req, res, next) => {
         COUNT(a.id) FILTER (WHERE a.status = 'no_show') AS no_show,
         COUNT(a.id) AS total
       FROM days d
-      LEFT JOIN appointments a ON DATE(a.scheduled_at) = d.date
+      LEFT JOIN appointments a ON a.scheduled_at >= d.date AND a.scheduled_at < d.date + INTERVAL '1 day'
       GROUP BY d.date
       ORDER BY d.date ASC
     `);
@@ -93,10 +93,10 @@ const getAppointmentTrends = async (req, res, next) => {
       status: 'success',
       data: result.rows.map(row => ({
         date: row.date,
-        completed: parseInt(row.completed),
-        cancelled: parseInt(row.cancelled),
-        noShow: parseInt(row.no_show),
-        total: parseInt(row.total)
+        completed: parseInt(row.completed) || 0,
+        cancelled: parseInt(row.cancelled) || 0,
+        noShow: parseInt(row.no_show) || 0,
+        total: parseInt(row.total) || 0
       }))
     });
   } catch (err) {
@@ -119,10 +119,10 @@ const getUserActivityStats = async (req, res, next) => {
       )
       SELECT 
         d.date,
-        COUNT(al.id) FILTER (WHERE al.action ILIKE '%login%') AS logins,
+        COUNT(al.id) FILTER (WHERE al.action = 'USER_LOGIN') AS logins,
         COUNT(al.id) AS total_actions
       FROM days d
-      LEFT JOIN audit_logs al ON DATE(al.created_at) = d.date
+      LEFT JOIN audit_logs al ON al.created_at >= d.date AND al.created_at < d.date + INTERVAL '1 day'
       GROUP BY d.date
       ORDER BY d.date ASC
     `);
@@ -131,8 +131,8 @@ const getUserActivityStats = async (req, res, next) => {
       status: 'success',
       data: result.rows.map(row => ({
         date: row.date,
-        logins: parseInt(row.logins),
-        totalActions: parseInt(row.total_actions)
+        logins: parseInt(row.logins) || 0,
+        totalActions: parseInt(row.total_actions) || 0
       }))
     });
   } catch (err) {
