@@ -45,6 +45,7 @@ const navConfig = [
   { path: '/inventory', label: 'Inventory', icon: Archive, roles: [...ROLE_GROUPS.CLINICAL, ROLES.PHARMACIST, ROLES.LAB_TECHNICIAN] },
   { path: '/suppliers', label: 'Suppliers', icon: Truck, roles: [ROLES.ADMIN] },
   { path: '/reports', label: 'Reports', icon: PieChart, roles: [ROLES.ADMIN] },
+  { path: '/audit-logs', label: 'Audit Logs', icon: ClipboardList, roles: [ROLES.ADMIN] },
 ];
 
 const roleColors = {
