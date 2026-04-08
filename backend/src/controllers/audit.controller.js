@@ -1,6 +1,7 @@
 const { query } = require('../config/database');
 
 exports.getAuditLogs = async (req, res, next) => {
+  console.log(`[AuditLogs] Request started: ${req.method} ${req.url}`);
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
@@ -99,12 +100,13 @@ exports.getAuditLogs = async (req, res, next) => {
       query(countQuery, params),
     ]);
 
-    const total = parseInt(countResult.rows[0].count, 10);
+    const total = countResult.rows?.[0] ? parseInt(countResult.rows[0].count, 10) : 0;
     const totalPages = Math.ceil(total / limit) || 1;
 
+    console.log(`[AuditLogs] Request finished, returning ${result.rows?.length || 0} rows.`);
     res.json({
       status: 'success',
-      data: result.rows,
+      data: result.rows || [],
       pagination: {
         page,
         limit,

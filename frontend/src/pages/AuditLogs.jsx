@@ -16,28 +16,36 @@ export default function AuditLogs() {
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 20 });
 
   useEffect(() => {
+    console.log('[AuditLogs] useEffect triggered for page:', filters.page);
     fetchLogs(filters.page);
   }, [filters.page]);
 
-  const fetchLogs = useCallback(async (currentPage = 1, overrideFilters = filters) => {
+  const fetchLogs = useCallback(async (currentPage = 1, overrideFilters = null) => {
+    console.log('[AuditLogs] fetchLogs called with page:', currentPage);
     setLoading(true);
     setError('');
     try {
-      const activeFilters = { ...overrideFilters, page: currentPage };
+      const activeFilters = { ...(overrideFilters || filters), page: currentPage };
       Object.keys(activeFilters).forEach(k => {
         if (activeFilters[k] === '') delete activeFilters[k];
       });
       
+      console.log('[AuditLogs] Fetching with filters:', activeFilters);
       const res = await auditService.getLogs(activeFilters);
-      setLogs(res.data);
-      setPagination(res.pagination);
+      console.log('[AuditLogs] Response received:', res);
+      
+      setLogs(Array.isArray(res.data) ? res.data : []);
+      setPagination(res.pagination || { total: 0, page: 1, limit: 20 });
     } catch (err) {
-      console.error('Error fetching audit logs', err);
+      console.error('[AuditLogs] Error:', err);
       setError('Failed to load audit logs.');
+      setLogs([]);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+    // We remove filters from dependency array to prevent loops on every filter change
+    // We only want to FETCH when explicitly asked (Apply Filters) or when page changes
+  }, []); 
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -135,7 +143,13 @@ export default function AuditLogs() {
               </TableHeader>
               <TableBody>
                 {loading && logs.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="h-32 text-center text-slate-500 flex justify-center items-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div></TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-32 text-center">
+                      <div className="flex justify-center items-center w-full h-full">
+                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ) : logs.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="h-32 text-center text-slate-500">No audit logs found matching criteria.</TableCell></TableRow>
                 ) : (
@@ -146,10 +160,14 @@ export default function AuditLogs() {
                       </TableCell>
                       <TableCell>
                         {log.user_email ? (
-                          <div>
-                            <p className="font-medium text-slate-900">{log.user_first_name} {log.user_last_name}</p>
-                            <p className="text-xs text-slate-400">{log.user_email}</p>
-                            <span className="text-[10px] uppercase bg-slate-100 text-slate-600 px-1 rounded inline-block mt-0.5">{log.user_role}</span>
+                          <div className="max-w-[150px] truncate" title={log.user_email}>
+                            <p className="font-medium text-slate-900 truncate">
+                              {log.user_first_name || 'User'} {log.user_last_name || ''}
+                            </p>
+                            <p className="text-xs text-slate-400 truncate">{log.user_email}</p>
+                            <span className="text-[10px] uppercase bg-slate-100 text-slate-600 px-1 rounded inline-block mt-0.5">
+                              {log.user_role || 'No Role'}
+                            </span>
                           </div>
                         ) : (
                           <span className="text-slate-400 italic text-sm">System / Anonymous</span>

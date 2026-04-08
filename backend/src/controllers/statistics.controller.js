@@ -81,7 +81,7 @@ const getAppointmentTrends = async (req, res, next) => {
         d.date,
         COUNT(a.id) FILTER (WHERE a.status = 'completed') AS completed,
         COUNT(a.id) FILTER (WHERE a.status = 'cancelled') AS cancelled,
-        COUNT(a.id) FILTER (WHERE a.status = 'no_show') AS no_show,
+        COUNT(a.id) FILTER (WHERE a.status = 'scheduled') AS scheduled,
         COUNT(a.id) AS total
       FROM days d
       LEFT JOIN appointments a ON a.scheduled_at >= d.date AND a.scheduled_at < d.date + INTERVAL '1 day'
@@ -95,7 +95,7 @@ const getAppointmentTrends = async (req, res, next) => {
         date: row.date,
         completed: parseInt(row.completed) || 0,
         cancelled: parseInt(row.cancelled) || 0,
-        noShow: parseInt(row.no_show) || 0,
+        scheduled: parseInt(row.scheduled) || 0,
         total: parseInt(row.total) || 0
       }))
     });
@@ -119,7 +119,7 @@ const getUserActivityStats = async (req, res, next) => {
       )
       SELECT 
         d.date,
-        COUNT(al.id) FILTER (WHERE al.action = 'USER_LOGIN') AS logins,
+        COUNT(al.id) FILTER (WHERE al.action = 'LOGIN') AS logins,
         COUNT(al.id) AS total_actions
       FROM days d
       LEFT JOIN audit_logs al ON al.created_at >= d.date AND al.created_at < d.date + INTERVAL '1 day'
