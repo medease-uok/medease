@@ -8,4 +8,10 @@ export const inventoryService = {
   delete: (id) => api.delete(`/inventory/${id}`),
   getReport: () => api.get('/inventory/report'),
   getAuditLogs: () => api.get('/inventory/audit/logs'),
+  exportInventoryData: (params = {}) => {
+    return api.get('/inventory/export', { 
+      params, 
+      responseType: 'blob' 
+    });
+  }
 };
