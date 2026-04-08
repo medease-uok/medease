@@ -40,6 +40,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Automated purchase order generation for low-stock inventory items (runs daily), with a structured approval workflow (PENDING → APPROVED → ORDERED → RECEIVED / CANCELLED) and automatic stock updates on receipt
 - Supplier management for tracking medication and equipment suppliers, with full-text search and soft deletion (admin only)
 - System reports with CSV and PDF export for inventory status, monthly inventory usage, appointment summaries, and supplier orders (admin only)
+- Statistics dashboard with visual metrics for system summary counts, inventory health, 7-day appointment trends, and user activity (admin only)
 - PDF generation for medical records and prescriptions
 - Voice input (speech-to-text) for clinical notes, diagnoses, prescriptions, and other text fields
 - Role-Based Access Control (RBAC) with permissions across 6 roles
