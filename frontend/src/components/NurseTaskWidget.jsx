@@ -10,6 +10,10 @@ export default function NurseTaskWidget() {
   const [newDueDate, setNewDueDate] = useState('');
   const [adding, setAdding] = useState(false);
   const [togglingIds, setTogglingIds] = useState(new Set());
+  const [editingId, setEditingId] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const fetchTasks = useCallback(() => {
     api.get('/nurse-tasks')
@@ -57,6 +61,35 @@ export default function NurseTaskWidget() {
         next.delete(task.id);
         return next;
       });
+    }
+  };
+
+  const handleStartEdit = (task) => {
+    setEditingId(task.id);
+    setEditTitle(task.title);
+    setEditDueDate(task.dueDate ? task.dueDate.split('T')[0] : '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+    setEditDueDate('');
+  };
+
+  const handleSaveEdit = async (id) => {
+    if (!editTitle.trim()) return;
+    setSaving(true);
+    try {
+      const res = await api.patch(`/nurse-tasks/${id}`, {
+        title: editTitle.trim(),
+        dueDate: editDueDate || null,
+      });
+      setTasks((prev) => prev.map((t) => (t.id === id ? res.data : t)));
+      handleCancelEdit();
+    } catch (err) {
+      console.error('Failed to update task:', err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -182,11 +215,52 @@ export default function NurseTaskWidget() {
                       : <Circle className="w-5 h-5" />}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-800">{task.title}</p>
-                    {due && (
-                      <p className={`text-xs mt-0.5 ${due.color}`}>
-                        {due.label}
-                      </p>
+                    {editingId === task.id ? (
+                      <div className="space-y-2 py-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-primary focus:border-transparent"
+                          autoFocus
+                          disabled={saving}
+                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="date"
+                            value={editDueDate}
+                            onChange={(e) => setEditDueDate(e.target.value)}
+                            className="text-xs px-1.5 py-0.5 border border-slate-200 rounded text-slate-600 focus:ring-1 focus:ring-primary focus:border-transparent"
+                            disabled={saving}
+                          />
+                          <div className="flex-1" />
+                          <button
+                            type="button"
+                            onClick={handleCancelEdit}
+                            className="text-xs font-medium text-slate-500 hover:text-slate-700 disabled:opacity-50"
+                            disabled={saving}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEdit(task.id)}
+                            className="text-xs font-bold text-primary hover:text-primary/80 disabled:opacity-50 flex items-center gap-1"
+                            disabled={saving || !editTitle.trim()}
+                          >
+                            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="cursor-pointer" onClick={() => handleStartEdit(task)}>
+                        <p className="text-sm text-slate-800">{task.title}</p>
+                        {due && (
+                          <p className={`text-xs mt-0.5 ${due.color}`}>
+                            {due.label}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                   <button
@@ -224,9 +298,53 @@ export default function NurseTaskWidget() {
                         ? <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
                         : <CheckCircle2 className="w-5 h-5" />}
                     </button>
-                    <p className="flex-1 min-w-0 text-sm text-slate-400 line-through">
-                      {task.title}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      {editingId === task.id ? (
+                        <div className="space-y-2 py-1" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full px-2 py-1 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-primary focus:border-transparent"
+                            autoFocus
+                            disabled={saving}
+                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="date"
+                              value={editDueDate}
+                              onChange={(e) => setEditDueDate(e.target.value)}
+                              className="text-xs px-1.5 py-0.5 border border-slate-200 rounded text-slate-600 focus:ring-1 focus:ring-primary focus:border-transparent"
+                              disabled={saving}
+                            />
+                            <div className="flex-1" />
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="text-xs font-medium text-slate-500 hover:text-slate-700 disabled:opacity-50"
+                              disabled={saving}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEdit(task.id)}
+                              className="text-xs font-bold text-primary hover:text-primary/80 disabled:opacity-50 flex items-center gap-1"
+                              disabled={saving || !editTitle.trim()}
+                            >
+                              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p 
+                          className="text-sm text-slate-400 line-through cursor-pointer"
+                          onClick={() => handleStartEdit(task)}
+                        >
+                          {task.title}
+                        </p>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleDelete(task.id)}
