@@ -18,13 +18,15 @@ import {
   Truck,
   FlaskConical,
   PieChart,
+  BarChart3,
 } from 'lucide-react';
 
 
 const navConfig = [
   // Dashboard always first
   { path: '/doctor-dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.DOCTOR] },
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.NURSE, ROLES.LAB_TECHNICIAN, ROLES.PHARMACIST, ROLES.ADMIN] },
+  { path: '/nurse-dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.NURSE] },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.LAB_TECHNICIAN, ROLES.PHARMACIST, ROLES.ADMIN] },
   // Patient navigation (alphabetical)
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: ROLE_GROUPS.PATIENT_ONLY },
@@ -44,6 +46,8 @@ const navConfig = [
   { path: '/inventory', label: 'Inventory', icon: Archive, roles: [...ROLE_GROUPS.CLINICAL, ROLES.PHARMACIST, ROLES.LAB_TECHNICIAN] },
   { path: '/suppliers', label: 'Suppliers', icon: Truck, roles: [ROLES.ADMIN] },
   { path: '/reports', label: 'Reports', icon: PieChart, roles: [ROLES.ADMIN] },
+  { path: '/statistics', label: 'Statistics', icon: BarChart3, roles: [ROLES.ADMIN] },
+  { path: '/audit-logs', label: 'Audit Logs', icon: ClipboardList, roles: [ROLES.ADMIN] },
 ];
 
 const roleColors = {
