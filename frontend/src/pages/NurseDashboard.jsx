@@ -131,7 +131,7 @@ export default function NurseDashboard() {
                   Today's Appointments
                 </CardTitle>
                 <CardDescription>
-                  {todayAppointments.length} total scheduled for your ward today
+                  {todayAppointments.length} scheduled for today
                 </CardDescription>
               </div>
               <button
