@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users, Calendar, FileText, Activity, Stethoscope,
+  Users, Calendar, Stethoscope,
   CheckCircle2, Clock, ChevronRight, ClipboardList
 } from 'lucide-react';
 import api from '../services/api';
