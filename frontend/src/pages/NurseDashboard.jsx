@@ -11,6 +11,7 @@ import EditStaffProfileModal from '../components/EditStaffProfileModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import AppointmentStatusBadge from '../components/AppointmentStatusBadge';
 import { formatTime } from '../utils/dateFormatters';
+import NurseTaskWidget from '../components/NurseTaskWidget';
 
 export default function NurseDashboard() {
   const { currentUser, updateUser } = useAuth();
@@ -19,29 +20,21 @@ export default function NurseDashboard() {
   const [error, setError] = useState(null);
   const [dashData, setDashData] = useState(null);
   const [assignedPatients, setAssignedPatients] = useState([]);
-  const [tasks, setTasks] = useState([]);
   const [profileData, setProfileData] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, profileRes, patientsRes, tasksRes] = await Promise.all([
+        const [statsRes, profileRes, patientsRes] = await Promise.all([
           api.get('/dashboard/stats'),
           api.get('/profile/me'),
-          api.get('/patients'),
-          api.get('/nurse-tasks').catch((err) => {
-            if (err.status === 404 || err.status === 403) {
-              return { data: [] };
-            }
-            throw err;
-          })
+          api.get('/patients')
         ]);
 
         setDashData(statsRes.data);
         setProfileData(profileRes.data);
         setAssignedPatients(patientsRes.data || []);
-        setTasks(tasksRes.data || []);
 
         if (profileRes.data.profileImageUrl) {
           updateUser({ profileImageUrl: profileRes.data.profileImageUrl });
@@ -244,40 +237,7 @@ export default function NurseDashboard() {
         <div className="lg:col-span-1 space-y-8">
 
           {/* Assigned & Today's Tasks */}
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <ClipboardList className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <CardTitle>Daily Tasks</CardTitle>
-                  <CardDescription>Assigned & Today's Checklist</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {tasks.length > 0 ? (
-                  tasks.slice(0, 8).map((task, i) => (
-                    <div key={task.id || i} className="flex items-center gap-3 p-2 group cursor-pointer">
-                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${task.isCompleted ? 'bg-primary border-primary' : 'bg-white border-slate-300 group-hover:border-primary'}`}>
-                        {task.isCompleted && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                      </div>
-                      <span className={`text-sm ${task.isCompleted ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{task.title}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-6 text-slate-400">
-                    <p className="text-sm">No tasks for today</p>
-                  </div>
-                )}
-              </div>
-              <button className="w-full mt-4 py-2 text-sm font-bold text-primary hover:underline transition-colors text-center">
-                Add New Task
-              </button>
-            </CardContent>
-          </Card>
+          <NurseTaskWidget />
 
           {/* Department Help */}
           <Card className="bg-gradient-to-br from-indigo-600 to-blue-700 text-white border-none shadow-lg">
