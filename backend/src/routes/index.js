@@ -29,6 +29,7 @@ const supplierRoutes = require('./supplier.routes');
 const purchaseOrdersRoutes = require('./purchaseOrders.routes');
 const reportRoutes = require('./report.routes');
 const auditRoutes = require('./audit.routes');
+const statisticsRoutes = require('./statistics.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -67,5 +68,6 @@ router.use('/suppliers', supplierRoutes);
 router.use('/purchase-orders', purchaseOrdersRoutes);
 router.use('/reports', reportRoutes);
 router.use('/audit-logs', auditRoutes);
+router.use('/statistics', statisticsRoutes);
 
 module.exports = router;

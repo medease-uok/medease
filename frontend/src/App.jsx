@@ -34,6 +34,7 @@ import MyRecords from './pages/MyRecords';
 import StaffRecords from './pages/StaffRecords';
 import PatientSatisfaction from './pages/PatientSatisfaction';
 import ForgotPassword from './pages/ForgotPassword';
+import StatisticsDashboard from './pages/StatisticsDashboard';
 import './App.css';
 
 const R = ({ roles, children }) => <RoleGuard roles={roles}>{children}</RoleGuard>;
@@ -86,6 +87,7 @@ function App() {
             <Route path="reports" element={<R roles={[ROLES.ADMIN]}><Reports /></R>} />
             <Route path="audit-logs" element={<R roles={[ROLES.ADMIN]}><AuditLogs /></R>} />
             <Route path="permissions" element={<R roles={[ROLES.ADMIN]}><PermissionManagement /></R>} />
+            <Route path="statistics" element={<R roles={[ROLES.ADMIN]}><StatisticsDashboard /></R>} />
             <Route path="admin" element={<DashboardRedirect />} />
           </Route>
           <Route path="*" element={<DashboardRedirect />} />
