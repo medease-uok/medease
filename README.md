@@ -28,6 +28,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Medicine catalogue search with category and form filtering
 - Doctor prescription templates for reusable medication sets
 - Doctor personal task list with priority ordering and due dates
+- Dedicated nurse dashboard with assigned patient overview, today's appointments, daily task checklist, and department ward information
 - Vaccination records and chronic condition tracking
 - Treatment plans with checklist items, priority levels, and status tracking
 - Medical document management (S3-backed with presigned URLs)
@@ -124,14 +125,14 @@ Password is saved to `.vault-password` (gitignored) for subsequent runs.
 
 When seeding, sample users across all roles are created. All use password **`Password@123`**.
 
-| Role | Email |
-|------|-------|
-| Admin | admin@medease.com |
-| Doctor | kamal.perera@medease.com |
-| Nurse | malini.bandara@medease.com |
-| Lab Tech | nimal.wijesinghe@medease.com |
-| Pharmacist | tharindu.gamage@medease.com |
-| Patient | sarah.fernando@medease.com |
+| Role | Email | Landing Page |
+|------|-------|--------------|
+| Admin | admin@medease.com | /dashboard |
+| Doctor | kamal.perera@medease.com | /doctor-dashboard |
+| Nurse | malini.bandara@medease.com | /nurse-dashboard |
+| Lab Tech | nimal.wijesinghe@medease.com | /dashboard |
+| Pharmacist | tharindu.gamage@medease.com | /dashboard |
+| Patient | sarah.fernando@medease.com | /my-health |
 
 > **Warning:** These credentials are for local development only.
 
