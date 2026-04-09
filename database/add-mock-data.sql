@@ -1,9 +1,12 @@
+DO $$ BEGIN
+  IF current_database() = 'medease_prod' THEN
+    RAISE EXCEPTION 'Refusing to seed production database';
+  END IF;
+END $$;
+
 BEGIN;
 
--- 1. Ensure `details` column exists for audit logs
-ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details JSONB;
-
--- 2. Mock Data for Audit Logs
+-- 1. Mock Data for Audit Logs
 INSERT INTO audit_logs (user_id, action, resource_type, resource_id, ip_address, success, details, created_at)
 VALUES 
   ('a0000000-0000-0000-0000-000000000001', 'CREATE', 'inventory', 'fcdc0000-0000-0000-0000-000000000001', '192.168.1.10', true, '{"item": "Paracetamol 500mg", "qty": 1000}', NOW() - INTERVAL '5 days'),

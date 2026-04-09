@@ -172,6 +172,29 @@ export default function Inventory() {
     return matchesSearch && matchesCat;
   });
 
+  const handleDownload = async (format) => {
+    try {
+      setReportError(null);
+      const activeFilters = { search: searchTerm, category: selectedCategory === 'All' ? '' : selectedCategory, format };
+      Object.keys(activeFilters).forEach(k => {
+        if (activeFilters[k] === '') delete activeFilters[k];
+      });
+      
+      const blob = await inventoryService.exportInventoryData(activeFilters);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `inventory_${new Date().toISOString().split('T')[0]}.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+      setReportError('Export failed. Please check your permissions.');
+    }
+  };
+
   const handleDownloadReport = async () => {
     try {
       setReportError(null);
@@ -252,12 +275,26 @@ export default function Inventory() {
               {loadingAudit ? 'Loading...' : 'Audit Logs'}
             </button>
             <button
+              onClick={() => handleDownload('csv')}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              CSV
+            </button>
+            <button
+              onClick={() => handleDownload('pdf')}
+              className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              PDF
+            </button>
+            <button
               onClick={handleDownloadReport}
               disabled={downloadingReport}
               className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors flex items-center gap-2"
             >
               <Download className="w-5 h-5" />
-              {downloadingReport ? 'Generating...' : 'Download Report'}
+              {downloadingReport ? 'Generating...' : 'Full Summary'}
             </button>
             <button
               onClick={() => handleOpenModal()}

@@ -8,5 +8,6 @@ router.use(authenticate);
 router.use(authorize('admin'));
 
 router.get('/', auditController.getAuditLogs);
+router.get('/export', auditController.exportAuditLogs);
 
 module.exports = router;
