@@ -16,6 +16,7 @@ import MedicalRecords from './pages/MedicalRecords';
 import Prescriptions from './pages/Prescriptions';
 import LabReports from './pages/LabReports';
 import LabReportsComparison from './pages/LabReportsComparison';
+import NotificationsCenter from './pages/NotificationsCenter';
 import LabTestRequests from './pages/LabTestRequests';
 import PermissionManagement from './pages/PermissionManagement';
 import PatientDashboard from './pages/PatientDashboard';
@@ -71,6 +72,7 @@ function App() {
             <Route path="doctors/:id" element={<R roles={[ROLES.PATIENT, ROLES.ADMIN]}><DoctorDetail /></R>} />
             <Route path="appointments" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><Appointments /></R>} />
             <Route path="schedule" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><ScheduleCalendar /></R>} />
+            <Route path="notifications" element={<R roles={ROLE_GROUPS.ALL}><NotificationsCenter /></R>} />
             <Route path="medical-history" element={<R roles={ROLE_GROUPS.PATIENT_ONLY}><MedicalHistory /></R>} />
             <Route path="records" element={<R roles={[...ROLE_GROUPS.CLINICAL, ROLES.LAB_TECHNICIAN]}><StaffRecords /></R>} />
             <Route path="medical-records" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><MedicalRecords /></R>} />
