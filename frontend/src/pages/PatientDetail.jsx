@@ -14,7 +14,7 @@ import VoiceNoteButton from '../components/VoiceNoteButton';
 import IcdCodeLookup from '../components/IcdCodeLookup';
 import DocumentViewer from '../components/DocumentViewer';
 import { usePayments } from '../hooks/usePayments';
-import { getStatusConfig, CATEGORY_LABELS, getMethodConfig } from '../constants/payments';
+import { getStatusConfig, CATEGORY_LABELS as PAYMENT_CATEGORY_LABELS, getMethodConfig } from '../constants/payments';
 
 const SEVERITY_COLORS = {
   severe: 'bg-red-100 text-red-700',
@@ -1468,7 +1468,7 @@ export default function PatientDetail() {
               { key: 'description', label: 'Description', render: (val) => val || 'Payment' },
               { key: 'category', label: 'Category', render: (val) => (
                 <span className="inline-flex px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
-                  {CATEGORY_LABELS[val] || (val || 'other').replaceAll('_', ' ')}
+                  {PAYMENT_CATEGORY_LABELS[val] || (val || 'other').replaceAll('_', ' ')}
                 </span>
               )},
               { key: 'payment_method', label: 'Method', render: (val) => {
