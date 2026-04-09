@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { X, Pill, User, Calendar, FileText, AlertCircle } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 
@@ -185,3 +186,32 @@ export default function DispensingRequestDetail({ request, onClose }) {
     </div>
   );
 }
+
+DispensingRequestDetail.propTypes = {
+  request: PropTypes.shape({
+    id: PropTypes.number.isRequired,
+    prescriptionId: PropTypes.string.isRequired,
+    patientName: PropTypes.string.isRequired,
+    patientId: PropTypes.string.isRequired,
+    doctorName: PropTypes.string.isRequired,
+    medications: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.number.isRequired,
+        name: PropTypes.string.isRequired,
+        strength: PropTypes.string.isRequired,
+        quantity: PropTypes.number.isRequired,
+        unit: PropTypes.string.isRequired,
+        dosage: PropTypes.string.isRequired,
+        duration: PropTypes.string.isRequired,
+        batchNumber: PropTypes.string,
+        expiryDate: PropTypes.string,
+      })
+    ).isRequired,
+    status: PropTypes.oneOf(['pending', 'in_progress', 'dispensed', 'on_hold', 'cancelled']).isRequired,
+    requestDate: PropTypes.string.isRequired,
+    dispensedDate: PropTypes.string,
+    dispensedBy: PropTypes.string,
+    notes: PropTypes.string,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+};

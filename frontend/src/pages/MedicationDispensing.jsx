@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import {
   Search, Plus, Check, Clock, AlertCircle, Pill, Filter, Download, X,
   ChevronDown, Package, User, Calendar, FileText, Loader2, AlertTriangle,
@@ -557,3 +558,43 @@ export default function MedicationDispensing() {
     </div>
   );
 }
+
+DispenseModal.propTypes = {
+  request: PropTypes.shape({
+    id: PropTypes.number.isRequired,
+    prescriptionId: PropTypes.string.isRequired,
+    patientName: PropTypes.string.isRequired,
+    medications: PropTypes.arrayOf(PropTypes.shape({
+      id: PropTypes.number.isRequired,
+      name: PropTypes.string.isRequired,
+      strength: PropTypes.string.isRequired,
+      quantity: PropTypes.number.isRequired,
+      unit: PropTypes.string.isRequired,
+      dosage: PropTypes.string.isRequired,
+    })).isRequired,
+  }).isRequired,
+  onClose: PropTypes.func.isRequired,
+  onDispense: PropTypes.func.isRequired,
+  isSubmitting: PropTypes.bool,
+};
+
+DispensingRequestCard.propTypes = {
+  request: PropTypes.shape({
+    id: PropTypes.number.isRequired,
+    status: PropTypes.oneOf(['pending', 'in_progress', 'dispensed', 'on_hold']).isRequired,
+    priority: PropTypes.oneOf(['low', 'normal', 'high', 'urgent']).isRequired,
+    patientName: PropTypes.string.isRequired,
+    prescriptionId: PropTypes.string.isRequired,
+    doctorName: PropTypes.string.isRequired,
+    medications: PropTypes.arrayOf(PropTypes.shape({
+      id: PropTypes.number.isRequired,
+      name: PropTypes.string.isRequired,
+      strength: PropTypes.string.isRequired,
+      quantity: PropTypes.number.isRequired,
+    })).isRequired,
+    notes: PropTypes.string,
+    requestDate: PropTypes.string.isRequired,
+  }).isRequired,
+  onDispense: PropTypes.func.isRequired,
+  onViewDetails: PropTypes.func.isRequired,
+};
