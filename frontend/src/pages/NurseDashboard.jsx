@@ -12,7 +12,240 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import AppointmentStatusBadge from '../components/AppointmentStatusBadge';
 import { formatTime } from '../utils/dateFormatters';
 import NurseTaskWidget from '../components/NurseTaskWidget';
-import { X, Check, AlertCircle, NotebookPen, Pencil, Trash2, Plus } from 'lucide-react';
+import { X, Check, AlertCircle, NotebookPen, Pencil, Trash2, Plus, Activity, History } from 'lucide-react';
+
+// ── Patient Vitals Modal ──────────────────────────────────────────────────
+function PatientVitalsModal({ patient, onClose }) {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Form State
+  const [vitals, setVitals] = useState({
+    temperature: '',
+    blood_pressure_sys: '',
+    blood_pressure_dia: '',
+    heart_rate: '',
+    respiratory_rate: '',
+    spo2: '',
+    weight: '',
+    height: ''
+  });
+
+  const fetchVitals = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/nurses/me/vitals/${patient.id}`);
+      setHistory(res.data || []);
+    } catch (err) {
+      setError('Failed to load vitals history.');
+    } finally {
+      setLoading(false);
+    }
+  }, [patient.id]);
+
+  useEffect(() => { fetchVitals(); }, [fetchVitals]);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+
+    // Check if at least one vital sign is entered
+    const hasValue = Object.values(vitals).some(val => val !== '' && val !== null);
+    if (!hasValue) {
+      setError('Please enter at least one vital sign value.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      await api.post(`/nurses/me/vitals/${patient.id}`, vitals);
+      setVitals({
+        temperature: '', blood_pressure_sys: '', blood_pressure_dia: '',
+        heart_rate: '', respiratory_rate: '', spo2: '', weight: '', height: ''
+      });
+      await fetchVitals();
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to save vitals.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this record?')) return;
+    try {
+      await api.delete(`/nurses/me/vitals/${id}`);
+      await fetchVitals();
+    } catch (err) {
+      setError('Failed to delete record.');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+              <Activity className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Patient Vitals</h2>
+              <p className="text-sm text-slate-500">{patient.firstName} {patient.lastName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-200 transition-colors text-slate-500">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+          {/* Left: Input Form */}
+          <div className="w-full md:w-1/3 p-6 border-b md:border-b-0 md:border-r border-slate-100 overflow-y-auto bg-slate-50/30">
+            <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-blue-500" /> New Entry
+            </h3>
+
+            <form onSubmit={handleAdd} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Temp (°C)</label>
+                  <input
+                    type="number" step="0.1"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={vitals.temperature}
+                    onChange={(e) => setVitals({ ...vitals, temperature: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">SpO2 (%)</label>
+                  <input
+                    type="number"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={vitals.spo2}
+                    onChange={(e) => setVitals({ ...vitals, spo2: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Blood Pressure (Sys / Dia)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" placeholder="Sys"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={vitals.blood_pressure_sys}
+                    onChange={(e) => setVitals({ ...vitals, blood_pressure_sys: e.target.value })}
+                  />
+                  <span className="text-slate-400">/</span>
+                  <input
+                    type="number" placeholder="Dia"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={vitals.blood_pressure_dia}
+                    onChange={(e) => setVitals({ ...vitals, blood_pressure_dia: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Heart Rate</label>
+                  <input
+                    type="number"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={vitals.heart_rate}
+                    onChange={(e) => setVitals({ ...vitals, heart_rate: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Resp. Rate</label>
+                  <input
+                    type="number"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={vitals.respiratory_rate}
+                    onChange={(e) => setVitals({ ...vitals, respiratory_rate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Weight (kg)</label>
+                  <input
+                    type="number" step="0.1"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={vitals.weight}
+                    onChange={(e) => setVitals({ ...vitals, weight: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Height (cm)</label>
+                  <input
+                    type="number" step="0.1"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={vitals.height}
+                    onChange={(e) => setVitals({ ...vitals, height: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 mt-2"
+              >
+                {submitting ? 'Saving...' : 'Record Vitals'}
+              </button>
+            </form>
+          </div>
+
+          {/* Right: History List */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <History className="w-4 h-4 text-slate-400" /> History
+            </h3>
+
+            {loading ? (
+              <div className="py-20 flex justify-center"><div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
+            ) : history.length === 0 ? (
+              <div className="py-20 text-center text-slate-400 text-sm">No records found</div>
+            ) : (
+              <div className="space-y-3">
+                {history.map(row => (
+                  <div key={row.id} className="p-4 rounded-xl border border-slate-100 bg-white shadow-sm hover:border-blue-200 transition-all group">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">
+                        {new Date(row.recorded_at).toLocaleString()} · {row.recorded_by_name}
+                      </div>
+                      <button
+                        onClick={() => handleDelete(row.id)}
+                        className="p-1 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-3 gap-x-4">
+                      {row.temperature && <div><p className="text-[10px] text-slate-500 font-medium">Temp</p><p className="text-sm font-bold">{row.temperature}°C</p></div>}
+                      {row.spo2 && <div><p className="text-[10px] text-slate-500 font-medium">SpO2</p><p className="text-sm font-bold">{row.spo2}%</p></div>}
+                      {row.blood_pressure_sys && <div><p className="text-[10px] text-slate-500 font-medium">BP</p><p className="text-sm font-bold">{row.blood_pressure_sys}/{row.blood_pressure_dia}</p></div>}
+                      {row.heart_rate && <div><p className="text-[10px] text-slate-500 font-medium">HR</p><p className="text-sm font-bold">{row.heart_rate} bpm</p></div>}
+                      {row.respiratory_rate && <div><p className="text-[10px] text-slate-500 font-medium">Resp. Rate</p><p className="text-sm font-bold">{row.respiratory_rate}/min</p></div>}
+                      {row.weight && <div><p className="text-[10px] text-slate-500 font-medium">Weight</p><p className="text-sm font-bold">{row.weight} kg</p></div>}
+                      {row.height && <div><p className="text-[10px] text-slate-500 font-medium">Height</p><p className="text-sm font-bold">{row.height} cm</p></div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Care Notes Modal ────────────────────────────────────────────────────────
 function CareNotesModal({ patient, onClose }) {
@@ -210,7 +443,7 @@ export default function NurseDashboard() {
   const [profileData, setProfileData] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [careNotesPatient, setCareNotesPatient] = useState(null);
-
+  const [vitalsPatient, setVitalsPatient] = useState(null);
   const fetchAssignedPatients = useCallback(async () => {
     try {
       // /patients already filters by nurse's department via patientAccess.js
@@ -422,13 +655,22 @@ export default function NurseDashboard() {
                           <p className="text-sm font-bold text-slate-900 truncate">{patient.firstName} {patient.lastName}</p>
                           <p className="text-xs text-slate-500 truncate">{patient.gender}, {patient.bloodType || 'N/A'}</p>
                         </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setCareNotesPatient(patient); }}
-                          title="Care Notes"
-                          className="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                        >
-                          <NotebookPen className="w-4 h-4" />
-                        </button>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setCareNotesPatient(patient); }}
+                            title="Care Notes"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                          >
+                            <NotebookPen className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setVitalsPatient(patient); }}
+                            title="Patient Vitals"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          >
+                            <Activity className="w-4 h-4" />
+                          </button>
+                        </div>
                         <ChevronRight
                           onClick={() => navigate(`/patients/${patient.id}`)}
                           className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors cursor-pointer flex-shrink-0"
@@ -504,6 +746,13 @@ export default function NurseDashboard() {
         <CareNotesModal
           patient={careNotesPatient}
           onClose={() => setCareNotesPatient(null)}
+        />
+      )}
+
+      {vitalsPatient && (
+        <PatientVitalsModal
+          patient={vitalsPatient}
+          onClose={() => setVitalsPatient(null)}
         />
       )}
     </div>
