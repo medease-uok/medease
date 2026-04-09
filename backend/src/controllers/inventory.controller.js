@@ -1,4 +1,5 @@
 const { query: dbQuery, getClient } = require('../config/database');
+const { generateCSV, generatePDF } = require('../utils/exportUtils');
 const { notifyAdmins } = require('../utils/notifications.helper');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -31,36 +32,21 @@ exports.getAllInventory = async (req, res, next) => {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
     const page = parseInt(req.query.page) || 1;
     const offset = (page - 1) * limit;
-    const { search, category } = req.query;
 
-    const conditions = ['deleted_at IS NULL'];
-    const values = [];
+    const { filters, values } = buildInventoryFilters(req.query);
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
 
-    if (search) {
-      values.push(search);
-      conditions.push(`to_tsvector('english', item_name || ' ' || COALESCE(category, '') || ' ' || COALESCE(supplier, '')) @@ plainto_tsquery('english', $${values.length})`);
-    }
-    
-    if (category && category !== 'All') {
-      values.push(category);
-      conditions.push(`category = $${values.length}`);
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    values.push(limit, offset);
     const query = `
       SELECT *, COUNT(*) OVER() AS total_count
       FROM inventory
       ${whereClause}
-      ORDER BY item_name ASC LIMIT $${values.length - 1} OFFSET $${values.length}
+      ORDER BY item_name ASC 
+      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
     `;
 
-    const result = await dbQuery(query, values);
+    const result = await dbQuery(query, [...values, limit, offset]);
+    const totalCount = result.rows?.[0]?.total_count ? parseInt(result.rows[0].total_count) : 0;
     
-    const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
-    
-    // Omit the window function count from each row response
     const data = result.rows.map(r => {
       const { total_count, ...rest } = r;
       return rest;
@@ -80,6 +66,63 @@ exports.getAllInventory = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.exportInventory = async (req, res, next) => {
+  try {
+    const { filters, values } = buildInventoryFilters(req.query);
+    const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+    const format = req.query.format === 'pdf' ? 'pdf' : 'csv';
+
+    const exportSql = `
+      SELECT item_name, category, quantity, unit, reorder_level, expiry_date, supplier, location
+      FROM inventory
+      ${whereClause}
+      ORDER BY item_name ASC
+      LIMIT 1000
+    `;
+    const result = await dbQuery(exportSql, values);
+    
+    res.setHeader('X-Export-Truncated', result.rows.length === 1000 ? 'true' : 'false');
+
+    const filename = `inventory_${new Date().toISOString().split('T')[0]}`;
+    const fields = [
+      { key: 'item_name', label: 'Item Name' },
+      { key: 'category', label: 'Category' },
+      { key: 'quantity', label: 'Stock' },
+      { key: 'unit', label: 'Unit' },
+      { key: 'reorder_level', label: 'Reorder Level' },
+      { key: 'supplier', label: 'Supplier' },
+      { key: 'expiry_date', label: 'Expiry Date' },
+      { key: 'location', label: 'Location' }
+    ];
+
+    if (format === 'csv') {
+      return generateCSV(res, filename, result.rows, fields);
+    } else {
+      return generatePDF(res, 'Inventory Status Report', filename, result.rows, fields);
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+function buildInventoryFilters(queryData) {
+  const { search, category } = queryData;
+  const filters = ['deleted_at IS NULL'];
+  const values = [];
+
+  if (search) {
+    values.push(search);
+    filters.push(`to_tsvector('english', item_name || ' ' || COALESCE(category, '') || ' ' || COALESCE(supplier, '')) @@ plainto_tsquery('english', $${values.length})`);
+  }
+  
+  if (category && category !== 'All') {
+    values.push(category);
+    filters.push(`category = $${values.length}`);
+  }
+
+  return { filters, values };
+}
 
 exports.getInventoryById = async (req, res, next) => {
   try {
