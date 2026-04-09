@@ -316,3 +316,72 @@ export const generateDispensingReport = (requests) => {
     dispensingRate: ((dispensedCount / totalRequests) * 100).toFixed(1),
   };
 };
+
+/**
+ * Sanitize value for CSV export to prevent CSV injection attacks
+ * @param {*} value - Value to sanitize
+ * @returns {string} - Sanitized value safe for CSV
+ */
+export const sanitizeForCSV = (value) => {
+  if (value === null || value === undefined) return '';
+
+  const str = String(value);
+
+  // Check for dangerous characters that indicate CSV injection
+  if (/^[=+\-@]/.test(str)) {
+    // Prefix with single quote to prevent formula execution
+    return `'${str}`;
+  }
+
+  // Escape double quotes and wrap in quotes if contains comma, newline, or quote
+  if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+
+  return str;
+};
+
+/**
+ * Convert dispensing data to CSV format with sanitization
+ * @param {Array} records - Array of records to convert
+ * @param {Array} headers - Column headers
+ * @returns {string} - CSV formatted string
+ */
+export const convertToCSV = (records, headers) => {
+  if (!records || records.length === 0) return '';
+
+  // Sanitize headers
+  const headerRow = headers.map(h => sanitizeForCSV(h)).join(',');
+
+  // Sanitize data rows
+  const dataRows = records.map(record => {
+    return headers.map(header => {
+      const value = record[header];
+      return sanitizeForCSV(value);
+    }).join(',');
+  });
+
+  return [headerRow, ...dataRows].join('\n');
+};
+
+/**
+ * Download CSV file with proper encoding
+ * @param {string} csvContent - CSV formatted content
+ * @param {string} filename - File name for download
+ */
+export const downloadCSV = (csvContent, filename = 'export.csv') => {
+  const BOM = '\uFEFF'; // UTF-8 BOM for proper Excel encoding
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+};
