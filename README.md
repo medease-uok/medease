@@ -30,6 +30,7 @@ MedEase streamlines patient care, appointment scheduling, medical record managem
 - Doctor personal task list with priority ordering and due dates
 - Nurse personal task list with priority ordering and due dates
 - Nurse care notes per patient with full create, edit, and delete support
+- Nurse patient vitals recording (temperature, blood pressure, heart rate, respiratory rate, SpO2, weight, height) with full create, edit, and delete support
 - Vaccination records and chronic condition tracking
 - Treatment plans with checklist items, priority levels, and status tracking
 - Medical document management (S3-backed with presigned URLs)
