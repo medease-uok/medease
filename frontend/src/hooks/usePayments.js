@@ -6,6 +6,7 @@ import {
   PAYMENT_SORT_OPTIONS,
   ALLOWED_EXPORT_FORMATS,
 } from '../constants/payments';
+import { getMockPayments } from '../data/mockPayments';
 
 /**
  * Manages payment list state including fetching, filtering, pagination, and export.
@@ -101,8 +102,13 @@ export const usePayments = ({ patientId } = {}) => {
     } catch (err) {
       // Ignore aborted requests — they are expected when filters change rapidly
       if (err.name === 'AbortError') return;
-      // Silently treat 404 (endpoint not found) as empty — backend may not be deployed yet
-      if (err.status === 404) return;
+      // Fall back to mock data when the backend endpoint is not available yet
+      if (err.status === 404) {
+        const mockData = getMockPayments(patientId);
+        setPayments(mockData);
+        setTotalCount(mockData.length);
+        return;
+      }
       setError(err.message || 'Failed to fetch payment history');
       console.error('Error fetching payments:', err);
     } finally {
