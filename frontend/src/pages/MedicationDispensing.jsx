@@ -1,103 +1,14 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Search, Plus, Check, Clock, AlertCircle, Pill, Filter, Download, X,
-  ChevronDown, Package, User, Calendar, FileText, QrCode, Loader2,
+  ChevronDown, Package, User, Calendar, FileText, Loader2, AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../data/AuthContext';
 import { ROLES } from '../data/roles';
-
-const MOCK_DISPENSING_REQUESTS = [
-  {
-    id: 1,
-    prescriptionId: 'RX-001',
-    patientName: 'Sarah Fernando',
-    patientId: 'P-001',
-    doctorName: 'Dr. Kamal Perera',
-    medications: [
-      { id: 1, name: 'Amoxicillin', strength: '500mg', quantity: 30, unit: 'tablets', dosage: '1 tablet x 3 daily', duration: '7 days' },
-    ],
-    requestDate: '2026-04-09T10:30:00Z',
-    status: 'pending',
-    priority: 'normal',
-    notes: 'Patient allergic to penicillin derivatives - verify before dispensing',
-  },
-  {
-    id: 2,
-    prescriptionId: 'RX-002',
-    patientName: 'John Silva',
-    patientId: 'P-002',
-    doctorName: 'Dr. Priya Sharma',
-    medications: [
-      { id: 1, name: 'Lisinopril', strength: '10mg', quantity: 60, unit: 'tablets', dosage: '1 tablet daily', duration: '30 days' },
-      { id: 2, name: 'Atorvastatin', strength: '20mg', quantity: 30, unit: 'tablets', dosage: '1 tablet daily', duration: '30 days' },
-    ],
-    requestDate: '2026-04-09T11:15:00Z',
-    status: 'pending',
-    priority: 'normal',
-    notes: '',
-  },
-  {
-    id: 3,
-    prescriptionId: 'RX-003',
-    patientName: 'Emily Rodriguez',
-    patientId: 'P-003',
-    doctorName: 'Dr. Kamal Perera',
-    medications: [
-      { id: 1, name: 'Insulin Glargine', strength: '100 U/mL', quantity: 1, unit: 'pen', dosage: '10 units at bedtime', duration: 'ongoing' },
-    ],
-    requestDate: '2026-04-09T08:45:00Z',
-    status: 'dispensed',
-    priority: 'high',
-    notes: 'Requires refrigeration. Patient trained on injection technique.',
-    dispensedBy: 'Tharindu Gamage',
-    dispensedDate: '2026-04-09T09:00:00Z',
-  },
-  {
-    id: 4,
-    prescriptionId: 'RX-004',
-    patientName: 'Michael Chen',
-    patientId: 'P-004',
-    doctorName: 'Dr. Nimal Jayawardena',
-    medications: [
-      { id: 1, name: 'Azithromycin', strength: '250mg', quantity: 6, unit: 'tablets', dosage: '1 tablet daily', duration: '3 days' },
-    ],
-    requestDate: '2026-04-09T13:20:00Z',
-    status: 'in_progress',
-    priority: 'normal',
-    notes: 'Take with food to reduce stomach upset',
-  },
-  {
-    id: 5,
-    prescriptionId: 'RX-005',
-    patientName: 'Angela Williams',
-    patientId: 'P-005',
-    doctorName: 'Dr. Priya Sharma',
-    medications: [
-      { id: 1, name: 'Salbutamol Inhaler', strength: '100mcg', quantity: 1, unit: 'inhaler', dosage: '1-2 puffs as needed', duration: 'ongoing' },
-      { id: 2, name: 'Fluticasone Inhaler', strength: '110mcg', quantity: 1, unit: 'inhaler', dosage: '2 puffs twice daily', duration: '30 days' },
-    ],
-    requestDate: '2026-04-09T14:00:00Z',
-    status: 'pending',
-    priority: 'high',
-    notes: 'Patient has severe asthma. Instruct on proper inhaler technique.',
-  },
-  {
-    id: 6,
-    prescriptionId: 'RX-006',
-    patientName: 'David Brown',
-    patientId: 'P-006',
-    doctorName: 'Dr. Kamal Perera',
-    medications: [
-      { id: 1, name: 'Metformin', strength: '850mg', quantity: 90, unit: 'tablets', dosage: '1 tablet x 3 daily', duration: '30 days' },
-    ],
-    requestDate: '2026-04-08T16:30:00Z',
-    status: 'pending',
-    priority: 'normal',
-    notes: 'Monitor for GI side effects',
-  },
-];
+import { useDispensingRequests } from '../hooks/useDispensing';
+import DispensingRequestDetail from '../components/DispensingRequestDetail';
 
 const STATUS_CONFIG = {
   pending: { color: 'bg-yellow-50 border-yellow-200', badge: 'warning', label: 'Pending', icon: Clock },
@@ -113,7 +24,7 @@ const PRIORITY_CONFIG = {
   urgent: { color: 'text-red-700 bg-red-100', label: 'Urgent' },
 };
 
-function DispenseModal({ request, onClose, onDispense }) {
+function DispenseModal({ request, onClose, onDispense, isSubmitting }) {
   const [loading, setLoading] = useState(false);
   const [batchNumbers, setBatchNumbers] = useState(
     request.medications.reduce((acc, med) => ({ ...acc, [med.id]: '' }), {})
@@ -137,23 +48,31 @@ function DispenseModal({ request, onClose, onDispense }) {
       return;
     }
 
-    setLoading(true);
-    try {
-      // Simulate API call
-      await new Promise(r => setTimeout(r, 1000));
-      onDispense({
-        requestId: request.id,
-        batchNumbers,
-        expiryDates,
-        notes,
-      });
-      onClose();
-    } catch (err) {
-      setError('Failed to dispense medication. Please try again.');
-    } finally {
-      setLoading(false);
+    // Validate batch number format
+    for (const [medId, batch] of Object.entries(batchNumbers)) {
+      if (!/^[A-Z0-9\-]{3,20}$/.test(batch)) {
+        setError('Batch numbers must be 3-20 alphanumeric characters (and hyphens)');
+        return;
+      }
     }
+
+    // Validate expiry dates are in future
+    for (const [medId, expiry] of Object.entries(expiryDates)) {
+      if (new Date(expiry) <= new Date()) {
+        setError('Expiry dates must be in the future');
+        return;
+      }
+    }
+
+    onDispense({
+      requestId: request.id,
+      batchNumbers,
+      expiryDates,
+      notes,
+    });
   };
+
+  const activeLoading = loading || isSubmitting;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -163,7 +82,7 @@ function DispenseModal({ request, onClose, onDispense }) {
             <h2 className="text-xl font-semibold text-slate-900">Dispense Medication</h2>
             <p className="text-sm text-slate-500 mt-1">{request.patientName} • {request.prescriptionId}</p>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-lg transition-colors" disabled={activeLoading}>
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
@@ -204,7 +123,8 @@ function DispenseModal({ request, onClose, onDispense }) {
                       onChange={(e) => setBatchNumbers(prev => ({ ...prev, [med.id]: e.target.value }))}
                       placeholder="e.g., BTH-2024-001"
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
-                      disabled={loading}
+                      disabled={activeLoading}
+                      required
                     />
                   </div>
                   <div>
@@ -216,7 +136,8 @@ function DispenseModal({ request, onClose, onDispense }) {
                       value={expiryDates[med.id]}
                       onChange={(e) => setExpiryDates(prev => ({ ...prev, [med.id]: e.target.value }))}
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
-                      disabled={loading}
+                      disabled={activeLoading}
+                      required
                     />
                   </div>
                 </div>
@@ -236,7 +157,7 @@ function DispenseModal({ request, onClose, onDispense }) {
               rows={3}
               maxLength={500}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors resize-none"
-              disabled={loading}
+              disabled={activeLoading}
             />
             <p className="text-xs text-slate-400 mt-1 text-right">{notes.length}/500</p>
           </div>
@@ -247,16 +168,16 @@ function DispenseModal({ request, onClose, onDispense }) {
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
-              disabled={loading}
+              disabled={activeLoading}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-              disabled={loading}
+              disabled={activeLoading}
             >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {activeLoading && <Loader2 className="w-4 h-4 animate-spin" />}
               <Check className="w-4 h-4" />
               Confirm Dispensing
             </button>
@@ -360,87 +281,107 @@ function DispensingRequestCard({ request, onDispense, onViewDetails }) {
 
 export default function MedicationDispensing() {
   const { currentUser } = useAuth();
-  const isPharmacist = currentUser?.role === ROLES.PHARMACIST;
+  const { requests, loading, error, stats, fetchRequests, dispenseRequest } = useDispensingRequests();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDispenseModal, setShowDispenseModal] = useState(false);
-  const [dispensingHistory, setDispensingHistory] = useState([]);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [sortBy, setSortBy] = useState('recent');
+  const [submitting, setSubmitting] = useState(false);
 
+  // Fetch requests on mount
+  useEffect(() => {
+    fetchRequests({ status: 'pending' });
+  }, [fetchRequests]);
+
+  // Filter and sort logic
   const filteredRequests = useMemo(() => {
-    let requests = MOCK_DISPENSING_REQUESTS;
+    if (!requests) return [];
+    
+    let filtered = [...requests];
 
     // Search filter
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
-      requests = requests.filter(req =>
-        req.patientName.toLowerCase().includes(query) ||
-        req.prescriptionId.toLowerCase().includes(query) ||
-        req.doctorName.toLowerCase().includes(query) ||
-        req.medications.some(med => med.name.toLowerCase().includes(query))
+      filtered = filtered.filter(req =>
+        req.patientName?.toLowerCase().includes(query) ||
+        req.prescriptionId?.toLowerCase().includes(query) ||
+        req.doctorName?.toLowerCase().includes(query) ||
+        req.medications?.some(med => med.name?.toLowerCase().includes(query))
       );
     }
 
     // Status filter
     if (filterStatus !== 'all') {
-      requests = requests.filter(req => req.status === filterStatus);
+      filtered = filtered.filter(req => req.status === filterStatus);
     }
 
     // Priority filter
     if (filterPriority !== 'all') {
-      requests = requests.filter(req => req.priority === filterPriority);
+      filtered = filtered.filter(req => req.priority === filterPriority);
     }
 
     // Sorting
     if (sortBy === 'recent') {
-      requests.sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
+      filtered.sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
     } else if (sortBy === 'priority') {
       const priorityOrder = { urgent: 0, high: 1, normal: 2, low: 3 };
-      requests.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+      filtered.sort((a, b) => (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2));
     }
 
-    return requests;
-  }, [searchTerm, filterStatus, filterPriority, sortBy]);
-
-  const stats = useMemo(() => {
-    return {
-      pending: MOCK_DISPENSING_REQUESTS.filter(r => r.status === 'pending').length,
-      inProgress: MOCK_DISPENSING_REQUESTS.filter(r => r.status === 'in_progress').length,
-      dispensed: MOCK_DISPENSING_REQUESTS.filter(r => r.status === 'dispensed').length,
-      onHold: MOCK_DISPENSING_REQUESTS.filter(r => r.status === 'on_hold').length,
-    };
-  }, []);
+    return filtered;
+  }, [requests, searchTerm, filterStatus, filterPriority, sortBy]);
 
   const handleDispense = (request) => {
     setSelectedRequest(request);
     setShowDispenseModal(true);
   };
 
-  const handleConfirmDispense = (dispensingData) => {
-    // Update the mock data
-    const updatedRequests = MOCK_DISPENSING_REQUESTS.map(req =>
-      req.id === dispensingData.requestId
-        ? {
-          ...req,
-          status: 'dispensed',
-          dispensedBy: currentUser?.name || 'Pharmacist',
-          dispensedDate: new Date().toISOString(),
-        }
-        : req
-    );
-
-    setDispensingHistory(prev => [...prev, dispensingData]);
-    setShowDispenseModal(false);
-    setSelectedRequest(null);
+  const handleConfirmDispense = async (dispensingData) => {
+    setSubmitting(true);
+    try {
+      await dispenseRequest(selectedRequest.id, dispensingData);
+      setShowDispenseModal(false);
+      setSelectedRequest(null);
+      // Refresh the list
+      fetchRequests({ status: filterStatus === 'all' ? undefined : filterStatus });
+    } catch (err) {
+      console.error('Dispensing error:', err);
+      alert(err.message || 'Failed to dispense medication');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleViewDetails = (request) => {
     setSelectedRequest(request);
-    // Could open a detail modal or drawer
+    setShowDetailModal(true);
   };
+
+  // Loading state
+  if (loading && requests.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-10 bg-slate-200 rounded-lg mb-4 w-48"></div>
+          <div className="h-5 bg-slate-100 rounded w-96 mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-24 bg-slate-100 rounded-lg"></div>
+            ))}
+          </div>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-32 bg-slate-100 rounded-lg"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -456,13 +397,30 @@ export default function MedicationDispensing() {
         </button>
       </div>
 
+      {/* Error state */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-medium text-red-900">Error loading dispensing requests</h3>
+            <p className="text-sm text-red-800 mt-1">{error}</p>
+            <button
+              onClick={() => fetchRequests()}
+              className="mt-2 text-sm text-red-700 hover:text-red-900 font-medium underline"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Statistics cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: 'Pending', count: stats.pending, color: 'bg-yellow-50 border-yellow-200', icon: Clock },
-          { label: 'In Progress', count: stats.inProgress, color: 'bg-blue-50 border-blue-200', icon: Loader2 },
-          { label: 'Dispensed', count: stats.dispensed, color: 'bg-green-50 border-green-200', icon: Check },
-          { label: 'On Hold', count: stats.onHold, color: 'bg-orange-50 border-orange-200', icon: AlertCircle },
+          { label: 'Pending', count: stats?.pending || 0, color: 'bg-yellow-50 border-yellow-200', icon: Clock },
+          { label: 'In Progress', count: stats?.inProgress || 0, color: 'bg-blue-50 border-blue-200', icon: Loader2 },
+          { label: 'Dispensed', count: stats?.dispensed || 0, color: 'bg-green-50 border-green-200', icon: Check },
+          { label: 'On Hold', count: stats?.onHold || 0, color: 'bg-orange-50 border-orange-200', icon: AlertCircle },
         ].map((stat, idx) => {
           const Icon = stat.icon;
           return (
@@ -553,7 +511,7 @@ export default function MedicationDispensing() {
 
             {/* Results count */}
             <div className="text-sm text-slate-600">
-              Showing {filteredRequests.length} of {MOCK_DISPENSING_REQUESTS.length} requests
+              Showing {filteredRequests.length} of {requests.length || 0} requests
             </div>
           </div>
         </CardContent>
@@ -585,6 +543,15 @@ export default function MedicationDispensing() {
           request={selectedRequest}
           onClose={() => setShowDispenseModal(false)}
           onDispense={handleConfirmDispense}
+          isSubmitting={submitting}
+        />
+      )}
+
+      {/* Detail modal */}
+      {showDetailModal && selectedRequest && (
+        <DispensingRequestDetail
+          request={selectedRequest}
+          onClose={() => setShowDetailModal(false)}
         />
       )}
     </div>
