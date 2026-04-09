@@ -1,0 +1,325 @@
+/**
+ * Dummy payment data for frontend development.
+ * Uses real patient IDs from the seed data.
+ * Remove this file once the backend /api/payments endpoint is live.
+ */
+
+const now = new Date();
+const daysAgo = (d) => new Date(now.getTime() - d * 86400000).toISOString();
+
+const MOCK_PAYMENTS = [
+  // Sarah Fernando — ce000000-0000-0000-0000-000000000001
+  {
+    id: 'pay-001',
+    patientId: 'ce000000-0000-0000-0000-000000000001',
+    description: 'Cardiology consultation — Dr. Kamal Perera',
+    category: 'consultation',
+    payment_method: 'credit_card',
+    status: 'completed',
+    amount: 3500,
+    created_at: daysAgo(30),
+  },
+  {
+    id: 'pay-002',
+    patientId: 'ce000000-0000-0000-0000-000000000001',
+    description: 'Complete Blood Count (CBC)',
+    category: 'lab_test',
+    payment_method: 'insurance',
+    status: 'completed',
+    amount: 1200,
+    created_at: daysAgo(28),
+  },
+  {
+    id: 'pay-003',
+    patientId: 'ce000000-0000-0000-0000-000000000001',
+    description: 'Lipid Panel',
+    category: 'lab_test',
+    payment_method: 'insurance',
+    status: 'completed',
+    amount: 1800,
+    created_at: daysAgo(28),
+  },
+  {
+    id: 'pay-004',
+    patientId: 'ce000000-0000-0000-0000-000000000001',
+    description: 'Amlodipine 5mg — 3 months supply',
+    category: 'prescription',
+    payment_method: 'cash',
+    status: 'completed',
+    amount: 850,
+    created_at: daysAgo(25),
+  },
+  {
+    id: 'pay-005',
+    patientId: 'ce000000-0000-0000-0000-000000000001',
+    description: 'Neurology consultation — Dr. Sithara Silva',
+    category: 'consultation',
+    payment_method: 'credit_card',
+    status: 'completed',
+    amount: 4000,
+    created_at: daysAgo(10),
+  },
+  {
+    id: 'pay-006',
+    patientId: 'ce000000-0000-0000-0000-000000000001',
+    description: 'Quarterly cardiac review — upcoming',
+    category: 'consultation',
+    payment_method: 'credit_card',
+    status: 'pending',
+    amount: 3500,
+    created_at: daysAgo(2),
+  },
+
+  // Dinesh Rajapaksa — ce000000-0000-0000-0000-000000000002
+  {
+    id: 'pay-007',
+    patientId: 'ce000000-0000-0000-0000-000000000002',
+    description: 'Neurology consultation — Dr. Sithara Silva',
+    category: 'consultation',
+    payment_method: 'mobile_payment',
+    status: 'completed',
+    amount: 4000,
+    created_at: daysAgo(25),
+  },
+  {
+    id: 'pay-008',
+    patientId: 'ce000000-0000-0000-0000-000000000002',
+    description: 'MRI Brain Scan',
+    category: 'lab_test',
+    payment_method: 'insurance',
+    status: 'completed',
+    amount: 12500,
+    created_at: daysAgo(22),
+  },
+  {
+    id: 'pay-009',
+    patientId: 'ce000000-0000-0000-0000-000000000002',
+    description: 'Paracetamol 500mg',
+    category: 'prescription',
+    payment_method: 'cash',
+    status: 'completed',
+    amount: 350,
+    created_at: daysAgo(20),
+  },
+  {
+    id: 'pay-010',
+    patientId: 'ce000000-0000-0000-0000-000000000002',
+    description: 'Cardiology follow-up — Dr. Kamal Perera',
+    category: 'consultation',
+    payment_method: 'debit_card',
+    status: 'pending',
+    amount: 3500,
+    created_at: daysAgo(1),
+  },
+
+  // Kavindi Weerasinghe — ce000000-0000-0000-0000-000000000003
+  {
+    id: 'pay-011',
+    patientId: 'ce000000-0000-0000-0000-000000000003',
+    description: 'Orthopedic consultation — Dr. Ruwan Fernando',
+    category: 'consultation',
+    payment_method: 'bank_transfer',
+    status: 'completed',
+    amount: 3500,
+    created_at: daysAgo(20),
+  },
+  {
+    id: 'pay-012',
+    patientId: 'ce000000-0000-0000-0000-000000000003',
+    description: 'X-Ray Left Knee (AP/Lateral)',
+    category: 'lab_test',
+    payment_method: 'insurance',
+    status: 'completed',
+    amount: 2200,
+    created_at: daysAgo(18),
+  },
+  {
+    id: 'pay-013',
+    patientId: 'ce000000-0000-0000-0000-000000000003',
+    description: 'Ibuprofen 400mg — 2 weeks',
+    category: 'prescription',
+    payment_method: 'cash',
+    status: 'completed',
+    amount: 420,
+    created_at: daysAgo(18),
+  },
+  {
+    id: 'pay-014',
+    patientId: 'ce000000-0000-0000-0000-000000000003',
+    description: 'Insurance claim — Knee surgery',
+    category: 'consultation',
+    payment_method: 'insurance',
+    status: 'refunded',
+    amount: 15000,
+    created_at: daysAgo(10),
+  },
+
+  // Nuwan Jayasuriya — ce000000-0000-0000-0000-000000000004
+  {
+    id: 'pay-015',
+    patientId: 'ce000000-0000-0000-0000-000000000004',
+    description: 'Cardiology consultation — Dr. Kamal Perera',
+    category: 'consultation',
+    payment_method: 'cash',
+    status: 'completed',
+    amount: 3500,
+    created_at: daysAgo(15),
+  },
+  {
+    id: 'pay-016',
+    patientId: 'ce000000-0000-0000-0000-000000000004',
+    description: 'ECG (12-Lead)',
+    category: 'lab_test',
+    payment_method: 'insurance',
+    status: 'completed',
+    amount: 1500,
+    created_at: daysAgo(14),
+  },
+  {
+    id: 'pay-017',
+    patientId: 'ce000000-0000-0000-0000-000000000004',
+    description: 'Warfarin 5mg — ongoing supply',
+    category: 'prescription',
+    payment_method: 'cash',
+    status: 'completed',
+    amount: 650,
+    created_at: daysAgo(13),
+  },
+  {
+    id: 'pay-018',
+    patientId: 'ce000000-0000-0000-0000-000000000004',
+    description: 'INR (Prothrombin Time)',
+    category: 'lab_test',
+    payment_method: 'bank_transfer',
+    status: 'completed',
+    amount: 800,
+    created_at: daysAgo(7),
+  },
+  {
+    id: 'pay-019',
+    patientId: 'ce000000-0000-0000-0000-000000000004',
+    description: 'Nerve Conduction Study',
+    category: 'procedure',
+    payment_method: 'insurance',
+    status: 'completed',
+    amount: 8500,
+    created_at: daysAgo(12),
+  },
+  {
+    id: 'pay-020',
+    patientId: 'ce000000-0000-0000-0000-000000000004',
+    description: 'Gabapentin 300mg — 6 months',
+    category: 'prescription',
+    payment_method: 'mobile_payment',
+    status: 'failed',
+    amount: 2400,
+    created_at: daysAgo(11),
+  },
+
+  // Hasini Abeywickrama — ce000000-0000-0000-0000-000000000005
+  {
+    id: 'pay-021',
+    patientId: 'ce000000-0000-0000-0000-000000000005',
+    description: 'Pediatric consultation — Dr. Anjali Dissanayake',
+    category: 'consultation',
+    payment_method: 'credit_card',
+    status: 'completed',
+    amount: 2800,
+    created_at: daysAgo(10),
+  },
+  {
+    id: 'pay-022',
+    patientId: 'ce000000-0000-0000-0000-000000000005',
+    description: 'Serum Ferritin Test',
+    category: 'lab_test',
+    payment_method: 'cash',
+    status: 'completed',
+    amount: 900,
+    created_at: daysAgo(9),
+  },
+  {
+    id: 'pay-023',
+    patientId: 'ce000000-0000-0000-0000-000000000005',
+    description: 'Ferrous Sulfate 200mg — 6 weeks',
+    category: 'prescription',
+    payment_method: 'cash',
+    status: 'completed',
+    amount: 380,
+    created_at: daysAgo(8),
+  },
+
+  // Arjuna Ranatunga — ce000000-0000-0000-0000-000000000019
+  {
+    id: 'pay-024',
+    patientId: 'ce000000-0000-0000-0000-000000000019',
+    description: 'Cardiology monitoring — Dr. Kamal Perera',
+    category: 'consultation',
+    payment_method: 'insurance',
+    status: 'completed',
+    amount: 5000,
+    created_at: daysAgo(19),
+  },
+  {
+    id: 'pay-025',
+    patientId: 'ce000000-0000-0000-0000-000000000019',
+    description: 'Cardiac Stress Test',
+    category: 'procedure',
+    payment_method: 'insurance',
+    status: 'completed',
+    amount: 6500,
+    created_at: daysAgo(18),
+  },
+  {
+    id: 'pay-026',
+    patientId: 'ce000000-0000-0000-0000-000000000019',
+    description: 'HbA1c Test',
+    category: 'lab_test',
+    payment_method: 'bank_transfer',
+    status: 'completed',
+    amount: 1100,
+    created_at: daysAgo(8),
+  },
+  {
+    id: 'pay-027',
+    patientId: 'ce000000-0000-0000-0000-000000000019',
+    description: 'Insulin Glargine + Metformin — monthly supply',
+    category: 'prescription',
+    payment_method: 'insurance',
+    status: 'completed',
+    amount: 4200,
+    created_at: daysAgo(7),
+  },
+  {
+    id: 'pay-028',
+    patientId: 'ce000000-0000-0000-0000-000000000019',
+    description: 'Renal Function Panel',
+    category: 'lab_test',
+    payment_method: 'cash',
+    status: 'completed',
+    amount: 1400,
+    created_at: daysAgo(8),
+  },
+  {
+    id: 'pay-029',
+    patientId: 'ce000000-0000-0000-0000-000000000019',
+    description: 'Endocrinology consultation — Dr. Malsha Kulathunga',
+    category: 'consultation',
+    payment_method: 'debit_card',
+    status: 'cancelled',
+    amount: 4500,
+    created_at: daysAgo(5),
+  },
+];
+
+/**
+ * Get mock payments filtered by patientId.
+ * @param {string} [patientId] - If provided, returns only that patient's payments.
+ * @returns {Array} Filtered and sorted payments (newest first).
+ */
+export const getMockPayments = (patientId) => {
+  let data = MOCK_PAYMENTS;
+  if (patientId) {
+    data = data.filter((p) => p.patientId === patientId);
+  }
+  return data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+};
