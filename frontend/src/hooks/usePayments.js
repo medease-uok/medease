@@ -101,6 +101,8 @@ export const usePayments = ({ patientId } = {}) => {
     } catch (err) {
       // Ignore aborted requests — they are expected when filters change rapidly
       if (err.name === 'AbortError') return;
+      // Silently treat 404 (endpoint not found) as empty — backend may not be deployed yet
+      if (err.status === 404) return;
       setError(err.message || 'Failed to fetch payment history');
       console.error('Error fetching payments:', err);
     } finally {
@@ -118,6 +120,8 @@ export const usePayments = ({ patientId } = {}) => {
       const data = await paymentsService.getPaymentSummary(params);
       setSummary(data.data || null);
     } catch (err) {
+      // Silently treat 404 as no summary data
+      if (err.status === 404) return;
       console.error('Error fetching payment summary:', err);
     }
   }, [patientId]);
