@@ -9,6 +9,7 @@ import {
   XCircle,
   AlertCircle,
   RotateCcw,
+  HelpCircle,
 } from 'lucide-react';
 
 export const PAYMENT_STATUS = {
@@ -70,6 +71,14 @@ export const PAYMENT_STATUS_CONFIG = {
   },
 };
 
+/** Neutral fallback for unrecognized payment statuses */
+const UNKNOWN_STATUS_CONFIG = {
+  label: 'Unknown',
+  icon: HelpCircle,
+  badgeClass: 'bg-gray-100 text-gray-600 border-gray-200',
+  dotClass: 'bg-gray-400',
+};
+
 export const PAYMENT_METHOD_CONFIG = {
   [PAYMENT_METHODS.CASH]: {
     label: 'Cash',
@@ -103,6 +112,13 @@ export const PAYMENT_METHOD_CONFIG = {
   },
 };
 
+/** Neutral fallback for unrecognized payment methods */
+const UNKNOWN_METHOD_CONFIG = {
+  label: 'Unknown',
+  icon: HelpCircle,
+  color: 'text-gray-500',
+};
+
 export const CATEGORY_LABELS = {
   [PAYMENT_CATEGORIES.CONSULTATION]: 'Consultation',
   [PAYMENT_CATEGORIES.LAB_TEST]: 'Lab Test',
@@ -112,20 +128,41 @@ export const CATEGORY_LABELS = {
   [PAYMENT_CATEGORIES.OTHER]: 'Other',
 };
 
+/**
+ * Get the UI config for a payment status.
+ * Falls back to a neutral "Unknown" config for unrecognized statuses.
+ */
 export const getStatusConfig = (status) => {
-  if (process.env.NODE_ENV === 'development' && !PAYMENT_STATUS_CONFIG[status]) {
-    console.warn(`Unknown payment status: "${status}". Falling back to pending.`);
+  const config = PAYMENT_STATUS_CONFIG[status];
+  if (!config) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`Unknown payment status: "${status}".`);
+    }
+    return UNKNOWN_STATUS_CONFIG;
   }
-  return PAYMENT_STATUS_CONFIG[status] || PAYMENT_STATUS_CONFIG[PAYMENT_STATUS.PENDING];
+  return config;
 };
 
+/**
+ * Get the UI config for a payment method.
+ * Falls back to a neutral "Unknown" config for unrecognized methods.
+ */
 export const getMethodConfig = (method) => {
-  if (process.env.NODE_ENV === 'development' && !PAYMENT_METHOD_CONFIG[method]) {
-    console.warn(`Unknown payment method: "${method}". Falling back to cash.`);
+  const config = PAYMENT_METHOD_CONFIG[method];
+  if (!config) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`Unknown payment method: "${method}".`);
+    }
+    return UNKNOWN_METHOD_CONFIG;
   }
-  return PAYMENT_METHOD_CONFIG[method] || PAYMENT_METHOD_CONFIG[PAYMENT_METHODS.CASH];
+  return config;
 };
 
+/**
+ * Filter options for the payments list.
+ * Includes 'all' plus every PAYMENT_STATUS value so users can filter
+ * by any status including cancelled and failed.
+ */
 export const PAYMENT_FILTER_OPTIONS = {
   ALL: 'all',
   ...PAYMENT_STATUS,
@@ -143,3 +180,6 @@ export const PAYMENT_PAGINATION = {
   DEFAULT_LIMIT: 10,
   LIMITS: [10, 25, 50],
 };
+
+/** Allowed export formats for payment history */
+export const ALLOWED_EXPORT_FORMATS = ['csv', 'pdf'];
