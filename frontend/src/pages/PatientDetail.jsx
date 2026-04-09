@@ -13,6 +13,8 @@ import StatusBadge from '../components/StatusBadge';
 import VoiceNoteButton from '../components/VoiceNoteButton';
 import IcdCodeLookup from '../components/IcdCodeLookup';
 import DocumentViewer from '../components/DocumentViewer';
+import { usePayments } from '../hooks/usePayments';
+import { getStatusConfig, CATEGORY_LABELS, getMethodConfig } from '../constants/payments';
 
 const SEVERITY_COLORS = {
   severe: 'bg-red-100 text-red-700',
@@ -1077,8 +1079,9 @@ export default function PatientDetail() {
   const [treatmentPlans, setTreatmentPlans] = useState([]);
   const [showAddPlan, setShowAddPlan] = useState(false);
   const [expandedPlan, setExpandedPlan] = useState(null);
-  const [payments, setPayments] = useState([]);
-  const [paymentsLoading, setPaymentsLoading] = useState(false);
+
+  // Payment history — uses shared hook scoped to this patient
+  const { payments, loading: paymentsLoading, error: paymentsError } = usePayments({ patientId: id });
 
   const fetchPatient = useCallback(() => {
     api.get(`/patients/${id}`)
@@ -1138,16 +1141,6 @@ export default function PatientDetail() {
   }, [id]);
 
   useEffect(() => { fetchTreatmentPlans(); }, [fetchTreatmentPlans]);
-
-  const fetchPayments = useCallback(() => {
-    setPaymentsLoading(true);
-    api.get(`/payments`, { params: { patientId: id } })
-      .then((res) => setPayments(res.data || []))
-      .catch(() => {})
-      .finally(() => setPaymentsLoading(false));
-  }, [id]);
-
-  useEffect(() => { fetchPayments(); }, [fetchPayments]);
 
   // Fetch active (in_progress) appointment for this patient
   const fetchActiveAppointment = useCallback(() => {
@@ -1459,6 +1452,12 @@ export default function PatientDetail() {
             Payment History ({payments.length})
           </h3>
         </div>
+        {paymentsError && (
+          <div className="flex items-center gap-2 p-3 mb-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {paymentsError}
+          </div>
+        )}
         {paymentsLoading ? (
           <div className="flex items-center gap-2 text-sm text-slate-400 py-4">
             <Loader2 className="w-4 h-4 animate-spin" /> Loading payments...
@@ -1469,23 +1468,19 @@ export default function PatientDetail() {
               { key: 'description', label: 'Description', render: (val) => val || 'Payment' },
               { key: 'category', label: 'Category', render: (val) => (
                 <span className="inline-flex px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
-                  {(val || 'other').replace('_', ' ')}
+                  {CATEGORY_LABELS[val] || (val || 'other').replaceAll('_', ' ')}
                 </span>
               )},
-              { key: 'payment_method', label: 'Method', render: (val) => (
-                <span className="text-sm text-slate-700">{(val || '—').replace('_', ' ')}</span>
-              )},
+              { key: 'payment_method', label: 'Method', render: (val) => {
+                if (!val) return <span className="text-sm text-slate-400">—</span>;
+                const methodConfig = getMethodConfig(val);
+                return <span className="text-sm text-slate-700">{methodConfig.label}</span>;
+              }},
               { key: 'status', label: 'Status', render: (val) => {
-                const colors = {
-                  completed: 'bg-green-100 text-green-700',
-                  pending: 'bg-amber-100 text-amber-700',
-                  failed: 'bg-red-100 text-red-700',
-                  refunded: 'bg-blue-100 text-blue-700',
-                  cancelled: 'bg-slate-100 text-slate-600',
-                };
+                const statusConfig = getStatusConfig(val);
                 return (
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${colors[val] || colors.pending}`}>
-                    {val || 'pending'}
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border ${statusConfig.badgeClass}`}>
+                    {statusConfig.label}
                   </span>
                 );
               }},
