@@ -20,7 +20,6 @@ const pageTitles = {
   '/chronic-conditions': 'Chronic Conditions',
   '/documents': 'Medical Documents',
   '/patient-satisfaction': 'Patient Satisfaction',
-  '/payment-history': 'Payment History',
   '/admin': 'Admin Panel',
 };
 
