@@ -19,7 +19,6 @@ import {
   FlaskConical,
   PieChart,
   BarChart3,
-  CreditCard,
 } from 'lucide-react';
 
 
@@ -34,7 +33,6 @@ const navConfig = [
   { path: '/documents', label: 'Documents', icon: FolderOpen, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/my-records', label: 'Medical Records', icon: ClipboardList, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/my-health', label: 'My Health', icon: Activity, roles: ROLE_GROUPS.PATIENT_ONLY },
-  { path: '/payment-history', label: 'Payment History', icon: CreditCard, roles: ROLE_GROUPS.PATIENT_ONLY },
   // Staff navigation (alphabetical)
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.CLINICAL },
   { path: '/schedule', label: 'Schedule', icon: CalendarDays, roles: [ROLES.NURSE, ROLES.ADMIN] },
