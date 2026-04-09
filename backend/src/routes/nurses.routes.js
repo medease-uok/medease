@@ -1,9 +1,9 @@
 const express = require('express')
 const router = express.Router()
 const {
-  getStatistics,
-  getCareNotes, addCareNote, updateCareNote, deleteCareNote,
-  getPatientVitals, addPatientVitals, deletePatientVitals
+    getStatistics,
+    getCareNotes, addCareNote, updateCareNote, deleteCareNote,
+    getPatientVitals, addPatientVitals, updatePatientVitals, deletePatientVitals
 } = require('../controllers/nurses.controller')
 const authenticate = require('../middleware/authenticate')
 const authorize = require('../middleware/authorize')
@@ -24,6 +24,7 @@ router.delete('/me/care-notes/:noteId', authorize('nurse'), resolveNurse, delete
 // Patient Vitals (nurse-only, per patient)
 router.get('/me/vitals/:patientId', authorize('nurse'), resolveNurse, getPatientVitals)
 router.post('/me/vitals/:patientId', authorize('nurse'), resolveNurse, addPatientVitals)
+router.patch('/me/vitals/:vitalId', authorize('nurse'), resolveNurse, updatePatientVitals)
 router.delete('/me/vitals/:vitalId', authorize('nurse'), resolveNurse, deletePatientVitals)
 
 module.exports = router

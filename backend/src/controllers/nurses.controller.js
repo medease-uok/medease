@@ -295,6 +295,43 @@ const deletePatientVitals = async (req, res, next) => {
   }
 };
 
+const updatePatientVitals = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { vitalId } = req.params;
+    const {
+      temperature, blood_pressure_sys, blood_pressure_dia,
+      heart_rate, respiratory_rate, spo2, weight, height
+    } = req.body;
+
+    if (!UUID_RE.test(vitalId)) {
+      throw new AppError('Invalid vital ID format.', 400);
+    }
+
+    const result = await db.query(
+      `UPDATE patient_vitals SET
+        temperature = $1, blood_pressure_sys = $2, blood_pressure_dia = $3,
+        heart_rate = $4, respiratory_rate = $5, spo2 = $6, weight = $7, height = $8,
+        recorded_at = NOW()
+       WHERE id = $9 AND recorded_by = $10
+       RETURNING *`,
+      [
+        temperature || null, blood_pressure_sys || null, blood_pressure_dia || null,
+        heart_rate || null, respiratory_rate || null, spo2 || null, weight || null, height || null,
+        vitalId, nurseId
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Vital record not found or not created by you.', 404);
+    }
+
+    res.json({ status: 'success', data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getStatistics,
   getCareNotes,
@@ -303,6 +340,7 @@ module.exports = {
   deleteCareNote,
   getPatientVitals,
   addPatientVitals,
+  updatePatientVitals,
   deletePatientVitals
 };
 
