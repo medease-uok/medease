@@ -19,7 +19,7 @@ function PatientVitalsModal({ patient, onClose }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [, setError] = useState(null);
 
   const [editingId, setEditingId] = useState(null);
   
