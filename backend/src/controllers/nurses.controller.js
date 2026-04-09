@@ -1,4 +1,9 @@
 const db = require('../config/database');
+const AppError = require('../utils/AppError');
+const { assertPatientAccess } = require('../utils/patientAccess');
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_NOTE_LENGTH = 2000;
 
 const getStatistics = async (req, res, next) => {
   try {
@@ -74,4 +79,293 @@ const getStatistics = async (req, res, next) => {
   }
 };
 
-module.exports = { getStatistics };
+// ─── Care Notes ───────────────────────────────────────────────────────────────
+
+const getCareNotes = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    // Security: Verify nurse has access to this patient
+    await assertPatientAccess(req.user, patientId);
+
+    const result = await db.query(
+      `SELECT ncn.id, ncn.note, ncn.created_at, ncn.updated_at,
+              u.first_name || ' ' || u.last_name AS nurse_name
+       FROM nurse_care_notes ncn
+       JOIN nurses n ON ncn.nurse_id = n.id
+       JOIN users u ON n.user_id = u.id
+       WHERE ncn.patient_id = $1
+       ORDER BY ncn.created_at DESC`,
+      [patientId]
+    );
+    res.json({ status: 'success', data: result.rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const addCareNote = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { patientId } = req.params;
+    const { note } = req.body;
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    if (!note || !note.trim()) {
+      throw new AppError('Note text is required.', 400);
+    }
+
+    if (note.trim().length > MAX_NOTE_LENGTH) {
+      throw new AppError(`Note is too long (max ${MAX_NOTE_LENGTH} characters).`, 400);
+    }
+
+    // Security: Verify nurse has access to this patient
+    await assertPatientAccess(req.user, patientId);
+
+    const result = await db.query(
+      `INSERT INTO nurse_care_notes (nurse_id, patient_id, note)
+       VALUES ($1, $2, $3)
+       RETURNING id, note, created_at, updated_at`,
+      [nurseId, patientId, note.trim()]
+    );
+    res.status(201).json({ status: 'success', data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateCareNote = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { noteId } = req.params;
+    const { note } = req.body;
+
+    if (!UUID_RE.test(noteId)) {
+      throw new AppError('Invalid note ID format.', 400);
+    }
+
+    if (!note || !note.trim()) {
+      throw new AppError('Note text is required.', 400);
+    }
+
+    if (note.trim().length > MAX_NOTE_LENGTH) {
+      throw new AppError(`Note is too long (max ${MAX_NOTE_LENGTH} characters).`, 400);
+    }
+
+    const result = await db.query(
+      `UPDATE nurse_care_notes
+       SET note = $1, updated_at = NOW()
+       WHERE id = $2 AND nurse_id = $3
+       RETURNING id, note, created_at, updated_at`,
+      [note.trim(), noteId, nurseId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Note not found.', 404);
+    }
+
+    res.json({ status: 'success', data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const deleteCareNote = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { noteId } = req.params;
+
+    if (!UUID_RE.test(noteId)) {
+      throw new AppError('Invalid note ID format.', 400);
+    }
+
+    const result = await db.query(
+      `DELETE FROM nurse_care_notes WHERE id = $1 AND nurse_id = $2 RETURNING id`,
+      [noteId, nurseId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Note not found.', 404);
+    }
+
+    res.json({ status: 'success', message: 'Note deleted.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Patient Vitals ──────────────────────────────────────────────────────────
+
+const getPatientVitals = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    // Security check
+    await assertPatientAccess(req.user, patientId);
+
+    const result = await db.query(
+      `SELECT pv.*, u.first_name || ' ' || u.last_name AS recorded_by_name
+       FROM patient_vitals pv
+       JOIN nurses n ON pv.recorded_by = n.id
+       JOIN users u ON n.user_id = u.id
+       WHERE pv.patient_id = $1
+       ORDER BY pv.recorded_at DESC`,
+      [patientId]
+    );
+
+    res.json({ status: 'success', data: result.rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const addPatientVitals = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { patientId } = req.params;
+    const {
+      temperature, blood_pressure_sys, blood_pressure_dia,
+      heart_rate, respiratory_rate, spo2, weight, height
+    } = req.body;
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    // Security check
+    await assertPatientAccess(req.user, patientId);
+
+    const result = await db.query(
+      `INSERT INTO patient_vitals (
+        patient_id, recorded_by, temperature, blood_pressure_sys,
+        blood_pressure_dia, heart_rate, respiratory_rate, spo2, weight, height
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *`,
+      [
+        patientId, nurseId,
+        (temperature !== '' && temperature !== undefined) ? temperature : null,
+        (blood_pressure_sys !== '' && blood_pressure_sys !== undefined) ? blood_pressure_sys : null,
+        (blood_pressure_dia !== '' && blood_pressure_dia !== undefined) ? blood_pressure_dia : null,
+        (heart_rate !== '' && heart_rate !== undefined) ? heart_rate : null,
+        (respiratory_rate !== '' && respiratory_rate !== undefined) ? respiratory_rate : null,
+        (spo2 !== '' && spo2 !== undefined) ? spo2 : null,
+        (weight !== '' && weight !== undefined) ? weight : null,
+        (height !== '' && height !== undefined) ? height : null
+      ]
+    );
+
+    res.status(201).json({ status: 'success', data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const deletePatientVitals = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { vitalId } = req.params;
+
+    if (!UUID_RE.test(vitalId)) {
+      throw new AppError('Invalid vital ID format.', 400);
+    }
+
+    // Security: Check if record exists and if nurse has access to the patient
+    const vital = await db.query('SELECT patient_id, recorded_by FROM patient_vitals WHERE id = $1', [vitalId]);
+    if (vital.rows.length === 0) {
+      throw new AppError('Vital record not found.', 404);
+    }
+
+    if (vital.rows[0].recorded_by !== nurseId) {
+      throw new AppError('You can only delete your own vitals records.', 403);
+    }
+
+    await assertPatientAccess(req.user, vital.rows[0].patient_id);
+
+    await db.query(`DELETE FROM patient_vitals WHERE id = $1`, [vitalId]);
+
+    res.json({ status: 'success', message: 'Vital record deleted.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updatePatientVitals = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { vitalId } = req.params;
+    const {
+      temperature, blood_pressure_sys, blood_pressure_dia,
+      heart_rate, respiratory_rate, spo2, weight, height
+    } = req.body;
+
+    if (!UUID_RE.test(vitalId)) {
+      throw new AppError('Invalid vital ID format.', 400);
+    }
+
+    // Security: Check ownership and current access
+    const vital = await db.query('SELECT patient_id, recorded_by FROM patient_vitals WHERE id = $1', [vitalId]);
+    if (vital.rows.length === 0) {
+      throw new AppError('Vital record not found.', 404);
+    }
+
+    if (vital.rows[0].recorded_by !== nurseId) {
+      throw new AppError('You can only update your own vitals records.', 403);
+    }
+
+    await assertPatientAccess(req.user, vital.rows[0].patient_id);
+
+    const result = await db.query(
+      `UPDATE patient_vitals SET
+        temperature = COALESCE($1, temperature),
+        blood_pressure_sys = COALESCE($2, blood_pressure_sys),
+        blood_pressure_dia = COALESCE($3, blood_pressure_dia),
+        heart_rate = COALESCE($4, heart_rate),
+        respiratory_rate = COALESCE($5, respiratory_rate),
+        spo2 = COALESCE($6, spo2),
+        weight = COALESCE($7, weight),
+        height = COALESCE($8, height),
+        updated_at = NOW()
+       WHERE id = $9 AND recorded_by = $10
+       RETURNING *`,
+      [
+        (temperature !== '' && temperature !== undefined) ? temperature : null,
+        (blood_pressure_sys !== '' && blood_pressure_sys !== undefined) ? blood_pressure_sys : null,
+        (blood_pressure_dia !== '' && blood_pressure_dia !== undefined) ? blood_pressure_dia : null,
+        (heart_rate !== '' && heart_rate !== undefined) ? heart_rate : null,
+        (respiratory_rate !== '' && respiratory_rate !== undefined) ? respiratory_rate : null,
+        (spo2 !== '' && spo2 !== undefined) ? spo2 : null,
+        (weight !== '' && weight !== undefined) ? weight : null,
+        (height !== '' && height !== undefined) ? height : null,
+        vitalId, nurseId
+      ]
+    );
+
+    res.json({ status: 'success', data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  getStatistics,
+  getCareNotes,
+  addCareNote,
+  updateCareNote,
+  deleteCareNote,
+  getPatientVitals,
+  addPatientVitals,
+  updatePatientVitals,
+  deletePatientVitals
+};
+

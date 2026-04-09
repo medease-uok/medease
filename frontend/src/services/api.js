@@ -116,6 +116,19 @@ async function request(endpoint, options = {}) {
     }
   }
 
+  if (options.responseType === 'blob') {
+    if (!res.ok) {
+      if (res.status === 401 && localStorage.getItem('medease_token')) {
+        clearSession();
+      }
+      const errText = await res.text().catch(() => 'Export failed');
+      const error = new Error(errText);
+      error.status = res.status;
+      throw error;
+    }
+    return res.blob();
+  }
+
   const data = await res.json();
 
   if (!res.ok) {
