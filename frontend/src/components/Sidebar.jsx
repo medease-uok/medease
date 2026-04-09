@@ -19,6 +19,7 @@ import {
   FlaskConical,
   PieChart,
   BarChart3,
+  Bell,
 } from 'lucide-react';
 
 
@@ -27,6 +28,8 @@ const navConfig = [
   { path: '/doctor-dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.DOCTOR] },
   { path: '/nurse-dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.NURSE] },
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [ROLES.LAB_TECHNICIAN, ROLES.PHARMACIST, ROLES.ADMIN] },
+  // Notifications (available to all)
+  { path: '/notifications', label: 'Notifications', icon: Bell, roles: ROLE_GROUPS.ALL },
   // Patient navigation (alphabetical)
   { path: '/appointments', label: 'Appointments', icon: Calendar, roles: ROLE_GROUPS.PATIENT_ONLY },
   { path: '/doctors', label: 'Doctors', icon: Stethoscope, roles: ROLE_GROUPS.PATIENT_ONLY },
