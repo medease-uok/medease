@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   Upload, X, AlertCircle, Eye, Loader2, Download, ExternalLink,
   Plus, FileText, FlaskConical, Pill, ChevronLeft, CheckCircle2, Star,
-  ClipboardList, Calendar, Check, Circle, Trash2,
+  ClipboardList, Calendar, Check, Circle, Trash2, CreditCard,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -1077,6 +1077,8 @@ export default function PatientDetail() {
   const [treatmentPlans, setTreatmentPlans] = useState([]);
   const [showAddPlan, setShowAddPlan] = useState(false);
   const [expandedPlan, setExpandedPlan] = useState(null);
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
 
   const fetchPatient = useCallback(() => {
     api.get(`/patients/${id}`)
@@ -1136,6 +1138,16 @@ export default function PatientDetail() {
   }, [id]);
 
   useEffect(() => { fetchTreatmentPlans(); }, [fetchTreatmentPlans]);
+
+  const fetchPayments = useCallback(() => {
+    setPaymentsLoading(true);
+    api.get(`/payments`, { params: { patientId: id } })
+      .then((res) => setPayments(res.data || []))
+      .catch(() => {})
+      .finally(() => setPaymentsLoading(false));
+  }, [id]);
+
+  useEffect(() => { fetchPayments(); }, [fetchPayments]);
 
   // Fetch active (in_progress) appointment for this patient
   const fetchActiveAppointment = useCallback(() => {
@@ -1436,6 +1448,56 @@ export default function PatientDetail() {
           </div>
         ) : (
           <p className="text-sm text-slate-400">No treatment plans yet.</p>
+        )}
+      </div>
+
+      {/* Payment History */}
+      <div style={{ marginBottom: 24 }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+          <h3 className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-emerald-600" />
+            Payment History ({payments.length})
+          </h3>
+        </div>
+        {paymentsLoading ? (
+          <div className="flex items-center gap-2 text-sm text-slate-400 py-4">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading payments...
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'description', label: 'Description', render: (val) => val || 'Payment' },
+              { key: 'category', label: 'Category', render: (val) => (
+                <span className="inline-flex px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                  {(val || 'other').replace('_', ' ')}
+                </span>
+              )},
+              { key: 'payment_method', label: 'Method', render: (val) => (
+                <span className="text-sm text-slate-700">{(val || '—').replace('_', ' ')}</span>
+              )},
+              { key: 'status', label: 'Status', render: (val) => {
+                const colors = {
+                  completed: 'bg-green-100 text-green-700',
+                  pending: 'bg-amber-100 text-amber-700',
+                  failed: 'bg-red-100 text-red-700',
+                  refunded: 'bg-blue-100 text-blue-700',
+                  cancelled: 'bg-slate-100 text-slate-600',
+                };
+                return (
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${colors[val] || colors.pending}`}>
+                    {val || 'pending'}
+                  </span>
+                );
+              }},
+              { key: 'amount', label: 'Amount', render: (val) => (
+                <span className="font-bold text-sm text-slate-900">
+                  LKR {Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </span>
+              )},
+              { key: 'created_at', label: 'Date', render: formatDate },
+            ]}
+            data={payments}
+          />
         )}
       </div>
 
