@@ -19,6 +19,7 @@ import {
   FlaskConical,
   PieChart,
   BarChart3,
+  Receipt,
 } from 'lucide-react';
 
 
@@ -47,6 +48,7 @@ const navConfig = [
   { path: '/suppliers', label: 'Suppliers', icon: Truck, roles: [ROLES.ADMIN] },
   { path: '/reports', label: 'Reports', icon: PieChart, roles: [ROLES.ADMIN] },
   { path: '/statistics', label: 'Statistics', icon: BarChart3, roles: [ROLES.ADMIN] },
+  { path: '/billing', label: 'Billing', icon: Receipt, roles: [ROLES.ADMIN] },
   { path: '/audit-logs', label: 'Audit Logs', icon: ClipboardList, roles: [ROLES.ADMIN] },
 ];
 
