@@ -35,6 +35,7 @@ import StaffRecords from './pages/StaffRecords';
 import PatientSatisfaction from './pages/PatientSatisfaction';
 import ForgotPassword from './pages/ForgotPassword';
 import StatisticsDashboard from './pages/StatisticsDashboard';
+import MedicationDispensing from './pages/MedicationDispensing';
 import './App.css';
 
 const R = ({ roles, children }) => <RoleGuard roles={roles}>{children}</RoleGuard>;
@@ -75,6 +76,7 @@ function App() {
             <Route path="records" element={<R roles={[...ROLE_GROUPS.CLINICAL, ROLES.LAB_TECHNICIAN]}><StaffRecords /></R>} />
             <Route path="medical-records" element={<R roles={ROLE_GROUPS.PATIENT_CARE}><MedicalRecords /></R>} />
             <Route path="prescriptions" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.PHARMACIST, ROLES.ADMIN]}><Prescriptions /></R>} />
+            <Route path="dispensing" element={<R roles={[ROLES.PHARMACIST, ROLES.ADMIN]}><MedicationDispensing /></R>} />
             <Route path="lab-reports" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.NURSE, ROLES.LAB_TECHNICIAN, ROLES.ADMIN]}><LabReports /></R>} />
             <Route path="lab-reports/comparison" element={<R roles={[ROLES.PATIENT, ROLES.DOCTOR, ROLES.NURSE, ROLES.ADMIN]}><LabReportsComparison /></R>} />
             <Route path="lab-test-requests" element={<R roles={[ROLES.DOCTOR, ROLES.LAB_TECHNICIAN, ROLES.NURSE, ROLES.ADMIN]}><LabTestRequests /></R>} />
