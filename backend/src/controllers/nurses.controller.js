@@ -201,11 +201,171 @@ const deleteCareNote = async (req, res, next) => {
   }
 };
 
+// ─── Patient Vitals ──────────────────────────────────────────────────────────
+
+const getPatientVitals = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    // Security check
+    await assertPatientAccess(req.user, patientId);
+
+    const result = await db.query(
+      `SELECT pv.*, u.first_name || ' ' || u.last_name AS recorded_by_name
+       FROM patient_vitals pv
+       JOIN nurses n ON pv.recorded_by = n.id
+       JOIN users u ON n.user_id = u.id
+       WHERE pv.patient_id = $1
+       ORDER BY pv.recorded_at DESC`,
+      [patientId]
+    );
+
+    res.json({ status: 'success', data: result.rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const addPatientVitals = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { patientId } = req.params;
+    const {
+      temperature, blood_pressure_sys, blood_pressure_dia,
+      heart_rate, respiratory_rate, spo2, weight, height
+    } = req.body;
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    // Security check
+    await assertPatientAccess(req.user, patientId);
+
+    const result = await db.query(
+      `INSERT INTO patient_vitals (
+        patient_id, recorded_by, temperature, blood_pressure_sys,
+        blood_pressure_dia, heart_rate, respiratory_rate, spo2, weight, height
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *`,
+      [
+        patientId, nurseId,
+        (temperature !== '' && temperature !== undefined) ? temperature : null,
+        (blood_pressure_sys !== '' && blood_pressure_sys !== undefined) ? blood_pressure_sys : null,
+        (blood_pressure_dia !== '' && blood_pressure_dia !== undefined) ? blood_pressure_dia : null,
+        (heart_rate !== '' && heart_rate !== undefined) ? heart_rate : null,
+        (respiratory_rate !== '' && respiratory_rate !== undefined) ? respiratory_rate : null,
+        (spo2 !== '' && spo2 !== undefined) ? spo2 : null,
+        (weight !== '' && weight !== undefined) ? weight : null,
+        (height !== '' && height !== undefined) ? height : null
+      ]
+    );
+
+    res.status(201).json({ status: 'success', data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const deletePatientVitals = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { vitalId } = req.params;
+
+    if (!UUID_RE.test(vitalId)) {
+      throw new AppError('Invalid vital ID format.', 400);
+    }
+
+    // Security: Check if record exists and if nurse has access to the patient
+    const vital = await db.query('SELECT patient_id, recorded_by FROM patient_vitals WHERE id = $1', [vitalId]);
+    if (vital.rows.length === 0) {
+      throw new AppError('Vital record not found.', 404);
+    }
+
+    if (vital.rows[0].recorded_by !== nurseId) {
+      throw new AppError('You can only delete your own vitals records.', 403);
+    }
+
+    await assertPatientAccess(req.user, vital.rows[0].patient_id);
+
+    await db.query(`DELETE FROM patient_vitals WHERE id = $1`, [vitalId]);
+
+    res.json({ status: 'success', message: 'Vital record deleted.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updatePatientVitals = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { vitalId } = req.params;
+    const {
+      temperature, blood_pressure_sys, blood_pressure_dia,
+      heart_rate, respiratory_rate, spo2, weight, height
+    } = req.body;
+
+    if (!UUID_RE.test(vitalId)) {
+      throw new AppError('Invalid vital ID format.', 400);
+    }
+
+    // Security: Check ownership and current access
+    const vital = await db.query('SELECT patient_id, recorded_by FROM patient_vitals WHERE id = $1', [vitalId]);
+    if (vital.rows.length === 0) {
+      throw new AppError('Vital record not found.', 404);
+    }
+
+    if (vital.rows[0].recorded_by !== nurseId) {
+      throw new AppError('You can only update your own vitals records.', 403);
+    }
+
+    await assertPatientAccess(req.user, vital.rows[0].patient_id);
+
+    const result = await db.query(
+      `UPDATE patient_vitals SET
+        temperature = COALESCE($1, temperature),
+        blood_pressure_sys = COALESCE($2, blood_pressure_sys),
+        blood_pressure_dia = COALESCE($3, blood_pressure_dia),
+        heart_rate = COALESCE($4, heart_rate),
+        respiratory_rate = COALESCE($5, respiratory_rate),
+        spo2 = COALESCE($6, spo2),
+        weight = COALESCE($7, weight),
+        height = COALESCE($8, height),
+        updated_at = NOW()
+       WHERE id = $9 AND recorded_by = $10
+       RETURNING *`,
+      [
+        (temperature !== '' && temperature !== undefined) ? temperature : null,
+        (blood_pressure_sys !== '' && blood_pressure_sys !== undefined) ? blood_pressure_sys : null,
+        (blood_pressure_dia !== '' && blood_pressure_dia !== undefined) ? blood_pressure_dia : null,
+        (heart_rate !== '' && heart_rate !== undefined) ? heart_rate : null,
+        (respiratory_rate !== '' && respiratory_rate !== undefined) ? respiratory_rate : null,
+        (spo2 !== '' && spo2 !== undefined) ? spo2 : null,
+        (weight !== '' && weight !== undefined) ? weight : null,
+        (height !== '' && height !== undefined) ? height : null,
+        vitalId, nurseId
+      ]
+    );
+
+    res.json({ status: 'success', data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getStatistics,
   getCareNotes,
   addCareNote,
   updateCareNote,
-  deleteCareNote
+  deleteCareNote,
+  getPatientVitals,
+  addPatientVitals,
+  updatePatientVitals,
+  deletePatientVitals
 };
 
