@@ -201,11 +201,108 @@ const deleteCareNote = async (req, res, next) => {
   }
 };
 
+// ─── Patient Vitals ──────────────────────────────────────────────────────────
+
+const getPatientVitals = async (req, res, next) => {
+  try {
+    const { patientId } = req.params;
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    // Security check
+    await assertPatientAccess(req.user, patientId);
+
+    const result = await db.query(
+      `SELECT pv.*, u.first_name || ' ' || u.last_name AS recorded_by_name
+       FROM patient_vitals pv
+       JOIN nurses n ON pv.recorded_by = n.id
+       JOIN users u ON n.user_id = u.id
+       WHERE pv.patient_id = $1
+       ORDER BY pv.recorded_at DESC`,
+      [patientId]
+    );
+
+    res.json({ status: 'success', data: result.rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const addPatientVitals = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { patientId } = req.params;
+    const {
+      temperature, blood_pressure_sys, blood_pressure_dia,
+      heart_rate, respiratory_rate, spo2, weight, height
+    } = req.body;
+
+    if (!UUID_RE.test(patientId)) {
+      throw new AppError('Invalid patient ID format.', 400);
+    }
+
+    // Security check
+    await assertPatientAccess(req.user, patientId);
+
+    const result = await db.query(
+      `INSERT INTO patient_vitals (
+        patient_id, recorded_by, temperature, blood_pressure_sys,
+        blood_pressure_dia, heart_rate, respiratory_rate, spo2, weight, height
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *`,
+      [
+        patientId, nurseId,
+        temperature || null,
+        blood_pressure_sys || null,
+        blood_pressure_dia || null,
+        heart_rate || null,
+        respiratory_rate || null,
+        spo2 || null,
+        weight || null,
+        height || null
+      ]
+    );
+
+    res.status(201).json({ status: 'success', data: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const deletePatientVitals = async (req, res, next) => {
+  try {
+    const nurseId = req.nurseId;
+    const { vitalId } = req.params;
+
+    if (!UUID_RE.test(vitalId)) {
+      throw new AppError('Invalid vital ID format.', 400);
+    }
+
+    const result = await db.query(
+      `DELETE FROM patient_vitals WHERE id = $1 AND recorded_by = $2 RETURNING id`,
+      [vitalId, nurseId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Vital record not found or not created by you.', 404);
+    }
+
+    res.json({ status: 'success', message: 'Vital record deleted.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getStatistics,
   getCareNotes,
   addCareNote,
   updateCareNote,
-  deleteCareNote
+  deleteCareNote,
+  getPatientVitals,
+  addPatientVitals,
+  deletePatientVitals
 };
 
