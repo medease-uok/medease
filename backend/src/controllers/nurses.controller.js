@@ -254,14 +254,14 @@ const addPatientVitals = async (req, res, next) => {
       RETURNING *`,
       [
         patientId, nurseId,
-        temperature || null,
-        blood_pressure_sys || null,
-        blood_pressure_dia || null,
-        heart_rate || null,
-        respiratory_rate || null,
-        spo2 || null,
-        weight || null,
-        height || null
+        (temperature !== '' && temperature !== undefined) ? temperature : null,
+        (blood_pressure_sys !== '' && blood_pressure_sys !== undefined) ? blood_pressure_sys : null,
+        (blood_pressure_dia !== '' && blood_pressure_dia !== undefined) ? blood_pressure_dia : null,
+        (heart_rate !== '' && heart_rate !== undefined) ? heart_rate : null,
+        (respiratory_rate !== '' && respiratory_rate !== undefined) ? respiratory_rate : null,
+        (spo2 !== '' && spo2 !== undefined) ? spo2 : null,
+        (weight !== '' && weight !== undefined) ? weight : null,
+        (height !== '' && height !== undefined) ? height : null
       ]
     );
 
@@ -280,14 +280,19 @@ const deletePatientVitals = async (req, res, next) => {
       throw new AppError('Invalid vital ID format.', 400);
     }
 
-    const result = await db.query(
-      `DELETE FROM patient_vitals WHERE id = $1 AND recorded_by = $2 RETURNING id`,
-      [vitalId, nurseId]
-    );
-
-    if (result.rows.length === 0) {
-      throw new AppError('Vital record not found or not created by you.', 404);
+    // Security: Check if record exists and if nurse has access to the patient
+    const vital = await db.query('SELECT patient_id, recorded_by FROM patient_vitals WHERE id = $1', [vitalId]);
+    if (vital.rows.length === 0) {
+      throw new AppError('Vital record not found.', 404);
     }
+
+    if (vital.rows[0].recorded_by !== nurseId) {
+      throw new AppError('You can only delete your own vitals records.', 403);
+    }
+
+    await assertPatientAccess(req.user, vital.rows[0].patient_id);
+
+    await db.query(`DELETE FROM patient_vitals WHERE id = $1`, [vitalId]);
 
     res.json({ status: 'success', message: 'Vital record deleted.' });
   } catch (err) {
@@ -308,23 +313,43 @@ const updatePatientVitals = async (req, res, next) => {
       throw new AppError('Invalid vital ID format.', 400);
     }
 
+    // Security: Check ownership and current access
+    const vital = await db.query('SELECT patient_id, recorded_by FROM patient_vitals WHERE id = $1', [vitalId]);
+    if (vital.rows.length === 0) {
+      throw new AppError('Vital record not found.', 404);
+    }
+
+    if (vital.rows[0].recorded_by !== nurseId) {
+      throw new AppError('You can only update your own vitals records.', 403);
+    }
+
+    await assertPatientAccess(req.user, vital.rows[0].patient_id);
+
     const result = await db.query(
       `UPDATE patient_vitals SET
-        temperature = $1, blood_pressure_sys = $2, blood_pressure_dia = $3,
-        heart_rate = $4, respiratory_rate = $5, spo2 = $6, weight = $7, height = $8,
-        recorded_at = NOW()
+        temperature = COALESCE($1, temperature),
+        blood_pressure_sys = COALESCE($2, blood_pressure_sys),
+        blood_pressure_dia = COALESCE($3, blood_pressure_dia),
+        heart_rate = COALESCE($4, heart_rate),
+        respiratory_rate = COALESCE($5, respiratory_rate),
+        spo2 = COALESCE($6, spo2),
+        weight = COALESCE($7, weight),
+        height = COALESCE($8, height),
+        updated_at = NOW()
        WHERE id = $9 AND recorded_by = $10
        RETURNING *`,
       [
-        temperature || null, blood_pressure_sys || null, blood_pressure_dia || null,
-        heart_rate || null, respiratory_rate || null, spo2 || null, weight || null, height || null,
+        (temperature !== '' && temperature !== undefined) ? temperature : null,
+        (blood_pressure_sys !== '' && blood_pressure_sys !== undefined) ? blood_pressure_sys : null,
+        (blood_pressure_dia !== '' && blood_pressure_dia !== undefined) ? blood_pressure_dia : null,
+        (heart_rate !== '' && heart_rate !== undefined) ? heart_rate : null,
+        (respiratory_rate !== '' && respiratory_rate !== undefined) ? respiratory_rate : null,
+        (spo2 !== '' && spo2 !== undefined) ? spo2 : null,
+        (weight !== '' && weight !== undefined) ? weight : null,
+        (height !== '' && height !== undefined) ? height : null,
         vitalId, nurseId
       ]
     );
-
-    if (result.rows.length === 0) {
-      throw new AppError('Vital record not found or not created by you.', 404);
-    }
 
     res.json({ status: 'success', data: result.rows[0] });
   } catch (err) {

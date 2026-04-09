@@ -14,26 +14,22 @@ import { formatTime } from '../utils/dateFormatters';
 import NurseTaskWidget from '../components/NurseTaskWidget';
 import { X, Check, AlertCircle, NotebookPen, Pencil, Trash2, Plus, Activity, History } from 'lucide-react';
 
+const EMPTY_VITALS = {
+  temperature: '', blood_pressure_sys: '', blood_pressure_dia: '',
+  heart_rate: '', respiratory_rate: '', spo2: '', weight: '', height: ''
+};
+
 // ── Patient Vitals Modal ──────────────────────────────────────────────────
 function PatientVitalsModal({ patient, onClose }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [, setError] = useState(null);
+  const [error, setError] = useState(null);
 
   const [editingId, setEditingId] = useState(null);
-  
+
   // Form State
-  const [vitals, setVitals] = useState({
-    temperature: '',
-    blood_pressure_sys: '',
-    blood_pressure_dia: '',
-    heart_rate: '',
-    respiratory_rate: '',
-    spo2: '',
-    weight: '',
-    height: ''
-  });
+  const [vitals, setVitals] = useState(EMPTY_VITALS);
 
   const fetchVitals = useCallback(async () => {
     try {
@@ -51,7 +47,7 @@ function PatientVitalsModal({ patient, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Check if at least one vital sign is entered
     const hasValue = Object.values(vitals).some(val => val !== '' && val !== null);
     if (!hasValue) {
@@ -68,11 +64,8 @@ function PatientVitalsModal({ patient, onClose }) {
       } else {
         await api.post(`/nurses/me/vitals/${patient.id}`, vitals);
       }
-      
-      setVitals({
-        temperature: '', blood_pressure_sys: '', blood_pressure_dia: '',
-        heart_rate: '', respiratory_rate: '', spo2: '', weight: '', height: ''
-      });
+
+      setVitals(EMPTY_VITALS);
       await fetchVitals();
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to save vitals.');
@@ -99,10 +92,7 @@ function PatientVitalsModal({ patient, onClose }) {
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setVitals({
-      temperature: '', blood_pressure_sys: '', blood_pressure_dia: '',
-      heart_rate: '', respiratory_rate: '', spo2: '', weight: '', height: ''
-    });
+    setVitals(EMPTY_VITALS);
   };
 
   const handleDelete = async (id) => {
@@ -137,6 +127,13 @@ function PatientVitalsModal({ patient, onClose }) {
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
           {/* Left: Input Form */}
           <div className="w-full md:w-1/3 p-6 border-b md:border-b-0 md:border-r border-slate-100 overflow-y-auto bg-slate-50/30">
+            {error && (
+              <div className="mb-4 flex items-center gap-2 p-3 bg-red-50 text-red-600 rounded-xl border border-red-100 text-sm animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <p>{error}</p>
+              </div>
+            )}
+
             <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
               {editingId ? (
                 <><Pencil className="w-4 h-4 text-emerald-500" /> Edit Record</>

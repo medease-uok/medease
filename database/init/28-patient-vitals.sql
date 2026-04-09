@@ -11,9 +11,13 @@ CREATE TABLE IF NOT EXISTS patient_vitals (
     spo2 INTEGER, -- %
     weight NUMERIC(5,2), -- kg
     height NUMERIC(5,2), -- cm
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_patient_vitals_patient_id ON patient_vitals(patient_id);
-CREATE INDEX IF NOT EXISTS idx_patient_vitals_recorded_at ON patient_vitals(recorded_at DESC);
+-- Composite index for patient history retrieval
+CREATE INDEX IF NOT EXISTS idx_patient_vitals_patient_history ON patient_vitals(patient_id, recorded_at DESC);
+-- Index for nursing staff management
+CREATE INDEX IF NOT EXISTS idx_patient_vitals_recorded_by ON patient_vitals(recorded_by);
+
