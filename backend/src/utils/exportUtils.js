@@ -19,6 +19,10 @@ function generateCSV(res, filename, data, fields) {
     }
     
     val = String(val).replace(/"/g, '""');
+    // Prevent CSV formula injection (matches handleDownloadReport sanitization)
+    if (/^[=+\-@\t\r\n]/.test(val)) {
+      val = "'" + val;
+    }
     return `"${val}"`;
   }).join(','));
   
@@ -72,8 +76,8 @@ function generatePDF(res, title, filename, data, fields) {
       doc.y = maxContentY + 8; // Row padding
   });
   
-  // Footer
-  doc.fontSize(8).text(`Generated on ${new Date().toLocaleString()}`, 30, 800, { align: 'center' });
+  // Footer - positioned relative to page height to avoid overflow
+  doc.fontSize(8).text(`Generated on ${new Date().toLocaleString()}`, 30, doc.page.height - 30, { align: 'center' });
 
   doc.end();
 }

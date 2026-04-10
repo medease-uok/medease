@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAllInventory, getInventoryById, addInventory, updateInventory, deleteInventory, getInventoryReport, getTransactionLogs } = require('../controllers/inventory.controller');
+const { getAllInventory, exportInventory, getInventoryById, addInventory, updateInventory, deleteInventory, getInventoryReport, getTransactionLogs } = require('../controllers/inventory.controller');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
 const { apiLimiter, exportLimiter } = require('../middleware/rateLimit');
@@ -11,6 +11,7 @@ router.use(apiLimiter);
 router.use(authenticate);
 
 router.get('/', authorize('admin', 'doctor', 'nurse', 'lab_technician', 'pharmacist'), getAllInventory);
+router.get('/export', exportLimiter, authorize('admin'), exportInventory);
 
 // WARNING: Route ordering dependency
 // /report MUST come before /:id, otherwise 'report' will be captured as an :id parameter

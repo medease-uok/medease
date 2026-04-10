@@ -22,6 +22,7 @@ const prescriptionTemplateRoutes = require('./prescriptionTemplates.routes');
 const patientFeedbackRoutes = require('./patientFeedback.routes');
 const labTestRequestRoutes = require('./labTestRequests.routes');
 const doctorTaskRoutes = require('./doctorTasks.routes');
+const nurseTaskRoutes = require('./nurseTasks.routes');
 const icd10Routes = require('./icd10.routes');
 const inventoryRoutes = require('./inventory.routes');
 const waitlistRoutes = require('./waitlist.routes');
@@ -29,6 +30,7 @@ const supplierRoutes = require('./supplier.routes');
 const purchaseOrdersRoutes = require('./purchaseOrders.routes');
 const reportRoutes = require('./report.routes');
 const auditRoutes = require('./audit.routes');
+const statisticsRoutes = require('./statistics.routes');
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -60,6 +62,7 @@ router.use('/prescription-templates', prescriptionTemplateRoutes);
 router.use('/patient-feedback', patientFeedbackRoutes);
 router.use('/lab-test-requests', labTestRequestRoutes);
 router.use('/doctor-tasks', doctorTaskRoutes);
+router.use('/nurse-tasks', nurseTaskRoutes);
 router.use('/icd10', icd10Routes);
 router.use('/inventory', inventoryRoutes);
 router.use('/waitlist', waitlistRoutes);
@@ -67,5 +70,6 @@ router.use('/suppliers', supplierRoutes);
 router.use('/purchase-orders', purchaseOrdersRoutes);
 router.use('/reports', reportRoutes);
 router.use('/audit-logs', auditRoutes);
+router.use('/statistics', statisticsRoutes);
 
 module.exports = router;
