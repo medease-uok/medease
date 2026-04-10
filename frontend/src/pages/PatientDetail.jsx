@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
   Upload, X, AlertCircle, Eye, Loader2, Download, ExternalLink,
   Plus, FileText, FlaskConical, Pill, ChevronLeft, CheckCircle2, Star,
-  ClipboardList, Calendar, Check, Circle, Trash2,
+  ClipboardList, Calendar, Check, Circle, Trash2, CreditCard,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../data/AuthContext';
@@ -13,6 +13,8 @@ import StatusBadge from '../components/StatusBadge';
 import VoiceNoteButton from '../components/VoiceNoteButton';
 import IcdCodeLookup from '../components/IcdCodeLookup';
 import DocumentViewer from '../components/DocumentViewer';
+import { usePayments } from '../hooks/usePayments';
+import { getStatusConfig, CATEGORY_LABELS as PAYMENT_CATEGORY_LABELS, getMethodConfig } from '../constants/payments';
 
 const SEVERITY_COLORS = {
   severe: 'bg-red-100 text-red-700',
@@ -1078,6 +1080,9 @@ export default function PatientDetail() {
   const [showAddPlan, setShowAddPlan] = useState(false);
   const [expandedPlan, setExpandedPlan] = useState(null);
 
+  // Payment history — uses shared hook scoped to this patient
+  const { payments, loading: paymentsLoading, error: paymentsError } = usePayments({ patientId: id });
+
   const fetchPatient = useCallback(() => {
     api.get(`/patients/${id}`)
       .then((res) => {
@@ -1436,6 +1441,58 @@ export default function PatientDetail() {
           </div>
         ) : (
           <p className="text-sm text-slate-400">No treatment plans yet.</p>
+        )}
+      </div>
+
+      {/* Payment History */}
+      <div style={{ marginBottom: 24 }}>
+        <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+          <h3 className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-emerald-600" />
+            Payment History ({payments.length})
+          </h3>
+        </div>
+        {paymentsError && (
+          <div className="flex items-center gap-2 p-3 mb-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {paymentsError}
+          </div>
+        )}
+        {paymentsLoading ? (
+          <div className="flex items-center gap-2 text-sm text-slate-400 py-4">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading payments...
+          </div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: 'description', label: 'Description', render: (val) => val || 'Payment' },
+              { key: 'category', label: 'Category', render: (val) => (
+                <span className="inline-flex px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                  {PAYMENT_CATEGORY_LABELS[val] || (val || 'other').replaceAll('_', ' ')}
+                </span>
+              )},
+              { key: 'payment_method', label: 'Method', render: (val) => {
+                if (!val) return <span className="text-sm text-slate-400">—</span>;
+                const methodConfig = getMethodConfig(val);
+                return <span className="text-sm text-slate-700">{methodConfig.label}</span>;
+              }},
+              { key: 'status', label: 'Status', render: (val) => {
+                const statusConfig = getStatusConfig(val);
+                return (
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border ${statusConfig.badgeClass}`}>
+                    {statusConfig.label}
+                  </span>
+                );
+              }},
+              { key: 'amount', label: 'Amount', render: (val) => (
+                <span className="font-bold text-sm text-slate-900">
+                  LKR {Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </span>
+              )},
+              { key: 'created_at', label: 'Date', render: formatDate },
+            ]}
+            data={payments}
+          />
         )}
       </div>
 
