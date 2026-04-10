@@ -76,6 +76,8 @@ services:
       VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
     volumes:
       - ./backend/src:/app/src
+      - ./database/init:/app/database/init
+
     depends_on:
       postgres:
         condition: service_healthy
