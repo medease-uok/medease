@@ -1,5 +1,6 @@
--- Create Database Reporting Views
+const { query } = require('./database');
 
+const VIEWS_SQL = `
 -- 1. vw_inventory_status
 CREATE OR REPLACE VIEW vw_inventory_status AS
 SELECT 
@@ -68,9 +69,26 @@ FROM suppliers s
 LEFT JOIN purchase_orders p ON s.name = p.supplier_name
 GROUP BY s.id, s.name;
 
--- Standardize permissions for views for the application role
+-- Standardize permissions
 GRANT SELECT ON vw_inventory_status TO medease_app;
 GRANT SELECT ON vw_monthly_inventory_usage TO medease_app;
 GRANT SELECT ON vw_appointment_summary TO medease_app;
 GRANT SELECT ON vw_supplier_order_summary TO medease_app;
+`;
+
+async function ensureViews() {
+  try {
+    console.log('PostgreSQL: Ensuring reporting views exist...');
+    await query(VIEWS_SQL);
+    console.log('PostgreSQL: Reporting views successfully initialized/updated.');
+  } catch (err) {
+    console.error('PostgreSQL Error: Failed to initialize reporting views -', err.message);
+  }
+}
+
+if (require.main === module) {
+  ensureViews().then(() => process.exit(0)).catch(() => process.exit(1));
+}
+
+module.exports = ensureViews;
 

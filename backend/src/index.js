@@ -10,6 +10,7 @@ const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const { startReminderScheduler } = require('./jobs/appointmentReminders');
 const { startInventoryScheduler } = require('./jobs/inventoryJobs');
+const ensureViews = require('./config/ensureViews');
 
 const app = express();
 
@@ -80,6 +81,7 @@ app.listen(PORT, () => {
 
   startReminderScheduler();
   startInventoryScheduler();
+  ensureViews().catch(err => console.error('Startup Warning: View initialization failed', err.message));
 });
 
 module.exports = app;
