@@ -1,10 +1,14 @@
 const rateLimit = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 const redis = require('../config/redis');
+const config = require('../config');
+
+// In development, use much higher limits to avoid blocking during testing
+const isDev = config.nodeEnv === 'development';
 
 const sensitiveDataLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: isDev ? 1000 : 30,
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({
@@ -19,7 +23,7 @@ const sensitiveDataLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max: isDev ? 100 : 10,
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({
@@ -34,7 +38,7 @@ const authLimiter = rateLimit({
 
 const exportLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 5,
+  max: isDev ? 50 : 5,
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({
@@ -49,7 +53,7 @@ const exportLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: isDev ? 2000 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({
