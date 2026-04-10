@@ -1,0 +1,54 @@
+# Example Terraform variables file
+# Copy this to terraform.tfvars and fill in your values
+
+# General
+aws_region  = "ap-southeast-1"
+environment = "production"
+domain_name = "medease.com"  # Replace with your domain
+
+# VPC
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["ap-southeast-1a", "ap-southeast-1b"]
+
+# RDS PostgreSQL
+db_name                     = "medease"
+db_username                 = "medease_user"
+db_password                 = "CHANGE_ME_STRONG_PASSWORD"  # Use AWS Secrets Manager in production
+db_instance_class           = "db.t3.medium"
+db_allocated_storage        = 100
+db_multi_az                 = true
+db_backup_retention_period  = 7
+db_backup_window            = "03:00-04:00"
+db_maintenance_window       = "sun:04:00-sun:05:00"
+
+# ElastiCache Redis
+redis_node_type          = "cache.t3.medium"
+redis_num_cache_nodes    = 2
+redis_parameter_group    = "redis7"
+redis_engine_version     = "7.0"
+redis_automatic_failover = true
+
+# Application Secrets (use AWS Secrets Manager in production)
+jwt_secret         = "CHANGE_ME_RANDOM_64_CHAR_STRING"
+jwt_refresh_secret = "CHANGE_ME_ANOTHER_RANDOM_64_CHAR_STRING"
+virustotal_api_key = ""  # Optional
+
+# ECS Scaling - Backend
+backend_desired_count = 2
+backend_min_capacity  = 2
+backend_max_capacity  = 10
+
+# ECS Scaling - Frontend
+frontend_desired_count = 2
+frontend_min_capacity  = 2
+frontend_max_capacity  = 10
+
+# Notifications
+notification_emails = [
+  "notifications@medease.com"
+]
+
+admin_emails = [
+  "admin@medease.com",
+  "devops@medease.com"
+]
