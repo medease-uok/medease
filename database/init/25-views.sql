@@ -1,7 +1,12 @@
--- Create Database Reporting Views
+-- 1. DROP EXISTING VIEWS (To avoid column name conflicts on replace)
+DROP VIEW IF EXISTS vw_supplier_order_summary;
+DROP VIEW IF EXISTS vw_appointment_summary;
+DROP VIEW IF EXISTS vw_monthly_inventory_usage;
+DROP VIEW IF EXISTS vw_inventory_status;
 
 -- 1. vw_inventory_status
 CREATE OR REPLACE VIEW vw_inventory_status AS
+
 SELECT 
     id,
     item_name,
@@ -62,15 +67,17 @@ SELECT
     s.name AS supplier_name,
     COUNT(p.id) AS total_orders,
     SUM(CASE WHEN p.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_orders,
+    SUM(CASE WHEN p.status = 'APPROVED' THEN 1 ELSE 0 END) AS approved_orders,
+    SUM(CASE WHEN p.status = 'ORDERED' THEN 1 ELSE 0 END) AS ordered_orders,
     SUM(CASE WHEN p.status = 'RECEIVED' THEN 1 ELSE 0 END) AS received_orders,
+    SUM(CASE WHEN p.status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled_orders,
     MAX(p.order_date) AS last_order_date
 FROM suppliers s
-LEFT JOIN purchase_orders p ON s.name = p.supplier_name
+LEFT JOIN purchase_orders p ON s.id = p.supplier_id
 GROUP BY s.id, s.name;
 
--- Standardize permissions for views for the application role
-GRANT SELECT ON vw_inventory_status TO medease_app;
-GRANT SELECT ON vw_monthly_inventory_usage TO medease_app;
-GRANT SELECT ON vw_appointment_summary TO medease_app;
-GRANT SELECT ON vw_supplier_order_summary TO medease_app;
+
+-- Standardize permissions for views are handled separately in init scripts
+-- to avoid runtime permission errors when executed by the application user.
+
 

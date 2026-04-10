@@ -1,6 +1,6 @@
 -- Inventory table: tracking hospital inventory including equipment, supplies, etc.
 CREATE TABLE inventory (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   item_name VARCHAR(255) NOT NULL,
   category VARCHAR(100) NOT NULL, -- e.g., 'Surgical', 'Stationery', 'Medical Equipment', 'Consumables'
   quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
@@ -42,7 +42,7 @@ CREATE POLICY "Allow all for authenticated app users" ON inventory FOR ALL TO me
 
 -- Inventory Transactions table: tracking stock usage and trends
 CREATE TABLE inventory_transactions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   inventory_id UUID REFERENCES inventory(id) ON DELETE RESTRICT,
   transaction_type VARCHAR(50) NOT NULL CHECK (transaction_type IN ('IN', 'OUT', 'ADJUSTMENT')), -- 'IN', 'OUT', 'ADJUSTMENT'
   quantity_changed INTEGER NOT NULL,

@@ -1,94 +1,55 @@
+const fs = require('fs');
+const path = require('path');
 const { query } = require('./database');
 
-const VIEWS_SQL = `
--- 1. vw_inventory_status
-CREATE OR REPLACE VIEW vw_inventory_status AS
-SELECT 
-    id,
-    item_name,
-    category,
-    quantity,
-    reorder_level,
-    unit,
-    CASE 
-        WHEN quantity = 0 THEN 'Out of Stock'
-        WHEN quantity <= reorder_level THEN 'Reorder Recommended'
-        ELSE 'Healthy'
-    END AS stock_status,
-    expiry_date,
-    CASE 
-        WHEN expiry_date IS NULL THEN 'Unknown'
-        WHEN expiry_date < CURRENT_DATE THEN 'Expired'
-        WHEN expiry_date < CURRENT_DATE + INTERVAL '30 days' THEN 'Expiring Soon'
-        ELSE 'Valid'
-    END AS expiry_status
-FROM inventory
-WHERE deleted_at IS NULL;
-
--- 2. vw_monthly_inventory_usage
-CREATE OR REPLACE VIEW vw_monthly_inventory_usage AS
-SELECT 
-    i.id AS inventory_id,
-    i.item_name,
-    i.category,
-    DATE_TRUNC('month', it.created_at) AS usage_month,
-    SUM(it.quantity_changed) AS total_quantity_used
-FROM inventory_transactions it
-JOIN inventory i ON it.inventory_id = i.id
-WHERE it.transaction_type = 'OUT' AND i.deleted_at IS NULL
-GROUP BY i.id, i.item_name, i.category, DATE_TRUNC('month', it.created_at);
-
--- 3. vw_appointment_summary
-CREATE OR REPLACE VIEW vw_appointment_summary AS
-SELECT 
-    a.id AS appointment_id,
-    a.scheduled_at,
-    a.status,
-    p.id AS patient_id,
-    COALESCE(pu.first_name || ' ' || pu.last_name, 'Unknown') AS patient_name,
-    d.id AS doctor_id,
-    COALESCE(du.first_name || ' ' || du.last_name, 'Unknown') AS doctor_name,
-    d.specialization AS specialty,
-    DATE_TRUNC('day', a.scheduled_at) AS appointment_day
-FROM appointments a
-LEFT JOIN patients p ON a.patient_id = p.id
-LEFT JOIN users pu ON p.user_id = pu.id
-LEFT JOIN doctors d ON a.doctor_id = d.id
-LEFT JOIN users du ON d.user_id = du.id;
-
--- 4. vw_supplier_order_summary
-CREATE OR REPLACE VIEW vw_supplier_order_summary AS
-SELECT 
-    s.id AS supplier_id,
-    s.name AS supplier_name,
-    COUNT(p.id) AS total_orders,
-    SUM(CASE WHEN p.status = 'PENDING' THEN 1 ELSE 0 END) AS pending_orders,
-    SUM(CASE WHEN p.status = 'RECEIVED' THEN 1 ELSE 0 END) AS received_orders,
-    MAX(p.order_date) AS last_order_date
-FROM suppliers s
-LEFT JOIN purchase_orders p ON s.name = p.supplier_name
-GROUP BY s.id, s.name;
-
--- Standardize permissions
-GRANT SELECT ON vw_inventory_status TO medease_app;
-GRANT SELECT ON vw_monthly_inventory_usage TO medease_app;
-GRANT SELECT ON vw_appointment_summary TO medease_app;
-GRANT SELECT ON vw_supplier_order_summary TO medease_app;
-`;
-
+/**
+ * Ensures that reporting views are created and permissions are granted.
+ * Reads SQL from the central database/init/25-views.sql file.
+ */
 async function ensureViews() {
   try {
-    console.log('PostgreSQL: Ensuring reporting views exist...');
-    await query(VIEWS_SQL);
-    console.log('PostgreSQL: Reporting views successfully initialized/updated.');
+    const viewsSqlPath = path.join(__dirname, '../../database/init/25-views.sql');
+    
+    if (!fs.existsSync(viewsSqlPath)) {
+      throw new Error(`Views SQL file not found at: ${viewsSqlPath}`);
+    }
+
+    const sqlContent = fs.readFileSync(viewsSqlPath, 'utf8');
+    
+    // Split by semicolon and filter out empty statements
+    const sqlStatements = sqlContent
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    
+    console.log(`PostgreSQL: Ensuring ${sqlStatements.length} reporting view statements (Single Source of Truth)...`);
+    
+    for (const statement of sqlStatements) {
+      await query(statement);
+    }
+    
+    console.log('PostgreSQL: All reporting views successfully initialized/updated.');
   } catch (err) {
-    console.error('PostgreSQL Error: Failed to initialize reporting views -', err.message);
+    console.error('PostgreSQL Critical Error: Failed to initialize reporting views -', err.stack);
+    throw err;
   }
 }
 
+
+
+
 if (require.main === module) {
-  ensureViews().then(() => process.exit(0)).catch(() => process.exit(1));
+  ensureViews()
+    .then(() => {
+      console.log('Standalone view initialization complete.');
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error('Standalone view initialization failed:', err);
+      process.exit(1);
+    });
 }
 
 module.exports = ensureViews;
+
 

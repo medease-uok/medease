@@ -58,30 +58,43 @@ app.use(errorHandler);
 
 const PORT = config.port || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Environment: ${config.nodeEnv}`);
+async function startServer() {
+  try {
+    // 1. Ensure database reporting views are initialized before accepting connections
+    // This resolves MEDEASE-505 race condition
+    await ensureViews();
 
-  // Security: Warn about malware scanning status
-  if (config.nodeEnv === 'production' && !process.env.VIRUSTOTAL_API_KEY) {
-    console.warn('⚠️  WARNING: VirusTotal malware scanning is DISABLED in production.');
-    console.warn('⚠️  Uploaded files will NOT be scanned for malware.');
-    console.warn('⚠️  Set VIRUSTOTAL_API_KEY environment variable to enable scanning.');
-    console.warn('⚠️  See backend/FILE_VALIDATION.md for HIPAA compliance considerations.');
-  } else if (process.env.VIRUSTOTAL_API_KEY) {
-    console.log('✓ VirusTotal malware scanning: ENABLED');
-    if (config.nodeEnv === 'production') {
-      console.warn('⚠️  HIPAA WARNING: VirusTotal uploads files to cloud service.');
-      console.warn('⚠️  Ensure compliance with PHI data handling requirements.');
-      console.warn('⚠️  See backend/FILE_VALIDATION.md for details.');
-    }
-  } else {
-    console.log('VirusTotal malware scanning: disabled (development)');
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+      console.log(`Environment: ${config.nodeEnv}`);
+
+      // Security: Warn about malware scanning status
+      if (config.nodeEnv === 'production' && !process.env.VIRUSTOTAL_API_KEY) {
+        console.warn('⚠️  WARNING: VirusTotal malware scanning is DISABLED in production.');
+        console.warn('⚠️  Uploaded files will NOT be scanned for malware.');
+        console.warn('⚠️  Set VIRUSTOTAL_API_KEY environment variable to enable scanning.');
+        console.warn('⚠️  See backend/FILE_VALIDATION.md for HIPAA compliance considerations.');
+      } else if (process.env.VIRUSTOTAL_API_KEY) {
+        console.log('✓ VirusTotal malware scanning: ENABLED');
+        if (config.nodeEnv === 'production') {
+          console.warn('⚠️  HIPAA WARNING: VirusTotal uploads files to cloud service.');
+          console.warn('⚠️  Ensure compliance with PHI data handling requirements.');
+          console.warn('⚠️  See backend/FILE_VALIDATION.md for details.');
+        }
+      } else {
+        console.log('VirusTotal malware scanning: disabled (development)');
+      }
+
+      startReminderScheduler();
+      startInventoryScheduler();
+    });
+  } catch (err) {
+    console.error('CRITICAL: Failed to start server due to view initialization failure:', err);
+    process.exit(1);
   }
+}
 
-  startReminderScheduler();
-  startInventoryScheduler();
-  ensureViews().catch(err => console.error('Startup Warning: View initialization failed', err.message));
-});
+startServer();
+
 
 module.exports = app;
