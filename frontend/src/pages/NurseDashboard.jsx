@@ -518,8 +518,16 @@ export default function NurseDashboard() {
 
         setDashData(statsRes.data);
         setProfileData(profileRes.data);
-        fetchAssignedPatients();
 
+        // Fetch patients
+        try {
+          const patientsRes = await api.get('/patients');
+          setAssignedPatients(patientsRes.data || []);
+        } catch (err) {
+          console.error('Error loading assigned patients:', err);
+        }
+
+        // Update profile image if available
         if (profileRes.data.profileImageUrl) {
           updateUser({ profileImageUrl: profileRes.data.profileImageUrl });
         }
@@ -532,7 +540,8 @@ export default function NurseDashboard() {
     };
 
     fetchData();
-  }, [updateUser, fetchAssignedPatients]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   if (error) {
     return (
